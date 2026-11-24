@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>古典油画静物（桃子与高脚杯）</title>
+<style>
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: #080504;
+    overflow: hidden;
+  }
+  body {
+    display: grid;
+    place-items: center;
+  }
+  canvas {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100vw;
+    max-height: 100vh;
+  }
+  a.home-link {
+    position: fixed;
+    top: 16px;
+    left: 18px;
+    z-index: 20;
+    padding: 6px 13px;
+    border-radius: 6px;
+    background: rgba(24, 19, 15, 0.84);
+    border: 1px solid rgba(196, 164, 108, 0.42);
+    color: #efe4cf;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+    font-size: 13px;
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(4px);
+    transition: background 0.16s ease, border-color 0.16s ease;
+  }
+  a.home-link:hover {
+    background: rgba(44, 34, 25, 0.94);
+    border-color: rgba(226, 193, 134, 0.72);
+  }
+</style>
+</head>
+<body>
+<a class="home-link" href="./index.html">← 回画廊首页</a>
+<canvas id="painting" width="1000" height="1200"></canvas>
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------------------
+  // A small oil-brush engine.  Every mark is a sequence of feathered,
+  // low-impasto dabs; no gradients, filters, patterns or post-processing.
+  // ---------------------------------------------------------------------------
+  const W = 1000, H = 1200, TAU = Math.PI * 2;
+  const canvas = document.getElementById('painting');
+  let ctx = canvas.getContext('2d', { alpha: false });
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  let seed = 0x51ed270b;
+  function mulberry32(a) {
+    return function () {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  let rng = mulberry32(seed);
+  function rand(a = 0, b = 1) { return a + rng() * (b - a); }
+  function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+  function pick(a) { return a[Math.floor(rng() * a.length)]; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+
+  function mix(c1, c2, t) {
+    return [
+      lerp(c1[0], c2[0], t),
+      lerp(c1[1], c2[1], t),
+      lerp(c1[2], c2[2], t)
+    ];
+  }
+  function ramp(stops, t) {
+    const n = stops.length - 1;
+    const f = clamp(t, 0, 1) * n;
+    const i = Math.min(n - 1, Math.floor(f));
+    return mix(stops[i], stops[i + 1], f - i);
+  }
+  function jitter(c, amt, warm = 0) {
+    return [
+      clamp(c[0] + rand(-amt, amt) + warm * rand(-0.5, 1.2), 0, 255),
+      clamp(c[1] + rand(-amt, amt) + warm * rand(-0.4, 0.6), 0, 255),
+      clamp(c[2] + rand(-amt, amt) + warm * rand(-1.0, 0.1), 0, 255)
+    ];
+  }
+  function rgb(c) {
+    return 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')';
+  }
+
+  // Three nested elliptical marks make a soft, feathered brush edge.
+  const DAB_LAYERS = [[1, 0.58], [1.25, 0.26], [1.53, 0.095]];
+  function softDab(x, y, r, angle, stretch, c, a) {
+    if (a <= 0.002 || r <= 0.25) return;
+    if (!c || !isFinite(c[0]) || !isFinite(c[1]) || !isFinite(c[2]) || !isFinite(x) || !isFinite(y) || !isFinite(r) || !isFinite(a)) return;
+    ctx.fillStyle = rgb(c);
+    for (let i = 0; i < DAB_LAYERS.length; i++) {
+      const L = DAB_LAYERS[i];
+      ctx.globalAlpha = Math.min(1, a * L[1]);
+      ctx.beginPath();
+      ctx.ellipse(x, y, Math.max(0.25, r * L[0]), Math.max(0.15, r * L[0] * stretch), angle, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // A stroke is sampled along an arbitrary parametric path.  The head and tail
+  // taper in width and opacity so no stroke ends in a blunt hard edge.
+  function paintPath(sampler, o) {
+    const n = o.n || 24;
+    const fade = o.fade == null ? 0.15 : o.fade;
+    const alpha0 = o.a == null ? 0.2 : o.a;
+    const w = o.w || 20;
+    const stretch = o.stretch == null ? 0.52 : o.stretch;
+    const posJ = o.posJ == null ? 0.9 : o.posJ;
+    const aj = o.aj == null ? 0.055 : o.aj;
+    const vary = o.vary == null ? 4 : o.vary;
+    for (let i = 0; i < n; i++) {
+      let u = (i + 0.5 + rand(-0.28, 0.28)) / n;
+      u = clamp(u, 0.002, 0.998);
+      const p = sampler(u);
+      if (!p) continue;
+      const edge = Math.min(1, u / fade, (1 - u) / fade);
+      const prof = 0.40 + 0.60 * smooth(clamp(edge, 0, 1));
+      const angle = p.a + (o.angOff || 0) + rand(-aj, aj);
+      const nx = Math.cos(angle + Math.PI / 2);
+      const ny = Math.sin(angle + Math.PI / 2);
+      const off = rand(-posJ, posJ);
+      const x = p.x + nx * off + rand(-0.6, 0.6);
+      const y = p.y + ny * off + rand(-0.6, 0.6);
+      let col = o.col ? o.col(x, y, u) : mix(o.c1, o.c2 == null ? o.c1 : o.c2, u);
+      col = jitter(col, vary, o.temp || 0);
+      const sj = o.sj == null ? 0.13 : o.sj;
+      const r = Math.max(0.45, w * 0.5 * prof * (1 + rand(-sj, sj)));
+      softDab(x, y, r, angle, stretch, col, alpha0 * prof);
+      if (o.bristle && r > 4 && rng() < o.bristle) {
+        const bo = rand(-r * 0.7, r * 0.7);
+        const bc = jitter(mix(col, o.bristleCol || [222, 208, 180], 0.18), 5, 0);
+        softDab(x + nx * bo, y + ny * bo, r * 0.44, angle + rand(-0.09, 0.09), stretch * 0.8, bc, alpha0 * 0.30);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function lineS(x1, y1, x2, y2, wob = 0, phase = 0, freq = 2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.max(0.001, Math.hypot(dx, dy));
+    const nx = -dy / len, ny = dx / len;
+    const base = Math.atan2(dy, dx);
+    return t => {
+      const w = Math.sin(t * Math.PI * freq + phase) * wob;
+      const dw = Math.cos(t * Math.PI * freq + phase) * wob * Math.PI * freq;
+      return {
+        x: x1 + dx * t + nx * w,
+        y: y1 + dy * t + ny * w,
+        a: base + Math.atan2(dw, len)
+      };
+    };
+  }
+
+  function quadS(x0, y0, x1, y1, x2, y2) {
+    return t => {
+      const mt = 1 - t;
+      const x = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+      const y = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
+      const dx = 2 * mt * (x1 - x0) + 2 * t * (x2 - x1);
+      const dy = 2 * mt * (y1 - y0) + 2 * t * (y2 - y1);
+      return { x, y, a: Math.atan2(dy, dx) };
+    };
+  }
+
+  function arcS(cx, cy, rx, ry, a0, a1) {
+    return t => {
+      const a = a0 + (a1 - a0) * t;
+      return {
+        x: cx + Math.cos(a) * rx,
+        y: cy + Math.sin(a) * ry,
+        a: Math.atan2(Math.cos(a) * ry, -Math.sin(a) * rx)
+      };
+    };
+  }
+
+  function offsetS(s, dx, dy, da = 0) {
+    return t => {
+      const p = s(t);
+      return { x: p.x + dx, y: p.y + dy, a: p.a + da };
+    };
+  }
+
+  function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1];
+      const xj = poly[j][0], yj = poly[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  function randomPointInPoly(poly) {
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    for (const p of poly) {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    }
+    for (let i = 0; i < 200; i++) {
+      const x = rand(minX, maxX), y = rand(minY, maxY);
+      if (pointInPoly(x, y, poly)) return [x, y];
+    }
+    return [(minX + maxX) / 2, (minY + maxY) / 2];
+  }
+
+  function segmentDist(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    let t = l2 > 0.0001 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+  }
+  function tracePoly(poly) {
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
+    ctx.closePath();
+  }
+  function clipPoly(poly) {
+    ctx.save();
+    tracePoly(poly);
+    ctx.clip();
+  }
+
+  function polyEdgeDist(x, y, poly) {
+    let d = 1e9;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      d = Math.min(d, segmentDist(x, y, poly[j][0], poly[j][1], poly[i][0], poly[i][1]));
+    }
+    return d;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Palette: muted earths, low saturation, warm key / cool-shadow bias.
+  // ---------------------------------------------------------------------------
+  const GROUNDS = [[105, 90, 70], [92, 78, 59], [119, 102, 79], [84, 72, 56], [111, 94, 72]];
+
+  const GRIS_BG = [[12, 10, 8], [23, 19, 15], [38, 32, 25], [56, 47, 37], [77, 65, 50]];
+  const GRIS_TABLE = [[24, 19, 15], [40, 32, 25], [60, 49, 38], [84, 70, 54], [110, 93, 72]];
+  const GRIS_CLOTH = [[34, 30, 26], [52, 46, 38], [76, 67, 54], [104, 92, 76], [132, 119, 100], [160, 146, 123]];
+  const GRIS_PEACH = [[28, 24, 21], [46, 40, 33], [72, 64, 53], [105, 95, 79], [145, 133, 112], [186, 173, 149]];
+  const GRIS_COPPER = [[24, 20, 16], [39, 33, 26], [61, 51, 39], [88, 75, 57], [120, 104, 81], [158, 141, 113], [201, 186, 157]];
+
+  const COL_BG = [[13, 9, 7], [21, 15, 11], [31, 22, 16], [44, 31, 21], [58, 41, 27], [72, 51, 33]];
+  const COL_TABLE = [[22, 15, 10], [37, 25, 16], [57, 38, 23], [81, 55, 32], [106, 73, 43], [130, 93, 55]];
+  const COL_CLOTH = [[52, 42, 30], [80, 65, 46], [112, 93, 67], [142, 119, 89], [168, 144, 111], [188, 164, 130], [202, 180, 148]];
+  const COL_PEACH = [
+    [52, 23, 19], [78, 32, 24], [112, 46, 32], [150, 66, 42],
+    [186, 94, 54], [212, 128, 74], [228, 160, 100], [238, 188, 130]
+  ];
+  const COL_COPPER = [
+    [44, 27, 18], [66, 40, 25], [96, 56, 32], [132, 73, 40],
+    [168, 92, 48], [198, 116, 59], [220, 143, 79], [235, 173, 106], [243, 198, 141]
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Composition geometry
+  // ---------------------------------------------------------------------------
+  const peachBack = { cx: 314, cy: 899, rx: 69, ry: 66 };
+  const peachMain = { cx: 420, cy: 840, rx: 99, ry: 95 };
+  const peachFront = { cx: 552, cy: 930, rx: 82, ry: 78 };
+  const PEACHES = [peachBack, peachMain, peachFront];
+
+  const GOB = {
+    cx: 728,
+    rimY: 580,
+    rimRX: 98,
+    rimRY: 25,
+    bowlBottom: 780,
+    stemBottom: 862,
+    baseY: 906,
+    baseRX: 86,
+    baseRY: 18
+  };
+  function gobletHW(y) {
+    const t = clamp((y - GOB.rimY) / (GOB.bowlBottom - GOB.rimY), 0, 1);
+    return 14 + 84 * Math.sqrt(Math.max(0, 1 - t * t));
+  }
+
+  const CLOTH = [
+    [0, 790], [70, 778], [140, 790], [210, 770], [285, 790], [360, 775],
+    [435, 792], [510, 772], [585, 788], [655, 775], [720, 792], [780, 820],
+    [815, 860], [825, 910], [818, 960], [802, 1010], [780, 1050], [750, 1085],
+    [710, 1115], [660, 1140], [600, 1155], [540, 1148], [480, 1158],
+    [420, 1145], [360, 1158], [300, 1146], [240, 1158], [180, 1146],
+    [120, 1155], [60, 1142], [0, 1152]
+  ];
+
+
+  function insetPoly(poly, amount) {
+    let cx = 0, cy = 0;
+    for (const p of poly) { cx += p[0]; cy += p[1]; }
+    cx /= poly.length; cy /= poly.length;
+    return poly.map(p => {
+      const dx = p[0] - cx, dy = p[1] - cy;
+      const len = Math.max(0.001, Math.hypot(dx, dy));
+      return [p[0] - (dx / len) * amount, p[1] - (dy / len) * amount];
+    });
+  }
+  const CLOTH_INNER = insetPoly(CLOTH, 26);
+
+  const FOLDS = [
+    { pts: [[40, 820], [150, 940], [250, 1100]], w: 130 },
+    { pts: [[250, 790], [340, 920], [420, 1090]], w: 105 },
+    { pts: [[430, 790], [510, 930], [580, 1090]], w: 120 },
+    { pts: [[620, 810], [710, 920], [740, 1040]], w: 95 },
+    { pts: [[40, 1040], [230, 1080], [430, 1096]], w: 75 },
+    { pts: [[460, 1090], [620, 1050], [780, 1000]], w: 65 },
+    { pts: [[300, 900], [390, 970], [500, 1030]], w: 70 },
+    { pts: [[560, 860], [640, 920], [690, 1015]], w: 62 }
+  ];
+
+
+  // ---------------------------------------------------------------------------
+  // Shading fields
+  // ---------------------------------------------------------------------------
+  function bgLit(x, y) {
+    const g = Math.exp(-(Math.pow((x - 220) / 520, 2) + Math.pow((y - 230) / 600, 2)));
+    let v = 0.025 + 0.225 * g - 0.025 * (y / H);
+    v *= 1 - 0.28 * clamp((x - 560) / 440, 0, 1);
+    return clamp(v, 0, 1);
+  }
+  function bgCol(x, y, mode) {
+    return ramp(mode === 'gris' ? GRIS_BG : COL_BG, bgLit(x, y));
+  }
+
+  function tableLit(x, y) {
+    let v = 0.88 - 0.00036 * x - 0.00028 * (y - 760);
+    v += 0.040 * Math.sin(x * 0.010 + y * 0.008 + 1.1);
+    v *= 1 - 0.14 * clamp((y - 1080) / 120, 0, 1);
+    return clamp(v, 0.10, 1);
+  }
+  function tableCol(x, y, mode) {
+    return ramp(mode === 'gris' ? GRIS_TABLE : COL_TABLE, tableLit(x, y));
+  }
+
+  function clothLit(x, y) {
+    let v = 0.69 - 0.00045 * x - 0.00010 * (y - 760);
+    v += 0.028 * Math.sin(x * 0.014 + y * 0.011 + 0.4);
+    v += 0.014 * Math.sin(x * 0.031 - y * 0.017 + 2.1);
+    v -= 0.12 * clamp((x - 640) / 220, 0, 1);
+    // The edge loses light and melts gently into the surrounding darks.
+    const edge = polyEdgeDist(x, y, CLOTH);
+    v -= 0.10 * (1 - smooth(clamp(edge / 34, 0, 1)));
+    return clamp(v, 0.05, 1);
+  }
+  function clothCol(x, y, mode, delta = 0) {
+    return ramp(mode === 'gris' ? GRIS_CLOTH : COL_CLOTH, clamp(clothLit(x, y) + delta, 0, 1));
+  }
+
+  function peachLit(x, y, p) {
+    const nx = (x - p.cx) / p.rx;
+    const ny = (y - p.cy) / p.ry;
+    let v = 0.50 - 0.57 * nx - 0.48 * ny;
+    v -= 0.10 * clamp((ny - 0.35) / 0.65, 0, 1);
+    v += 0.055 * clamp((nx - 0.55) / 0.45, 0, 1) * clamp((ny - 0.05) / 0.5, 0, 1);
+    return clamp(v, 0, 1);
+  }
+  function peachCol(x, y, p, mode) {
+    const nx = (x - p.cx) / p.rx;
+    const ny = (y - p.cy) / p.ry;
+    const v = peachLit(x, y, p);
+    if (mode === 'gris') return ramp(GRIS_PEACH, v);
+    let c = ramp(COL_PEACH, v);
+    const blush = clamp(0.18 + 0.75 * nx + 0.42 * ny, 0, 1);
+    c = mix(c, [108, 47, 40], 0.14 * blush);
+    const top = clamp(-ny * 0.9 - 0.1, 0, 1);
+    c = mix(c, [160, 116, 72], 0.09 * top);
+    if (nx > 0.52 && ny > 0.10) c = mix(c, [139, 82, 56], 0.14);
+    return c;
+  }
+
+  function gobletLit(x, y) {
+    const hw = gobletHW(y);
+    const u = (x - GOB.cx) / Math.max(1, hw);
+    const t = clamp((y - GOB.rimY) / (GOB.bowlBottom - GOB.rimY), 0, 1);
+    let v = 0.55 - 0.34 * u - 0.12 * t + 0.06;
+    v += 0.44 * Math.exp(-Math.pow((u + 0.40) / 0.19, 2));
+    v += 0.17 * Math.exp(-Math.pow((u - 0.92) / 0.17, 2)) * (1 - t * 0.4);
+    return clamp(v, 0, 1);
+  }
+  function gobletCol(x, y, mode) {
+    const t = clamp((y - GOB.rimY) / (GOB.bowlBottom - GOB.rimY), 0, 1);
+    const hw = gobletHW(y);
+    const u = (x - GOB.cx) / Math.max(1, hw);
+    if (mode === 'gris') return ramp(GRIS_COPPER, gobletLit(x, y));
+    let c = ramp(COL_COPPER, gobletLit(x, y) * 0.84);
+    const patina = clamp(0.2 + 0.45 * u + 0.3 * t, 0, 1);
+    c = mix(c, [74, 78, 58], 0.055 * patina);
+    if (u > 0.62) c = mix(c, [88, 68, 46], 0.12);
+    if (u > 0.88) c = mix(c, [120, 89, 59], 0.10);
+    return c;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared painting helpers
+  // ---------------------------------------------------------------------------
+  function paintBackground(mode, density = 1) {
+    // A deep, even field of warm black, laid in broad and quiet.
+    for (let i = 0; i < Math.round(30 * density); i++) {
+      const y = rand(-120, 790);
+      const x = rand(-260, 1260);
+      const c = mode === 'gris' ? [31, 26, 21] : [27, 19, 14];
+      paintPath(lineS(x - 260, y + rand(-30, 30), x + 300, y + rand(-34, 34),
+        rand(3, 12), rand(0, 6), rand(1.1, 2.1)), {
+        n: randInt(18, 30), w: rand(240, 400), a: 0.38,
+        stretch: 0.66, fade: 0.26, posJ: 3, vary: 2,
+        c1: c, c2: jitter(c, 4, 0)
+      });
+    }
+    // A subtle lift from the key in the upper left.
+    for (let i = 0; i < 9; i++) {
+      const x = rand(0, 430), y = rand(0, 360);
+      const c = mode === 'gris' ? [59, 50, 38] : [63, 46, 30];
+      paintPath(lineS(x - 140, y - 60, x + 140, y + 60, 8, rand(0, 6), 2), {
+        n: randInt(12, 20), w: rand(180, 280), a: 0.07,
+        stretch: 0.66, fade: 0.32, posJ: 3, vary: 2,
+        c1: c, c2: jitter(c, 4, 0)
+      });
+    }
+    // The right side and top corners go down into the dark.
+    for (let i = 0; i < 12; i++) {
+      const x = rand(550, 1120), y = rand(-100, 740);
+      const c = [14, 10, 8];
+      paintPath(lineS(x, y, x + rand(-100, 30), y + rand(180, 380),
+        rand(3, 12), rand(0, 6), 2), {
+        n: randInt(14, 24), w: rand(180, 330), a: 0.20,
+        stretch: 0.64, fade: 0.28, vary: 2,
+        c1: c, c2: jitter(c, 3, 0)
+      });
+    }
+  }
+
+  function paintTable(mode, density = 1) {
+    // Broad horizontal drags of dark wood.
+    for (let i = 0; i < Math.round(38 * density); i++) {
+      const y = rand(756, 1210);
+      paintPath(lineS(rand(-100, 60), y + rand(-16, 16), rand(940, 1140), y + rand(-24, 24),
+        rand(2, 9), rand(0, 6), rand(1.2, 2.4)), {
+        n: randInt(24, 44), w: rand(38, 76), a: mode === 'gris' ? 0.26 : 0.32,
+        stretch: 0.46, fade: 0.18, posJ: 2, vary: 2,
+        col: (px, py) => tableCol(px, py, mode)
+      });
+    }
+    // Long grain, dry and slightly darker.
+    for (let i = 0; i < Math.round(26 * density); i++) {
+      const y = rand(772, 1190);
+      const c = mix(tableCol(rand(120, 900), y, mode), [28, 18, 11], rand(0.25, 0.55));
+      paintPath(lineS(rand(-80, 80), y, rand(900, 1090), y + rand(-18, 18),
+        rand(1, 5), rand(0, 6), rand(1.4, 2.7)), {
+        n: randInt(30, 56), w: rand(2.8, 8), a: 0.17, stretch: 0.4, fade: 0.22, vary: 3,
+        c1: c, c2: jitter(c, 5, 1)
+      });
+    }
+    // A few lit ribbons of grain.
+    for (let i = 0; i < 8; i++) {
+      const y = rand(800, 1080);
+      paintPath(lineS(rand(-40, 250), y, rand(520, 940), y + rand(-22, 12),
+        rand(2, 7), rand(0, 6), rand(1.4, 2.5)), {
+        n: randInt(22, 38), w: rand(2.5, 6), a: 0.13, stretch: 0.42, fade: 0.26, vary: 3,
+        c1: [134, 97, 58], c2: [87, 60, 35]
+      });
+    }
+    // Wood grain visible to the right of the cloth.
+    for (let i = 0; i < 12; i++) {
+      const y = rand(790, 1100);
+      paintPath(lineS(rand(760, 840), y, rand(970, 1040), y + rand(-16, 16),
+        rand(1, 4), rand(0, 6), 2), {
+        n: randInt(16, 28), w: rand(2.2, 5), a: 0.11, stretch: 0.42, fade: 0.26, vary: 3,
+        c1: [137, 99, 59], c2: [74, 51, 31]
+      });
+    }
+    // The beveled front edge.
+    paintPath(lineS(-20, 1106, 1020, 1130, 4, 0.5, 2.2), {
+      n: 58, w: 17, a: 0.30, stretch: 0.42, fade: 0.2, vary: 3,
+      c1: [119, 83, 49], c2: [51, 34, 21]
+    });
+    paintPath(lineS(-20, 1122, 1020, 1146, 3, 2.0, 2), {
+      n: 55, w: 16, a: 0.32, stretch: 0.4, fade: 0.18, vary: 3,
+      c1: [43, 29, 18], c2: [18, 12, 9]
+    });
+    paintPath(lineS(-20, 1152, 1020, 1178, 4, 1.2, 1.7), {
+      n: 50, w: 40, a: 0.30, stretch: 0.5, fade: 0.2, vary: 3,
+      c1: [25, 18, 12], c2: [11, 8, 6]
+    });
+  }
+
+  function paintClothBase(mode, density = 1) {
+    clipPoly(CLOTH);
+    // A coarse lattice of broad, opaque linen marks gives a solid cloth body.
+    for (let gy = 772; gy < 1112; gy += 32) {
+      for (let gx = -24; gx < 848; gx += 44) {
+        const x = gx + rand(-16, 16);
+        const y = gy + rand(-13, 13);
+        if (!pointInPoly(x, y, CLOTH_INNER)) continue;
+        const ang = 0.70 + 0.28 * Math.sin(x * 0.008 + y * 0.006) + rand(-0.30, 0.30);
+        const len = rand(44, 96);
+        paintPath(lineS(x - Math.cos(ang) * len * 0.5, y - Math.sin(ang) * len * 0.5,
+          x + Math.cos(ang) * len * 0.5, y + Math.sin(ang) * len * 0.5,
+          rand(2, 7), rand(0, 6), 2), {
+          n: randInt(4, 7), w: rand(64, 104), a: mode === 'gris' ? 0.26 : 0.32,
+          stretch: 0.54, fade: 0.3, posJ: 2, vary: 3,
+          col: (px, py) => clothCol(px, py, mode)
+        });
+      }
+    }
+    // Longer drawing strokes, following the fall of the cloth.
+    for (let i = 0; i < Math.round(46 * density); i++) {
+      const p = randomPointInPoly(CLOTH_INNER);
+      const ang = 0.72 + rand(-0.45, 0.45);
+      const len = rand(90, 230);
+      const x0 = p[0] - Math.cos(ang) * len * 0.5;
+      const y0 = p[1] - Math.sin(ang) * len * 0.5;
+      const x1 = p[0] + rand(-25, 25);
+      const y1 = p[1] + rand(-20, 20);
+      const x2 = x0 + Math.cos(ang) * len;
+      const y2 = y0 + Math.sin(ang) * len;
+      paintPath(quadS(x0, y0, x1, y1, x2, y2), {
+        n: randInt(14, 24), w: rand(34, 62), a: mode === 'gris' ? 0.20 : 0.25,
+        stretch: 0.52, fade: 0.2, posJ: 2, vary: 3,
+        col: (px, py) => clothCol(px, py, mode)
+      });
+    }
+    ctx.restore();
+  }
+
+  function paintFold(f, mode) {
+    const q = quadS(f.pts[0][0], f.pts[0][1], f.pts[1][0], f.pts[1][1], f.pts[2][0], f.pts[2][1]);
+    // Broad side falling away from the key.
+    paintPath(offsetS(q, 8, 10), {
+      n: 22, w: f.w * 0.66, a: mode === 'gris' ? 0.16 : 0.20,
+      stretch: 0.55, fade: 0.24, posJ: 2.6, vary: 4,
+      col: (px, py) => clothCol(px, py, mode, -0.30)
+    });
+    // The rounded crest catching warm light.
+    paintPath(offsetS(q, -7, -8), {
+      n: 18, w: f.w * 0.34, a: mode === 'gris' ? 0.13 : 0.17,
+      stretch: 0.5, fade: 0.26, posJ: 2, vary: 4,
+      col: (px, py) => clothCol(px, py, mode, 0.18)
+    });
+    // A soft crease, wider and lower in contrast than a drawn line.
+    paintPath(offsetS(q, 1.5, 3), {
+      n: 24, w: Math.max(4.5, f.w * 0.095), a: mode === 'gris' ? 0.15 : 0.19,
+      stretch: 0.45, fade: 0.26, posJ: 1.4, vary: 4,
+      col: (px, py) => clothCol(px, py, mode, -0.30)
+    });
+  }
+
+  function paintClothEdgeBand(mode) {
+    // Short tangent marks bridge the inset body out to the soft silhouette.
+    for (let i = 0, j = CLOTH.length - 1; i < CLOTH.length; j = i++) {
+      const x1 = CLOTH[j][0], y1 = CLOTH[j][1];
+      const x2 = CLOTH[i][0], y2 = CLOTH[i][1];
+      const len = Math.max(0.001, Math.hypot(x2 - x1, y2 - y1));
+      const tx = (x2 - x1) / len, ty = (y2 - y1) / len;
+      const steps = Math.max(2, Math.round(len / 20));
+      for (let k = 0; k < steps; k++) {
+        const t = (k + rand(0.15, 0.85)) / steps;
+        const x = lerp(x1, x2, t) + rand(-1.5, 1.5);
+        const y = lerp(y1, y2, t) + rand(-1.5, 1.5);
+        const sl = rand(20, 40);
+        paintPath(lineS(x - tx * sl * 0.5, y - ty * sl * 0.5,
+          x + tx * sl * 0.5, y + ty * sl * 0.5,
+          rand(0.8, 3), rand(0, 6), 2), {
+          n: 5, w: rand(28, 44), a: mode === 'gris' ? 0.10 : 0.13,
+          stretch: 0.54, fade: 0.34, posJ: 1.5, vary: 3,
+          col: (px, py) => mix(clothCol(px, py, mode, -0.04), mode === 'gris' ? [45, 39, 32] : [55, 43, 31], 0.18)
+        });
+      }
+    }
+  }
+
+  function softenClothEdge(mode) {
+    // A brush-dragged transition, never a clipped outline.
+    for (let i = 0, j = CLOTH.length - 1; i < CLOTH.length; j = i++) {
+      const x1 = CLOTH[j][0], y1 = CLOTH[j][1];
+      const x2 = CLOTH[i][0], y2 = CLOTH[i][1];
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.max(0.001, Math.hypot(dx, dy));
+      const nx = dy / len, ny = -dx / len; // outward for this winding
+      const steps = Math.max(2, Math.round(len / 11));
+      for (let k = 0; k < steps; k++) {
+        const t = (k + rand(0.2, 0.8)) / steps;
+        const x = lerp(x1, x2, t), y = lerp(y1, y2, t);
+        const outside = y < 765 ? bgCol(x, y, mode) : tableCol(x, y, mode);
+        // outside: drag the surrounding tone over the raw edge
+        paintPath(lineS(x + nx * 1, y + ny * 1, x + nx * rand(8, 16), y + ny * rand(8, 16), rand(1, 4), rand(0, 6), 2), {
+          n: 4, w: rand(16, 30), a: mode === 'gris' ? 0.10 : 0.13,
+          stretch: 0.55, fade: 0.35, vary: 3,
+          col: (px, py) => mix(outside, mode === 'gris' ? [42, 37, 31] : [55, 44, 34], 0.18)
+        });
+        // inside: a quiet rim of linen colour, a little darker than the body
+        paintPath(lineS(x - nx * 2, y - ny * 2, x - nx * rand(5, 12), y - ny * rand(5, 12), rand(1, 3), rand(0, 6), 2), {
+          n: 4, w: rand(12, 24), a: mode === 'gris' ? 0.09 : 0.12,
+          stretch: 0.52, fade: 0.36, vary: 3,
+          col: (px, py) => clothCol(px, py, mode, -0.06)
+        });
+      }
+    }
+  }
+
+  function clothRidge(points, w, mode) {
+    const q = quadS(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1]);
+    paintPath(offsetS(q, 12, 14), {
+      n: 26, w: w * 0.68, a: mode === 'gris' ? 0.11 : 0.14,
+      stretch: 0.55, fade: 0.24, posJ: 2.6, vary: 3,
+      col: (px, py) => clothCol(px, py, mode, -0.32)
+    });
+    paintPath(offsetS(q, -9, -10), {
+      n: 22, w: w * 0.34, a: mode === 'gris' ? 0.11 : 0.14,
+      stretch: 0.5, fade: 0.26, posJ: 2, vary: 3,
+      col: (px, py) => clothCol(px, py, mode, 0.18)
+    });
+    paintPath(offsetS(q, 2, 3), {
+      n: 28, w: Math.max(4, w * 0.075), a: mode === 'gris' ? 0.12 : 0.14,
+      stretch: 0.45, fade: 0.28, posJ: 1.6, vary: 3,
+      col: (px, py) => clothCol(px, py, mode, -0.40)
+    });
+  }
+
+  function paintClothStructure(mode) {
+    clipPoly(CLOTH);
+    // Three large rolling folds, then the dark hollow that the fruit sits in.
+    clothRidge([[55, 835], [160, 960], [250, 1108]], 120, mode);
+    clothRidge([[430, 805], [505, 930], [580, 1100]], 112, mode);
+    clothRidge([[620, 820], [720, 930], [748, 1060]], 92, mode);
+    for (let i = 0; i < 22; i++) {
+      const x = rand(250, 690), y = rand(880, 1105);
+      const ang = rand(0.2, 1.15);
+      paintPath(lineS(x - Math.cos(ang) * rand(35, 90), y - Math.sin(ang) * rand(35, 90),
+        x + Math.cos(ang) * rand(35, 90), y + Math.sin(ang) * rand(35, 90),
+        rand(2, 8), rand(0, 6), 2), {
+        n: randInt(12, 20), w: rand(24, 46), a: mode === 'gris' ? 0.06 : 0.08,
+        stretch: 0.52, fade: 0.3, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, -0.18)
+      });
+    }
+    ctx.restore();
+  }
+
+  function paintClothHem(mode) {
+    // One long, smooth rolled hem; no per-segment sawteeth.
+    const q = quadS(-10, 1150, 330, 1162, 700, 1102);
+    paintPath(offsetS(q, 0, 9), {
+      n: 54, w: 22, a: 0.18, stretch: 0.5, fade: 0.18, vary: 3,
+      c1: [38, 27, 18], c2: [24, 17, 12]
+    });
+    paintPath(offsetS(q, -2, -3), {
+      n: 46, w: 12, a: 0.13, stretch: 0.45, fade: 0.22, vary: 3,
+      col: (px, py) => clothCol(px, py, mode, 0.16)
+    });
+    paintPath(offsetS(q, 1, 2), {
+      n: 50, w: 6, a: 0.18, stretch: 0.42, fade: 0.2, vary: 3,
+      col: (px, py) => clothCol(px, py, mode, -0.38)
+    });
+  }
+
+  function featherClothEdge(mode) {
+    // Just enough softness to keep the clipped silhouette from looking cut.
+    for (let i = 0, j = CLOTH.length - 1; i < CLOTH.length; j = i++) {
+      const x1 = CLOTH[j][0], y1 = CLOTH[j][1];
+      const x2 = CLOTH[i][0], y2 = CLOTH[i][1];
+      const len = Math.max(0.001, Math.hypot(x2 - x1, y2 - y1));
+      const tx = (x2 - x1) / len, ty = (y2 - y1) / len;
+      const steps = Math.max(2, Math.round(len / 26));
+      for (let k = 0; k < steps; k++) {
+        const t = (k + rand(0.2, 0.8)) / steps;
+        const x = lerp(x1, x2, t), y = lerp(y1, y2, t);
+        const outside = y < 770 ? bgCol(x, y, mode) : tableCol(x, y, mode);
+        paintPath(lineS(x - tx * 16, y - ty * 16, x + tx * 16, y + ty * 16, 1, rand(0, 6), 2), {
+          n: 6, w: rand(14, 24), a: 0.07, stretch: 0.5, fade: 0.34, vary: 2,
+          col: (px, py) => mix(clothCol(px, py, mode), outside, 0.55)
+        });
+      }
+    }
+  }
+
+  function paintClothCreases(mode) {
+    clipPoly(CLOTH);
+    const creases = [
+      [[280, 900], [380, 940], [490, 990]],
+      [[470, 880], [530, 950], [600, 1020]],
+      [[100, 850], [155, 960], [210, 1080]],
+      [[560, 830], [625, 910], [675, 1000]],
+      [[210, 1040], [420, 1080], [630, 1040]],
+      [[700, 860], [760, 950], [745, 1030]]
+    ];
+    for (const pts of creases) {
+      const q = quadS(pts[0][0], pts[0][1], pts[1][0], pts[1][1], pts[2][0], pts[2][1]);
+      paintPath(offsetS(q, 6, 8), {
+        n: 24, w: rand(28, 46), a: 0.30, stretch: 0.55, fade: 0.18, posJ: 1.2, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, -0.42)
+      });
+      paintPath(offsetS(q, -5, -6), {
+        n: 20, w: rand(11, 22), a: 0.24, stretch: 0.5, fade: 0.2, posJ: 1, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, 0.20)
+      });
+      paintPath(offsetS(q, 1, 2), {
+        n: 24, w: rand(3.5, 6), a: 0.36, stretch: 0.4, fade: 0.1, posJ: 0.6, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, -0.55)
+      });
+    }
+    ctx.restore();
+  }
+
+  function paintClothTexture(mode) {
+    // A quiet linen tooth, painted only where the light grazes.
+    for (let i = 0; i < 150; i++) {
+      const p = randomPointInPoly(CLOTH_INNER);
+      const ang = 0.70 + rand(-0.5, 0.5);
+      const len = rand(3, 12);
+      const light = rng() < 0.55;
+      paintPath(lineS(p[0], p[1], p[0] + Math.cos(ang) * len, p[1] + Math.sin(ang) * len, 0, 0, 1), {
+        n: 3, w: rand(0.8, 1.8), a: light ? 0.06 : 0.045,
+        stretch: 0.4, fade: 0.4, vary: 2,
+        c1: light ? [194, 174, 143] : [85, 70, 53]
+      });
+    }
+    for (let i = 0; i < 22; i++) {
+      const p = randomPointInPoly(CLOTH_INNER);
+      const ang = 0.70 + rand(-0.35, 0.35);
+      paintPath(lineS(p[0] - Math.cos(ang) * rand(10, 35), p[1] - Math.sin(ang) * rand(10, 35),
+        p[0] + Math.cos(ang) * rand(10, 35), p[1] + Math.sin(ang) * rand(10, 35), 2, rand(0, 6), 2), {
+        n: 8, w: rand(2.2, 5), a: 0.08, stretch: 0.42, fade: 0.3, vary: 2,
+        c1: [176, 156, 126]
+      });
+    }
+  }
+
+  function paintClothFolds(mode) {
+    clipPoly(CLOTH);
+    for (const f of FOLDS) paintFold(f, mode);
+    // Secondary crumples: short, broad and brushed, never wiry.
+    for (let i = 0; i < 16; i++) {
+      const p = randomPointInPoly(CLOTH);
+      let ang = rand(0, TAU);
+      if (rng() < 0.7) ang = rand(0.2, 1.5);
+      const len = rand(26, 88);
+      const q = quadS(
+        p[0] - Math.cos(ang) * len * 0.5, p[1] - Math.sin(ang) * len * 0.5,
+        p[0] + Math.cos(ang + rand(-0.7, 0.7)) * 8, p[1] + Math.sin(ang + rand(-0.7, 0.7)) * 8,
+        p[0] + Math.cos(ang) * len * 0.5, p[1] + Math.sin(ang) * len * 0.5
+      );
+      paintPath(offsetS(q, 3, 4), {
+        n: 12, w: rand(9, 22), a: 0.065, stretch: 0.52, fade: 0.28, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, -0.24)
+      });
+      paintPath(offsetS(q, -2, -3), {
+        n: 11, w: rand(6, 15), a: 0.07, stretch: 0.48, fade: 0.3, vary: 3,
+        col: (px, py) => clothCol(px, py, mode, 0.12)
+      });
+    }
+    ctx.restore();
+  }
+
+  function shadowEllipse(cx, cy, rx, ry, colorFn, a = 0.12, arcs = 24, around = TAU) {
+    for (let i = 0; i < arcs; i++) {
+      const rr = rand(0.2, 1.04);
+      const a0 = rand(0, TAU);
+      const sweep = rand(0.8, 2.3);
+      paintPath(arcS(cx, cy, rx * rr, ry * rr, a0, a0 + sweep), {
+        n: 10, w: rand(16, 34), a, stretch: 0.55, fade: 0.24, posJ: 2, vary: 3,
+        col: colorFn
+      });
+    }
+  }
+
+  function paintCastShadows(mode) {
+    const darkCloth = mode === 'gris' ? [25, 22, 19] : [39, 29, 22];
+    const warmDark = mode === 'gris' ? [33, 29, 24] : [52, 33, 22];
+    // Peach cluster casts down and to the right onto the linen.
+    shadowEllipse(peachBack.cx + 30, peachBack.cy + 48, 82, 30, (x, y) => mix(clothCol(x, y, mode), darkCloth, 0.72), 0.13, 18);
+    shadowEllipse(peachMain.cx + 26, peachMain.cy + 70, 112, 38, (x, y) => mix(clothCol(x, y, mode), darkCloth, 0.78), 0.15, 22);
+    shadowEllipse(peachFront.cx + 22, peachFront.cy + 58, 92, 30, (x, y) => mix(clothCol(x, y, mode), darkCloth, 0.75), 0.14, 18);
+    // Long goblet shadow, thrown right across cloth and bare table.
+    for (let i = 0; i < 26; i++) {
+      const y = rand(930, 992);
+      paintPath(lineS(rand(680, 755), y, rand(820, 960), y + rand(10, 48), rand(2, 8), rand(0, 6), 2), {
+        n: randInt(18, 30), w: rand(20, 46), a: 0.09,
+        stretch: 0.5, fade: 0.22, vary: 3,
+        col: (px, py) => mix(tableCol(px, py, mode), warmDark, 0.55)
+      });
+    }
+    // Pooled occlusion at the foot.
+    shadowEllipse(GOB.cx + 10, GOB.baseY + 22, 112, 27, (x, y) => mix(clothCol(x, y, mode), [22, 17, 13], 0.8), 0.18, 26);
+    // Deep folds and the cloth's shadowed right flank.
+    for (let i = 0; i < 18; i++) {
+      const p = randomPointInPoly(CLOTH);
+      const x = p[0], y = p[1];
+      const lo = clothCol(x, y, mode, -0.30);
+      paintPath(lineS(x - 20, y - 8, x + rand(30, 100), y + rand(5, 55), rand(2, 10), rand(0, 6), 2), {
+        n: 16, w: rand(12, 32), a: 0.10, stretch: 0.5, fade: 0.24, vary: 3,
+        c1: lo, c2: mix(lo, darkCloth, 0.4)
+      });
+    }
+    // Table shadow beneath the near cloth edge.
+    for (let i = 0; i < 18; i++) {
+      const x = rand(0, 760);
+      paintPath(lineS(x, rand(1080, 1110), x + rand(30, 110), rand(1110, 1150), rand(2, 8), rand(0, 6), 2), {
+        n: 12, w: rand(18, 38), a: 0.10, stretch: 0.5, fade: 0.24, vary: 3,
+        c1: [26, 19, 13], c2: [18, 13, 9]
+      });
+    }
+  }
+
+  function paintPeach(p, mode) {
+    ctx.save();
+    ctx.beginPath();
+    for (let a = 0; a <= TAU + 0.001; a += 0.09) {
+      const w = 1 + 0.012 * Math.sin(a * 3 + 1.7) + 0.007 * Math.sin(a * 5 + 0.4);
+      const x = p.cx + Math.cos(a) * p.rx * w;
+      const y = p.cy + Math.sin(a) * p.ry * w;
+      if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.clip();
+    // A dense base closes any pinholes before the turning strokes.
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      const rr = Math.sqrt(rand(0, 0.90));
+      const x = p.cx + Math.cos(a) * p.rx * rr;
+      const y = p.cy + Math.sin(a) * p.ry * rr;
+      softDab(x, y, rand(34, 58), rand(0, TAU), 0.55,
+        jitter(peachCol(x, y, p, mode), 3, 1), mode === 'gris' ? 0.30 : 0.42);
+    }
+
+    // Broad, opaque turning strokes: a solid fruit first, then its lights.
+    for (let i = 0; i < 66; i++) {
+      const rr = Math.sqrt(rand(0.01, 0.94));
+      const a = rand(0, TAU);
+      const x = p.cx + Math.cos(a) * p.rx * rr;
+      const y = p.cy + Math.sin(a) * p.ry * rr;
+      const tang = Math.atan2(Math.cos(a) * p.ry, -Math.sin(a) * p.rx);
+      const len = rand(24, 58);
+      const bend = rand(-0.4, 0.4);
+      const q = quadS(
+        x - Math.cos(tang) * len * 0.5, y - Math.sin(tang) * len * 0.5,
+        x + Math.cos(tang + bend) * len * 0.10, y + Math.sin(tang + bend) * len * 0.10,
+        x + Math.cos(tang) * len * 0.5, y + Math.sin(tang) * len * 0.5
+      );
+      paintPath(q, {
+        n: randInt(4, 8), w: rand(30, 58), a: mode === 'gris' ? 0.27 : 0.38,
+        stretch: 0.55, fade: 0.34, posJ: 1.5, vary: 3,
+        col: (px, py) => peachCol(px, py, p, mode)
+      });
+    }
+
+    // The core shadow, a deep turning crescent low and right.
+    for (let i = 0; i < 14; i++) {
+      const a = rand(-0.2, 1.3);
+      const rr = rand(0.62, 0.99);
+      const x = p.cx + Math.cos(a) * p.rx * rr;
+      const y = p.cy + Math.sin(a) * p.ry * rr;
+      const tang = Math.atan2(Math.cos(a) * p.ry, -Math.sin(a) * p.rx);
+      const len = rand(18, 46);
+      const c = mode === 'gris' ? [31, 27, 23] : [64, 27, 21];
+      paintPath(lineS(x - Math.cos(tang) * len * 0.5, y - Math.sin(tang) * len * 0.5,
+        x + Math.cos(tang) * len * 0.5, y + Math.sin(tang) * len * 0.5,
+        rand(1, 4), rand(0, 6), 2), {
+        n: 6, w: rand(24, 42), a: mode === 'gris' ? 0.20 : 0.25,
+        stretch: 0.52, fade: 0.34, vary: 3,
+        col: (px, py) => mix(peachCol(px, py, p, mode), c, 0.48)
+      });
+    }
+
+    // The lit shoulder: a warm, compact sheen, not a white patch.
+    const hx = p.cx - p.rx * 0.43, hy = p.cy - p.ry * 0.43;
+    for (let i = 0; i < 13; i++) {
+      const a = rand(0, TAU);
+      const rr = Math.sqrt(rand(0.02, 1));
+      const x = hx + Math.cos(a) * p.rx * 0.33 * rr;
+      const y = hy + Math.sin(a) * p.ry * 0.33 * rr;
+      const tang = rand(0, TAU);
+      const len = rand(14, 34);
+      const c = mode === 'gris' ? [209, 197, 173] : [236, 176, 109];
+      paintPath(lineS(x - Math.cos(tang) * len * 0.5, y - Math.sin(tang) * len * 0.5,
+        x + Math.cos(tang) * len * 0.5, y + Math.sin(tang) * len * 0.5,
+        rand(1, 3), rand(0, 6), 2), {
+        n: 4, w: rand(14, 28), a: mode === 'gris' ? 0.16 : 0.22,
+        stretch: 0.52, fade: 0.34, vary: 3,
+        col: (px, py) => mix(peachCol(px, py, p, mode), c, 0.44)
+      });
+    }
+    for (let i = 0; i < 3; i++) {
+      softDab(hx + rand(-p.rx * 0.08, p.rx * 0.08), hy + rand(-p.ry * 0.08, p.ry * 0.08),
+        rand(3, 6), rand(0, TAU), 0.55, [238, 188, 128], 0.16);
+    }
+
+    // A warm bounce from the cloth on the shadow rim.
+    for (let i = 0; i < 9; i++) {
+      const a = rand(0.0, 0.95);
+      const c = mode === 'gris' ? [128, 118, 100] : [189, 116, 70];
+      paintPath(arcS(p.cx, p.cy, p.rx * rand(0.9, 0.99), p.ry * rand(0.9, 0.99), a, a + rand(0.18, 0.48)), {
+        n: 6, w: rand(5, 11), a: 0.16, stretch: 0.5, fade: 0.34, vary: 3,
+        col: (px, py) => mix(peachCol(px, py, p, mode), c, 0.42)
+      });
+    }
+
+    ctx.restore();
+    // A soft, broken contour keeps the fruit from dissolving into the linen.
+    for (let i = 0; i < 18; i++) {
+      const a = rand(0, TAU);
+      const x = p.cx + Math.cos(a) * p.rx * rand(0.945, 1.005);
+      const y = p.cy + Math.sin(a) * p.ry * rand(0.945, 1.005);
+      const tang = Math.atan2(Math.cos(a) * p.ry, -Math.sin(a) * p.rx);
+      const len = rand(8, 20);
+      paintPath(lineS(x - Math.cos(tang) * len * 0.5, y - Math.sin(tang) * len * 0.5,
+        x + Math.cos(tang) * len * 0.5, y + Math.sin(tang) * len * 0.5,
+        rand(1, 3), rand(0, 6), 2), {
+        n: 4, w: rand(12, 22), a: 0.20, stretch: 0.5, fade: 0.34, vary: 3,
+        col: (px, py) => mix(peachCol(px, py, p, mode), [50, 30, 22], 0.20)
+      });
+    }
+
+    // The true sheen: a compact, warm light on the curved shoulder.
+    for (let i = 0; i < 7; i++) {
+      const a = rand(3.45, 4.35);
+      const rr = rand(0.55, 0.82);
+      softDab(p.cx + Math.cos(a) * p.rx * rr, p.cy + Math.sin(a) * p.ry * rr,
+        rand(7, 14), a + rand(-0.3, 0.3), 0.55,
+        mode === 'gris' ? [224, 211, 184] : [244, 198, 140], 0.24);
+    }
+    softDab(hx, hy, rand(3.5, 6.5), rand(0, TAU), 0.6,
+      mode === 'gris' ? [233, 221, 195] : [248, 220, 172], 0.20);
+    softDab(hx - rand(2, 7), hy - rand(1, 5), rand(2.2, 4.2), rand(0, TAU), 0.55,
+      mode === 'gris' ? [239, 228, 204] : [252, 230, 188], 0.24);
+
+    // Stem cavity and short soft seam.
+    const sx = p.cx - p.rx * 0.08, sy = p.cy - p.ry * 0.72;
+    for (let i = 0; i < 6; i++) {
+      softDab(sx + rand(-5, 5), sy + rand(-4, 4), rand(3.5, 8), rand(0, TAU), 0.6,
+        mode === 'gris' ? [44, 38, 31] : [62, 30, 24], 0.16);
+    }
+    const crease = quadS(sx, sy + 5, p.cx - p.rx * 0.28, p.cy + p.ry * 0.04, p.cx - p.rx * 0.19, p.cy + p.ry * 0.33);
+    paintPath(offsetS(crease, 1, 1), {
+      n: 11, w: 3.8, a: 0.12, stretch: 0.45, fade: 0.3, vary: 3,
+      c1: mode === 'gris' ? [50, 44, 36] : [78, 36, 28]
+    });
+    paintPath(offsetS(crease, -2, -2), {
+      n: 9, w: 2.4, a: 0.08, stretch: 0.45, fade: 0.34, vary: 2,
+      c1: mode === 'gris' ? [147, 135, 114] : [198, 139, 92]
+    });
+    paintPath(lineS(sx - 1, sy - 2, sx + rand(-3, 2), sy - rand(6, 10), 0, 0, 1), {
+      n: 4, w: 2.4, a: 0.28, stretch: 0.4, fade: 0.3,
+      c1: [72, 48, 29], c2: [46, 30, 19]
+    });
+  }
+
+  function paintGobletBody(mode) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(GOB.cx - GOB.rimRX, GOB.rimY + 2);
+    for (let y = GOB.rimY + 2; y <= GOB.bowlBottom; y += 4) {
+      ctx.lineTo(GOB.cx - gobletHW(y), y);
+    }
+    for (let y = GOB.bowlBottom; y >= GOB.rimY + 2; y -= 4) {
+      ctx.lineTo(GOB.cx + gobletHW(y), y);
+    }
+    ctx.closePath();
+    ctx.clip();
+    const dark = mode === 'gris' ? [23, 19, 16] : [40, 28, 20];
+    // Hollow interior.
+    for (let i = 0; i < 30; i++) {
+      const rr = rand(0.2, 1.0);
+      const a0 = rand(0, TAU);
+      paintPath(arcS(GOB.cx, GOB.rimY + 2, (GOB.rimRX - 9) * rr, (GOB.rimRY - 3) * rr, a0, a0 + rand(0.8, 2.2)), {
+        n: 9, w: rand(10, 20), a: 0.28, stretch: 0.5, fade: 0.2, vary: 3,
+        col: (x, y) => mix(dark, [82, 54, 34], 0.35 * clamp((GOB.rimY + 24 - y) / 34, 0, 1))
+      });
+    }
+    for (let i = 0; i < 6; i++) {
+      const a0 = rand(3.25, 4.55);
+      paintPath(arcS(GOB.cx, GOB.rimY + 5, rand(42, 70), rand(8, 15), a0, a0 + rand(0.2, 0.5)), {
+        n: 7, w: rand(4, 9), a: 0.14, stretch: 0.5, fade: 0.3, vary: 3,
+        c1: mode === 'gris' ? [96, 82, 62] : [132, 86, 47]
+      });
+    }
+
+    // Close the copper wall with a dense base before the turning marks.
+    for (let i = 0; i < 40; i++) {
+      const y = rand(GOB.rimY + 12, GOB.bowlBottom - 4);
+      const hw = gobletHW(y);
+      const u = rand(-0.94, 0.94);
+      const x = GOB.cx + u * hw;
+      softDab(x, y, rand(24, 42), rand(0, TAU), 0.52,
+        jitter(gobletCol(x, y, mode), 3, 1), mode === 'gris' ? 0.26 : 0.36);
+    }
+
+    // A solid copper wall, built with vertical turning strokes.
+    const cols = 68;
+    for (let i = 0; i < cols; i++) {
+      const u = -0.982 + (1.964 * i) / cols + rand(-0.008, 0.008);
+      const y0 = GOB.rimY + rand(6, 12);
+      const y1 = GOB.bowlBottom - rand(1, 5);
+      const curved = t => {
+        const y = lerp(y0, y1, t);
+        const y2 = lerp(y0, y1, Math.min(1, t + 0.01));
+        const x = GOB.cx + u * gobletHW(y);
+        const x2 = GOB.cx + u * gobletHW(y2);
+        return { x, y, a: Math.atan2(y2 - y, x2 - x) };
+      };
+      paintPath(curved, {
+        n: randInt(22, 30), w: rand(20, 30), a: mode === 'gris' ? 0.30 : 0.38,
+        stretch: 0.48, fade: 0.14, posJ: 0.8, vary: 4,
+        col: (x, y) => gobletCol(x, y, mode)
+      });
+    }
+    // A second, broader and softer pass closes any brush gaps.
+    for (let i = 0; i < 20; i++) {
+      const u = rand(-0.9, 0.9);
+      const y0 = GOB.rimY + rand(15, 40);
+      const y1 = GOB.bowlBottom - rand(2, 18);
+      const curved = t => {
+        const y = lerp(y0, y1, t);
+        const y2 = lerp(y0, y1, Math.min(1, t + 0.01));
+        const x = GOB.cx + u * gobletHW(y);
+        const x2 = GOB.cx + u * gobletHW(y2);
+        return { x, y, a: Math.atan2(y2 - y, x2 - x) };
+      };
+      paintPath(curved, {
+        n: 20, w: rand(38, 60), a: 0.10, stretch: 0.5, fade: 0.24, vary: 3,
+        col: (x, y) => gobletCol(x, y, mode)
+      });
+    }
+
+    // Core shadow down the right turning side.
+    for (let i = 0; i < 16; i++) {
+      const y = rand(GOB.rimY + 20, GOB.bowlBottom - 8);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(0.48, 0.96) * hw;
+      paintPath(lineS(x, y, x + rand(-4, 5), y + rand(30, 75), 2, rand(0, 6), 2), {
+        n: 8, w: rand(24, 44), a: 0.17, stretch: 0.5, fade: 0.28, vary: 3,
+        c1: mode === 'gris' ? [39, 33, 27] : [54, 36, 23]
+      });
+    }
+
+    // Silhouette edges.
+    for (let i = 0; i < 18; i++) {
+      const y = rand(GOB.rimY + 30, GOB.bowlBottom - 8);
+      const hw = gobletHW(y);
+      const right = i % 2 === 0;
+      const x = GOB.cx + (right ? 1 : -1) * hw * 0.985;
+      const c = right
+        ? (mode === 'gris' ? [118, 103, 82] : [166, 108, 68])
+        : (mode === 'gris' ? [201, 187, 160] : [235, 174, 104]);
+      paintPath(lineS(x, y - rand(10, 20), x + (right ? 1 : -1) * rand(-1, 2), y + rand(14, 30), 1, rand(0, 6), 2), {
+        n: 5, w: rand(5, 9), a: 0.20, stretch: 0.45, fade: 0.3, vary: 3,
+        c1: c
+      });
+    }
+    // Dark outer contour on the shadow side.
+    for (let i = 0; i < 9; i++) {
+      const y = rand(GOB.rimY + 35, GOB.bowlBottom - 8);
+      const hw = gobletHW(y);
+      const x = GOB.cx + hw - 1;
+      paintPath(lineS(x, y - rand(10, 20), x + rand(-2, 1), y + rand(16, 30), 1, rand(0, 6), 2), {
+        n: 5, w: rand(4, 8), a: 0.20, stretch: 0.45, fade: 0.3, vary: 2,
+        c1: mode === 'gris' ? [32, 27, 21] : [51, 34, 21]
+      });
+    }
+
+    // A few horizontal turning bands keep the cylinder round.
+    for (let i = 0; i < 8; i++) {
+      const y = rand(GOB.rimY + 50, GOB.bowlBottom - 20);
+      const hw = gobletHW(y);
+      paintPath(arcS(GOB.cx, y, hw * rand(0.45, 0.82), rand(5, 11), 2.9, 4.2), {
+        n: 12, w: rand(8, 15), a: 0.10, stretch: 0.5, fade: 0.28, vary: 3,
+        col: (x, yy) => mix(gobletCol(x, yy, mode), mode === 'gris' ? [190, 177, 152] : [232, 169, 96], 0.30)
+      });
+    }
+
+    // A broad reflected edge from the linen on the shadow side.
+    for (let i = 0; i < 8; i++) {
+      const y = rand(GOB.rimY + 35, GOB.bowlBottom - 10);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(0.82, 0.99) * hw;
+      paintPath(lineS(x, y, x + rand(-2, 2), y + rand(30, 60), 1, rand(0, 6), 2), {
+        n: 6, w: rand(16, 30), a: 0.075, stretch: 0.5, fade: 0.3, vary: 2,
+        c1: mode === 'gris' ? [112, 99, 80] : [164, 108, 66]
+      });
+    }
+
+    // Tarnish, hammer dents and darkening near the base.
+    for (let i = 0; i < 18; i++) {
+      const y = rand(GOB.rimY + 35, GOB.bowlBottom - 8);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(-0.8, 0.85) * hw;
+      const ang = rand(-0.5, 0.5);
+      const c = mode === 'gris' ? [58, 51, 40] : [72, 75, 55];
+      paintPath(arcS(x, y, rand(3, 9), rand(2, 5), ang, ang + rand(0.8, 2)), {
+        n: 4, w: rand(2.5, 4.5), a: 0.10, stretch: 0.5, fade: 0.35, vary: 3,
+        c1: c
+      });
+      paintPath(arcS(x - 1, y - 2, rand(2, 5), rand(1.5, 3), ang + 0.2, ang + rand(1, 2.2)), {
+        n: 3, w: rand(1.5, 2.8), a: 0.08, stretch: 0.5, fade: 0.35,
+        c1: mix(c, [206, 179, 132], 0.5)
+      });
+    }
+    for (let i = 0; i < 10; i++) {
+      const y = rand(GOB.bowlBottom - 45, GOB.bowlBottom - 5);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(-0.8, 0.9) * hw;
+      paintPath(lineS(x, y, x + rand(-10, 10), y + rand(10, 25), 2, rand(0, 6), 2), {
+        n: 5, w: rand(14, 26), a: 0.12, stretch: 0.5, fade: 0.3, vary: 2,
+        c1: mode === 'gris' ? [38, 32, 26] : [56, 37, 23]
+      });
+    }
+
+    // Peach and room reflections.
+    for (let i = 0; i < 7; i++) {
+      const y = rand(GOB.bowlBottom - 70, GOB.bowlBottom - 12);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(0.0, 0.72) * hw;
+      paintPath(lineS(x, y, x + rand(-4, 4), y + rand(12, 28), 2, rand(0, 6), 2), {
+        n: 5, w: rand(10, 18), a: 0.12, stretch: 0.5, fade: 0.32, vary: 3,
+        c1: mode === 'gris' ? [100, 86, 68] : [180, 102, 56]
+      });
+    }
+    for (let i = 0; i < 4; i++) {
+      const y = rand(GOB.rimY + 50, GOB.rimY + 140);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(0.62, 0.9) * hw;
+      paintPath(lineS(x, y, x + rand(-3, 2), y + rand(15, 34), 1, rand(0, 6), 2), {
+        n: 5, w: rand(10, 17), a: 0.06, stretch: 0.5, fade: 0.34, vary: 2,
+        c1: mode === 'gris' ? [96, 88, 74] : [112, 101, 76]
+      });
+    }
+
+    // A small collar covers the join with the stem.
+    for (let i = 0; i < 12; i++) {
+      const a = rand(0, TAU);
+      softDab(GOB.cx + Math.cos(a) * rand(8, 26), GOB.bowlBottom - 2 + Math.sin(a) * rand(2, 8),
+        rand(5, 10), rand(0, TAU), 0.5,
+        ramp(mode === 'gris' ? GRIS_COPPER : COL_COPPER, 0.30), 0.22);
+    }
+
+    // Narrow specular band on the lit face.
+    for (let i = 0; i < 6; i++) {
+      const y0 = GOB.rimY + rand(22, 50);
+      const y1 = GOB.rimY + rand(105, 165);
+      const u = -0.40 + rand(-0.03, 0.03);
+      const sampler = t => {
+        const y = lerp(y0, y1, t);
+        return { x: GOB.cx + u * gobletHW(y), y, a: Math.atan2(1, -0.12) };
+      };
+      paintPath(sampler, {
+        n: 13, w: rand(6, 11), a: mode === 'gris' ? 0.24 : 0.30,
+        stretch: 0.42, fade: 0.24, vary: 4,
+        col: (x, y) => mix(gobletCol(x, y, mode), mode === 'gris' ? [231, 218, 191] : [242, 188, 120], 0.42)
+      });
+    }
+    // A soft dark band hides the seam where the bowl closes onto the stem.
+    paintPath(arcS(GOB.cx, GOB.bowlBottom - 6, 26, 9, 0.05, Math.PI - 0.05), {
+      n: 24, w: 20, a: 0.34, stretch: 0.5, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [35, 30, 24] : [55, 36, 23]
+    });
+    paintPath(arcS(GOB.cx, GOB.bowlBottom - 10, 22, 7, 3.5, 5.9), {
+      n: 12, w: 4, a: 0.16, stretch: 0.45, fade: 0.3, vary: 3,
+      c1: mode === 'gris' ? [152, 137, 112] : [191, 126, 73]
+    });
+    ctx.restore();
+  }
+
+  function paintGobletStemBase(mode) {
+    // Stem, continuous from bowl to foot.
+    for (let i = 0; i < 34; i++) {
+      const off = rand(-13, 13);
+      const y0 = rand(776, 788);
+      const y1 = rand(894, 902);
+      const sampler = t => {
+        const y = lerp(y0, y1, t);
+        const w = 16 + 10 * Math.exp(-Math.pow((y - 824) / 16, 2));
+        return { x: GOB.cx + off * (w / 26), y, a: Math.atan2(1, 0) };
+      };
+      paintPath(sampler, {
+        n: 22, w: rand(15, 25), a: mode === 'gris' ? 0.34 : 0.44,
+        stretch: 0.48, fade: 0.16, vary: 4,
+        col: (x, y) => {
+          const side = (off + 10) / 20;
+          return mix(mode === 'gris' ? [154, 138, 110] : [197, 131, 74],
+                     mode === 'gris' ? [49, 41, 32] : [62, 41, 26], side);
+        }
+      });
+    }
+    // Strong lit and shadow edges on the stem.
+    paintPath(lineS(GOB.cx - 9, 786, GOB.cx - 8, 898, 1.5, 0, 2), {
+      n: 26, w: 5, a: 0.30, stretch: 0.42, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [213, 199, 171] : [239, 183, 111]
+    });
+    paintPath(lineS(GOB.cx + 9, 786, GOB.cx + 8, 898, 1.5, 0, 2), {
+      n: 26, w: 4.8, a: 0.30, stretch: 0.42, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [40, 34, 27] : [55, 36, 23]
+    });
+    // Solid turned knop.
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      const rr = Math.sqrt(rand(0, 1));
+      const x = GOB.cx + Math.cos(a) * 24 * rr;
+      const y = 824 + Math.sin(a) * 14 * rr;
+      const gl = clamp(0.62 - (x - GOB.cx) / 55, 0.1, 1);
+      softDab(x, y, rand(6, 13), rand(0, TAU), 0.5,
+        ramp(mode === 'gris' ? GRIS_COPPER : COL_COPPER, 0.25 + gl * 0.6), mode === 'gris' ? 0.24 : 0.32);
+    }
+    paintPath(arcS(GOB.cx - 3, 824, 23, 13, 3.3, 5.7), {
+      n: 14, w: 5, a: 0.24, stretch: 0.5, fade: 0.3, vary: 3,
+      c1: mode === 'gris' ? [220, 206, 178] : [241, 191, 120]
+    });
+    paintPath(arcS(GOB.cx + 3, 826, 22, 12, -0.15, 1.6), {
+      n: 14, w: 6, a: 0.22, stretch: 0.5, fade: 0.3, vary: 3,
+      c1: mode === 'gris' ? [38, 32, 25] : [56, 37, 24]
+    });
+
+    // Foot: a solid copper top face, clipped to a clean ellipse.
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(GOB.cx, GOB.baseY, GOB.baseRX, GOB.baseRY, 0, 0, TAU);
+    ctx.clip();
+    for (let i = 0; i < 85; i++) {
+      const a = rand(0, TAU);
+      const rr = Math.sqrt(rand(0, 1));
+      const x = GOB.cx + Math.cos(a) * GOB.baseRX * rr;
+      const y = GOB.baseY + Math.sin(a) * GOB.baseRY * rr;
+      const gl = clamp(0.68 - (x - GOB.cx) / (GOB.baseRX * 1.55), 0.06, 1);
+      const c = ramp(mode === 'gris' ? GRIS_COPPER : COL_COPPER, 0.14 + gl * 0.64);
+      softDab(x, y, rand(7, 15), rand(0, TAU), 0.5, jitter(c, 4, 1), mode === 'gris' ? 0.28 : 0.38);
+    }
+    ctx.restore();
+    // Bright left lip, dark right lip and the foot's thickness.
+    paintPath(arcS(GOB.cx, GOB.baseY, GOB.baseRX - 1, GOB.baseRY, 3.25, 5.95), {
+      n: 34, w: 5.5, a: mode === 'gris' ? 0.34 : 0.44,
+      stretch: 0.45, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [226, 212, 184] : [246, 197, 126]
+    });
+    paintPath(arcS(GOB.cx, GOB.baseY, GOB.baseRX - 1, GOB.baseRY, -0.15, 1.65), {
+      n: 26, w: 5, a: 0.30, stretch: 0.45, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [40, 34, 27] : [56, 37, 23]
+    });
+    paintPath(arcS(GOB.cx, GOB.baseY + 12, GOB.baseRX, GOB.baseRY, 0.05, Math.PI - 0.05), {
+      n: 44, w: 12, a: 0.34, stretch: 0.45, fade: 0.16, vary: 4,
+      col: (x, y) => mix(mode === 'gris' ? [54, 47, 37] : [87, 57, 34], [20, 15, 11], 0.35)
+    });
+    // Dark outer contour around the whole foot.
+    paintPath(arcS(GOB.cx, GOB.baseY, GOB.baseRX + 1, GOB.baseRY + 1, 0, TAU), {
+      n: 70, w: 3.4, a: 0.24, stretch: 0.45, fade: 0.1, vary: 3,
+      c1: mode === 'gris' ? [33, 28, 22] : [49, 33, 21]
+    });
+    // A few dark occlusions where the foot meets the cloth.
+    for (let i = 0; i < 10; i++) {
+      const a = rand(0, TAU);
+      softDab(GOB.cx + Math.cos(a) * 78, GOB.baseY + 21 + Math.sin(a) * 8,
+        rand(4, 9), rand(0, TAU), 0.5, [31, 22, 15], 0.18);
+    }
+  }
+
+  function paintGobletRim(mode) {
+    const band = mode === 'gris'
+      ? [[44, 38, 30], [68, 57, 44], [96, 82, 63], [126, 109, 86], [160, 142, 116], [192, 176, 148], [220, 206, 179]]
+      : [[58, 35, 22], [84, 51, 30], [118, 70, 39], [152, 91, 50], [184, 116, 62], [208, 145, 82], [230, 174, 110]];
+    // Concentric copper arcs form a solid, dark metal lip.
+    const rings = [
+      { dr: -1, w: 9, lift: 0.18 },
+      { dr: -6, w: 9, lift: 0.10 },
+      { dr: -11, w: 8, lift: 0.00 },
+      { dr: -15, w: 7, lift: -0.08 }
+    ];
+    for (const ring of rings) {
+      const rx = GOB.rimRX + ring.dr;
+      const ry = Math.max(4, GOB.rimRY + ring.dr * 0.45);
+      for (let a = 0; a < TAU; a += 0.046) {
+        const top = clamp((Math.cos(a - 3.95) + 1) * 0.5, 0, 1);
+        const lit = clamp(0.45 + 0.50 * Math.pow(top, 1.1) + ring.lift, 0, 1);
+        const c = ramp(band, lit);
+        paintPath(arcS(GOB.cx, GOB.rimY, rx, ry, a, a + 0.054), {
+          n: 3, w: ring.w, a: 0.55, stretch: 0.58, fade: 0.08, vary: 3,
+          c1: c
+        });
+      }
+    }
+    // The front lip lifts slightly out of shadow.
+    paintPath(arcS(GOB.cx, GOB.rimY + 2, GOB.rimRX - 9, GOB.rimRY - 4, 0.55, 2.55), {
+      n: 34, w: 5, a: 0.14, stretch: 0.48, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [128, 114, 92] : [150, 95, 50]
+    });
+    // Dark inner lip.
+    paintPath(arcS(GOB.cx, GOB.rimY + 3, GOB.rimRX - 18, GOB.rimRY - 9, 0.02, TAU - 0.02), {
+      n: 78, w: 3.6, a: 0.36, stretch: 0.45, fade: 0.1, vary: 3,
+      c1: mode === 'gris' ? [22, 18, 15] : [34, 23, 16]
+    });
+    // The outer silhouette: dark on the shadow side, lit at the upper-left.
+    paintPath(arcS(GOB.cx, GOB.rimY + 1, GOB.rimRX + 1, GOB.rimRY + 1, -0.6, 1.6), {
+      n: 34, w: 3.0, a: 0.22, stretch: 0.45, fade: 0.18, vary: 3,
+      c1: mode === 'gris' ? [35, 30, 24] : [55, 36, 23]
+    });
+    paintPath(arcS(GOB.cx, GOB.rimY - 1, GOB.rimRX + 1, GOB.rimRY + 0.5, 3.35, 4.35), {
+      n: 22, w: 4.2, a: 0.34, stretch: 0.45, fade: 0.2, vary: 3,
+      c1: mode === 'gris' ? [230, 218, 191] : [247, 202, 140]
+    });
+    // Aged tarnish on the right half of the lip.
+    paintPath(arcS(GOB.cx, GOB.rimY, GOB.rimRX - 8, GOB.rimRY - 4, -0.35, 1.25), {
+      n: 26, w: 7, a: 0.18, stretch: 0.5, fade: 0.22, vary: 3,
+      c1: mode === 'gris' ? [47, 43, 35] : [70, 71, 51]
+    });
+    // Hero highlight, upper left.
+    for (let i = 0; i < 3; i++) {
+      paintPath(arcS(GOB.cx, GOB.rimY - 2, GOB.rimRX - 6 + i * 2.2, GOB.rimRY - 2, 3.44, 4.30), {
+        n: 30, w: 10 - i * 2, a: 0.40 - i * 0.05,
+        stretch: 0.45, fade: 0.16, vary: 3,
+        c1: mix(mode === 'gris' ? [238, 227, 201] : [248, 210, 150], [255, 247, 224], 0.12)
+      });
+    }
+    // Broad warm sheen on the outer lip.
+    paintPath(arcS(GOB.cx, GOB.rimY - 2, GOB.rimRX - 2, GOB.rimRY - 1, 3.25, 4.38), {
+      n: 30, w: 9, a: 0.26, stretch: 0.48, fade: 0.18, vary: 3,
+      c1: mode === 'gris' ? [214, 201, 174] : [241, 186, 118]
+    });
+    // Front-left secondary gleam.
+    paintPath(arcS(GOB.cx, GOB.rimY + 1, GOB.rimRX - 8, GOB.rimRY - 4, 2.52, 3.12), {
+      n: 16, w: 4.2, a: 0.18, stretch: 0.45, fade: 0.24, vary: 3,
+      c1: mode === 'gris' ? [206, 194, 168] : [232, 181, 113]
+    });
+    // Pinpoints.
+    for (let i = 0; i < 8; i++) {
+      const a = rand(3.50, 4.22);
+      const x = GOB.cx + Math.cos(a) * (GOB.rimRX - 5);
+      const y = GOB.rimY + Math.sin(a) * (GOB.rimRY - 3);
+      softDab(x, y, rand(1.2, 2.4), a, 0.45, [250, 233, 196], 0.28);
+    }
+    // The hero light on the copper rim, laid last so it stays clean.
+    paintPath(arcS(GOB.cx, GOB.rimY - 2, GOB.rimRX - 1.5, GOB.rimRY - 1, 3.32, 4.28), {
+      n: 30, w: 8.5, a: 0.40, stretch: 0.46, fade: 0.16, vary: 3,
+      c1: [247, 201, 137]
+    });
+    paintPath(arcS(GOB.cx, GOB.rimY - 2, GOB.rimRX - 3, GOB.rimRY - 2, 3.44, 4.15), {
+      n: 22, w: 4, a: 0.34, stretch: 0.45, fade: 0.2, vary: 2,
+      c1: [252, 227, 178]
+    });
+  }
+
+  function paintGoblet(mode) {
+    // The bowl is painted first, then the stem and foot sit in front of the
+    // soft lower edge, hiding the join.
+    paintGobletBody(mode);
+    paintGobletStemBase(mode);
+    paintGobletRim(mode);
+  }
+
+  function paintContactShadows(mode) {
+    const core = mode === 'gris' ? [18, 15, 12] : [30, 22, 16];
+    // Tender dark at the points where fruit meets cloth.
+    for (const p of PEACHES) {
+      const y = p.cy + p.ry * 0.79;
+      for (let i = 0; i < 12; i++) {
+        const x = p.cx + rand(-p.rx * 0.55, p.rx * 0.55) + 12;
+        paintPath(arcS(x, y + rand(-3, 7), rand(18, 45), rand(7, 16), rand(0, TAU), rand(0, TAU) + rand(0.5, 1.8)), {
+          n: 6, w: rand(9, 18), a: 0.22, stretch: 0.5, fade: 0.3, vary: 3,
+          c1: core
+        });
+      }
+    }
+    // Goblet foot bites into the cloth.
+    shadowEllipse(GOB.cx + 6, GOB.baseY + 25, 78, 10, () => core, 0.18, 16);
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU);
+      softDab(GOB.cx + Math.cos(a) * 72, GOB.baseY + 26 + Math.sin(a) * 8, rand(3, 8), rand(0, TAU), 0.5, core, 0.16);
+    }
+    // A tight, darker bite at the base of each peach.
+    for (const p of PEACHES) {
+      for (let i = 0; i < 8; i++) {
+        const x = p.cx + rand(-p.rx * 0.45, p.rx * 0.45) + 10;
+        const y = p.cy + p.ry * 0.82 + rand(-2, 5);
+        softDab(x, y, rand(8, 18), rand(0, TAU), 0.5, core, 0.20);
+      }
+    }
+    // Air-tight shadow under the front peach and in the gap between fruit.
+    for (let i = 0; i < 11; i++) {
+      const x = rand(470, 525), y = rand(885, 945);
+      softDab(x, y, rand(5, 13), rand(0, TAU), 0.6, core, 0.12);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LAYER 1 — stretched linen: warm imprimatura, woven grain, slubs.
+  // ---------------------------------------------------------------------------
+  function layer1Linen() {
+    // Broad imprimatura, laid in with a large soft brush.
+    for (let i = 0; i < 62; i++) {
+      const y = rand(-80, H + 80);
+      const c = pick(GROUNDS);
+      paintPath(lineS(rand(-180, 80), y + rand(-30, 30), rand(920, 1180), y + rand(-40, 40),
+        rand(3, 15), rand(0, 6), rand(1.3, 2.7)), {
+        n: randInt(42, 76), w: rand(52, 96), a: 0.30, stretch: 0.55, fade: 0.16, posJ: 4, vary: 5,
+        c1: c, c2: jitter(mix(c, pick(GROUNDS), 0.5), 8, 1)
+      });
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = rand(-80, W + 80);
+      const c = pick(GROUNDS);
+      paintPath(lineS(x + rand(-30, 30), rand(-100, 120), x + rand(-30, 30), rand(1080, 1280),
+        rand(3, 12), rand(0, 6), rand(1.4, 2.8)), {
+        n: randInt(42, 78), w: rand(46, 88), a: 0.26, stretch: 0.52, fade: 0.18, posJ: 4, vary: 5,
+        c1: c, c2: jitter(mix(c, pick(GROUNDS), 0.5), 8, 0)
+      });
+    }
+
+    // Fine linen weave.  Warp and weft are drawn as tiny irregular threads.
+    for (let y = 1; y < H; y += 3.15) {
+      const phase = rand(0, 9);
+      for (let x = -24; x < W + 24; x += rand(28, 64)) {
+        if (rng() < 0.08) continue;
+        const len = rand(18, 58);
+        const light = rng() < 0.55;
+        const c = light ? [181, 163, 136] : [58, 46, 35];
+        ctx.globalAlpha = rand(0.025, 0.085);
+        ctx.strokeStyle = rgb(c);
+        ctx.lineWidth = rand(0.75, 1.55);
+        ctx.beginPath();
+        ctx.moveTo(x, y + rand(-0.45, 0.45));
+        ctx.quadraticCurveTo(x + len * 0.5, y + rand(-1.3, 1.3), x + len, y + rand(-0.8, 0.8));
+        ctx.stroke();
+      }
+    }
+    for (let x = 1; x < W; x += 3.15) {
+      const phase = rand(0, 9);
+      for (let y = -24; y < H + 24; y += rand(28, 64)) {
+        if (rng() < 0.09) continue;
+        const len = rand(18, 58);
+        const light = rng() < 0.45;
+        const c = light ? [163, 145, 118] : [45, 35, 27];
+        ctx.globalAlpha = rand(0.02, 0.075);
+        ctx.strokeStyle = rgb(c);
+        ctx.lineWidth = rand(0.7, 1.45);
+        ctx.beginPath();
+        ctx.moveTo(x + rand(-0.45, 0.45), y);
+        ctx.quadraticCurveTo(x + rand(-1.3, 1.3), y + len * 0.5, x + rand(-0.8, 0.8), y + len);
+        ctx.stroke();
+      }
+    }
+
+    // Occasional slubs and crossed fibres in the raw linen.
+    for (let i = 0; i < 850; i++) {
+      const x = rand(0, W), y = rand(0, H);
+      const light = rng() < 0.62;
+      const c = light ? [193, 174, 144] : [49, 38, 28];
+      ctx.globalAlpha = rand(0.03, 0.10);
+      ctx.strokeStyle = rgb(c);
+      ctx.lineWidth = rand(0.8, 2.1);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + rand(-9, 9), y + rand(-2, 2));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------------------
+  // LAYER 2 — grisaille: shadow mass first, then form, then reserved light.
+  // ---------------------------------------------------------------------------
+  function layer2Grisaille() {
+    paintBackground('gris', 1);
+    paintTable('gris', 1);
+    paintClothBase('gris', 1);
+    paintClothEdgeBand('gris');
+    featherClothEdge('gris');
+    paintClothFolds('gris');
+    paintClothStructure('gris');
+    paintClothCreases('gris');
+    paintClothTexture('gris');
+    paintClothHem('gris');
+    paintCastShadows('gris');
+
+    paintPeach(peachBack, 'gris');
+    paintPeach(peachMain, 'gris');
+    paintPeach(peachFront, 'gris');
+    paintGoblet('gris');
+    paintContactShadows('gris');
+
+    // Reclaim the deep darks after the forms are established.
+    for (let i = 0; i < 18; i++) {
+      const x = rand(620, 1040), y = rand(0, 780);
+      paintPath(lineS(x, y, x + rand(-60, 20), y + rand(100, 300), 6, rand(0, 6), 2), {
+        n: 20, w: rand(42, 88), a: 0.06, stretch: 0.5, fade: 0.25, vary: 2,
+        c1: [11, 9, 7]
+      });
+    }
+    for (let i = 0; i < 12; i++) {
+      const y = rand(1100, 1230);
+      paintPath(lineS(rand(-20, 120), y, rand(860, 1020), y + rand(-20, 20), 4, 0, 2), {
+        n: 28, w: rand(30, 62), a: 0.10, stretch: 0.5, fade: 0.22, vary: 2,
+        c1: [10, 8, 6]
+      });
+    }
+
+    // A few final grisaille accents reserve the strongest lights.
+    paintPath(arcS(GOB.cx, GOB.rimY - 1, GOB.rimRX - 2, GOB.rimRY - 1, 3.42, 4.28), {
+      n: 24, w: 4.5, a: 0.30, stretch: 0.45, fade: 0.18, vary: 3,
+      c1: [240, 230, 205]
+    });
+    for (const p of PEACHES) {
+      for (let i = 0; i < 5; i++) {
+        paintPath(arcS(p.cx - 2, p.cy - 2, p.rx * rand(0.55, 0.85), p.ry * rand(0.55, 0.85), rand(3.45, 4.15), rand(3.45, 4.15) + rand(0.35, 0.75)), {
+          n: 8, w: rand(5, 10), a: 0.22, stretch: 0.5, fade: 0.3, vary: 3,
+          c1: [214, 202, 177]
+        });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LAYER 3 — opaque local colour, laid into the wet grisaille.
+  // ---------------------------------------------------------------------------
+  function layer3Color() {
+    paintBackground('color', 0.9);
+    paintTable('color', 1);
+    paintClothBase('color', 1.05);
+    paintClothEdgeBand('color');
+    featherClothEdge('color');
+    paintClothFolds('color');
+    paintClothStructure('color');
+    paintClothCreases('color');
+    paintClothTexture('color');
+    paintClothHem('color');
+    paintCastShadows('color');
+
+    paintPeach(peachBack, 'color');
+    paintPeach(peachMain, 'color');
+    paintPeach(peachFront, 'color');
+    paintGoblet('color');
+    paintContactShadows('color');
+
+    // Warm reflected colour on the lower right of the fruit and the cool
+    // reflected patina on the copper's shadow edge.
+    for (const p of PEACHES) {
+      for (let i = 0; i < 8; i++) {
+        const a0 = rand(0.05, 0.85);
+        paintPath(arcS(p.cx, p.cy, p.rx * rand(0.88, 0.98), p.ry * rand(0.88, 0.98), a0, a0 + rand(0.25, 0.6)), {
+          n: 7, w: rand(3, 7), a: 0.15, stretch: 0.5, fade: 0.35, vary: 3,
+          c1: [185, 115, 73]
+        });
+      }
+    }
+    for (let i = 0; i < 12; i++) {
+      const y = rand(640, 790);
+      const hw = gobletHW(y);
+      const x = GOB.cx + rand(0.45, 0.95) * hw;
+      paintPath(lineS(x, y, x + rand(-5, 5), y + rand(20, 65), 2, rand(0, 6), 2), {
+        n: 8, w: rand(5, 12), a: 0.10, stretch: 0.5, fade: 0.3, vary: 3,
+        c1: [72, 74, 55]
+      });
+    }
+
+    // Reserved, brushed highlights: peach bloom, copper rim, cloth ridges.
+    for (const p of PEACHES) {
+      for (let i = 0; i < 9; i++) {
+        const a0 = rand(3.38, 4.08);
+        const sweep = rand(0.35, 0.8);
+        paintPath(arcS(p.cx - 2, p.cy - 2, p.rx * rand(0.48, 0.86), p.ry * rand(0.48, 0.86), a0, a0 + sweep), {
+          n: 10, w: rand(5, 11), a: 0.22, stretch: 0.5, fade: 0.28, vary: 4,
+          col: (x, y) => mix(peachCol(x, y, p, 'color'), [244, 202, 153], 0.5)
+        });
+      }
+      for (let i = 0; i < 7; i++) {
+        const a = rand(3.6, 4.5);
+        softDab(p.cx + Math.cos(a) * p.rx * rand(0.55, 0.8), p.cy + Math.sin(a) * p.ry * rand(0.55, 0.8),
+          rand(3, 6.5), a + rand(-0.5, 0.5), 0.5, [241, 202, 157], 0.24);
+      }
+    }
+    // Peach fuzz, separate fine filaments at the lit rim.
+    for (const p of PEACHES) {
+      for (let i = 0; i < 55; i++) {
+        const a = rand(3.1, 5.1);
+        const x = p.cx + Math.cos(a) * p.rx * rand(0.92, 1.0);
+        const y = p.cy + Math.sin(a) * p.ry * rand(0.92, 1.0);
+        const ang = Math.atan2(Math.cos(a) * p.ry, -Math.sin(a) * p.rx) + Math.PI / 2;
+        paintPath(lineS(x, y, x + Math.cos(ang) * rand(2, 8), y + Math.sin(ang) * rand(2, 8), 0, 0, 1), {
+          n: 3, w: rand(0.8, 2.1), a: 0.15, stretch: 0.4, fade: 0.4, vary: 2,
+          c1: [229, 194, 151]
+        });
+      }
+    }
+    // Copper rim's strongest warm note.
+    for (let i = 0; i < 3; i++) {
+      paintPath(arcS(GOB.cx, GOB.rimY - 1, GOB.rimRX - 2 + i, GOB.rimRY - 1, 3.42, 4.28), {
+        n: 20, w: 5.6 - i * 1.5, a: 0.32 - i * 0.04, stretch: 0.44, fade: 0.16, vary: 3,
+        c1: [251, 219, 162]
+      });
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = rand(3.58, 4.18);
+      const x = GOB.cx + Math.cos(a) * (GOB.rimRX - 3);
+      const y = GOB.rimY + Math.sin(a) * (GOB.rimRY - 2);
+      softDab(x, y, rand(1.8, 3.4), a, 0.45, [252, 235, 196], 0.40);
+    }
+    // Ridge glints on the linen.
+    for (let i = 0; i < 10; i++) {
+      const p = randomPointInPoly(CLOTH);
+      const ang = rand(0.35, 1.3);
+      paintPath(lineS(p[0] - Math.cos(ang) * rand(10, 45), p[1] - Math.sin(ang) * rand(10, 45),
+        p[0] + Math.cos(ang) * rand(10, 45), p[1] + Math.sin(ang) * rand(10, 45), rand(1, 5), rand(0, 6), 2), {
+        n: 12, w: rand(2, 5.5), a: 0.16, stretch: 0.42, fade: 0.3, vary: 3,
+        c1: [198, 181, 150]
+      });
+    }
+    // A few sparse linen fibres catch the light; just enough to feel woven.
+    for (let i = 0; i < 45; i++) {
+      const p = randomPointInPoly(CLOTH);
+      const ang = rand(-0.4, 1.4);
+      const len = rand(3, 13);
+      ctx.globalAlpha = rand(0.02, 0.06);
+      ctx.strokeStyle = rgb(mix(clothCol(p[0], p[1], 'color'), [225, 208, 176], 0.45));
+      ctx.lineWidth = rand(0.6, 1.5);
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1]);
+      ctx.lineTo(p[0] + Math.cos(ang) * len, p[1] + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------------------
+  // LAYER 4 — several thin translucent glazing passes.  Each pass is a low-alpha
+  // brush loop; shadows are darkened slowly and repeatedly, never with a filter.
+  // ---------------------------------------------------------------------------
+  // Glazing is built on a transparent offscreen layer, then laid onto the painting
+  // once at low opacity.  This keeps each pass thin and translucent instead of
+  // letting hundreds of tiny low-alpha dabs collapse into an opaque mud.
+  function glazePass(opacity, painter) {
+    const layer = document.createElement('canvas');
+    layer.width = W;
+    layer.height = H;
+    const layerCtx = layer.getContext('2d');
+    const mainCtx = ctx;
+    ctx = layerCtx;
+    painter();
+    ctx = mainCtx;
+    mainCtx.save();
+    mainCtx.globalAlpha = opacity;
+    mainCtx.drawImage(layer, 0, 0);
+    mainCtx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function glazeStrokes(count, x0, x1, y0, y1, color, alpha, angleLo, angleHi, widthLo, widthHi) {
+    for (let i = 0; i < count; i++) {
+      const x = rand(x0, x1), y = rand(y0, y1);
+      const ang = rand(angleLo, angleHi);
+      const len = rand(80, 300);
+      paintPath(lineS(x - Math.cos(ang) * len * 0.45, y - Math.sin(ang) * len * 0.45,
+        x + Math.cos(ang) * len * 0.55, y + Math.sin(ang) * len * 0.55,
+        rand(2, 12), rand(0, 6), rand(1.2, 2.3)), {
+        n: randInt(18, 36), w: rand(widthLo, widthHi), a: alpha,
+        stretch: 0.52, fade: 0.24, posJ: 3, vary: 2,
+        col: (px, py) => jitter(mix(color, bgCol(px, py, 'color'), 0.08), 3, 1)
+      });
+    }
+  }
+
+  function glazeFoldShadows() {
+    for (const f of FOLDS) {
+      const q = quadS(f.pts[0][0], f.pts[0][1], f.pts[1][0], f.pts[1][1], f.pts[2][0], f.pts[2][1]);
+      paintPath(offsetS(q, 9, 11), {
+        n: 20, w: f.w * 0.28, a: 0.10, stretch: 0.5, fade: 0.24, vary: 2,
+        c1: [45, 31, 22]
+      });
+    }
+  }
+
+  function layer4Glazing() {
+    // Pass 1 — warm amber unifier over the lit half.
+    glazePass(0.11, () => {
+      glazeStrokes(34, -80, 900, -60, 1160, [181, 116, 58], 0.26, -1.1, 1.2, 80, 180);
+    });
+
+    // Pass 2 — the first deep umber veil through the shadow architecture.
+    glazePass(0.13, () => {
+      glazeStrokes(36, 560, 1080, -80, 1200, [29, 19, 12], 0.28, -1.35, 1.1, 80, 180);
+      glazeStrokes(22, -80, 1080, 1030, 1280, [27, 18, 12], 0.26, -0.3, 0.4, 80, 160);
+      glazeStrokes(18, -80, 400, 680, 1200, [42, 29, 19], 0.22, 0.4, 1.3, 60, 130);
+      glazeFoldShadows();
+    });
+
+    // Pass 3 — a second, slower umber glaze; the velvet darks deepen.
+    glazePass(0.10, () => {
+      glazeStrokes(28, 620, 1080, 0, 1060, [19, 13, 9], 0.26, -1.5, 1.2, 70, 160);
+      for (const p of PEACHES) {
+        for (let i = 0; i < 6; i++) {
+          const a0 = rand(0.0, 1.25);
+          paintPath(arcS(p.cx, p.cy, p.rx * rand(0.65, 0.98), p.ry * rand(0.65, 0.98), a0, a0 + rand(0.4, 1.05)), {
+            n: 11, w: 24, a: 0.18, stretch: 0.5, fade: 0.28, vary: 2,
+            c1: [49, 22, 18]
+          });
+        }
+      }
+      // Copper turning shadow and interior.
+      for (let i = 0; i < 14; i++) {
+        const y = rand(GOB.rimY + 25, GOB.bowlBottom - 5);
+        const hw = gobletHW(y);
+        const x = GOB.cx + rand(0.28, 0.95) * hw;
+        paintPath(lineS(x, y, x + rand(-5, 8), y + rand(30, 80), 2, rand(0, 6), 2), {
+          n: 9, w: rand(16, 30), a: 0.18, stretch: 0.5, fade: 0.28, vary: 2,
+          c1: [47, 32, 21]
+        });
+      }
+      for (let i = 0; i < 8; i++) {
+        paintPath(arcS(GOB.cx, GOB.rimY + 4, rand(16, 72), rand(4, 15), rand(0, TAU), rand(0, TAU) + rand(0.5, 1.5)), {
+          n: 9, w: rand(10, 20), a: 0.22, stretch: 0.5, fade: 0.3, vary: 2,
+          c1: [22, 15, 11]
+        });
+      }
+    });
+
+    // Pass 4 — attenuated crimson in the fruit shadows and the linen beneath.
+    glazePass(0.09, () => {
+      for (const p of PEACHES) {
+        for (let i = 0; i < 7; i++) {
+          const a0 = rand(-0.1, 1.35);
+          paintPath(arcS(p.cx, p.cy, p.rx * rand(0.55, 0.98), p.ry * rand(0.55, 0.98), a0, a0 + rand(0.5, 1.25)), {
+            n: 12, w: 22, a: 0.20, stretch: 0.5, fade: 0.3, vary: 2,
+            c1: [105, 38, 32]
+          });
+        }
+      }
+      glazeStrokes(13, 280, 700, 850, 1130, [96, 38, 30], 0.20, 0.3, 1.3, 50, 100);
+      glazeStrokes(9, 0, 280, 680, 1050, [96, 43, 32], 0.16, -0.4, 0.8, 45, 90);
+    });
+
+    // Pass 5 — cool, muted patina on copper and at the far edge of the room.
+    glazePass(0.075, () => {
+      for (let i = 0; i < 13; i++) {
+        const y = rand(GOB.rimY + 45, GOB.bowlBottom + 30);
+        const hw = y < GOB.bowlBottom ? gobletHW(y) : 30;
+        const x = GOB.cx + rand(0.10, 0.95) * hw;
+        paintPath(lineS(x, y, x + rand(-4, 6), y + rand(25, 85), 2, rand(0, 6), 2), {
+          n: 8, w: rand(12, 24), a: 0.16, stretch: 0.5, fade: 0.3, vary: 2,
+          c1: [67, 75, 57]
+        });
+      }
+      glazeStrokes(12, 760, 1080, 0, 900, [52, 60, 50], 0.13, -1.4, 1.1, 60, 120);
+    });
+
+    // Pass 6 — transparent warm light over the lit side; a glaze, not a repaint.
+    glazePass(0.09, () => {
+      glazeStrokes(16, -80, 650, -60, 780, [205, 146, 78], 0.18, -1.2, 1.2, 70, 150);
+      for (const p of PEACHES) {
+        for (let i = 0; i < 4; i++) {
+          paintPath(arcS(p.cx - 2, p.cy - 2, p.rx * rand(0.4, 0.85), p.ry * rand(0.4, 0.85), rand(3.2, 4.2), rand(3.2, 4.2) + rand(0.4, 0.9)), {
+            n: 9, w: 16, a: 0.16, stretch: 0.5, fade: 0.3, vary: 2,
+            c1: [236, 172, 104]
+          });
+        }
+      }
+      for (let i = 0; i < 8; i++) {
+        const y = rand(GOB.rimY + 20, GOB.rimY + 150);
+        const x = GOB.cx - rand(0.25, 0.65) * gobletHW(y);
+        paintPath(lineS(x, y, x + rand(-3, 3), y + rand(25, 65), 1, 0, 1.5), {
+          n: 8, w: rand(6, 14), a: 0.18, stretch: 0.45, fade: 0.3, vary: 2,
+          c1: [220, 155, 80]
+        });
+      }
+      for (let i = 0; i < 10; i++) {
+        const p = randomPointInPoly(CLOTH);
+        const ang = rand(0.4, 1.25);
+        paintPath(lineS(p[0] - Math.cos(ang) * 40, p[1] - Math.sin(ang) * 40,
+          p[0] + Math.cos(ang) * 40, p[1] + Math.sin(ang) * 40, 3, rand(0, 6), 2), {
+          n: 10, w: rand(8, 18), a: 0.14, stretch: 0.45, fade: 0.3, vary: 2,
+          c1: [214, 174, 122]
+        });
+      }
+    });
+
+    // Pass 6b — a warm skin glaze that knits the peach colours together.
+    glazePass(0.10, () => {
+      for (const p of PEACHES) {
+        for (let i = 0; i < 18; i++) {
+          const a = rand(0, TAU);
+          const rr = Math.sqrt(rand(0.05, 0.92));
+          const x = p.cx + Math.cos(a) * p.rx * rr;
+          const y = p.cy + Math.sin(a) * p.ry * rr;
+          const ang = rand(0, TAU);
+          const len = rand(24, 60);
+          paintPath(lineS(x - Math.cos(ang) * len * 0.5, y - Math.sin(ang) * len * 0.5,
+            x + Math.cos(ang) * len * 0.5, y + Math.sin(ang) * len * 0.5,
+            rand(1, 3), rand(0, 6), 2), {
+            n: 5, w: rand(24, 44), a: 0.20, stretch: 0.5, fade: 0.34, vary: 2,
+            c1: [188, 100, 55]
+          });
+        }
+      }
+    });
+
+    // Pass 6c — a deeper veil over the upper room to settle the scumbles.
+    glazePass(0.10, () => {
+      for (let i = 0; i < 18; i++) {
+        const y = rand(-80, 700);
+        const x = rand(-100, 1100);
+        paintPath(lineS(x - 200, y - 30, x + 220, y + 30, rand(4, 14), rand(0, 6), 1.6), {
+          n: 20, w: rand(220, 360), a: 0.22, stretch: 0.62, fade: 0.26, vary: 2,
+          c1: [22, 15, 11]
+        });
+      }
+    });
+
+    // Pass 7 — quiet bounce light and a final thin rim of umber around the scene.
+    glazePass(0.085, () => {
+      for (const p of PEACHES) {
+        for (let i = 0; i < 3; i++) {
+          const a0 = rand(0.05, 0.85);
+          paintPath(arcS(p.cx, p.cy, p.rx * rand(0.90, 0.99), p.ry * rand(0.90, 0.99), a0, a0 + rand(0.3, 0.6)), {
+            n: 8, w: 9, a: 0.18, stretch: 0.5, fade: 0.3, vary: 2,
+            c1: [194, 128, 78]
+          });
+        }
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = rand(-0.2, 1.3);
+        paintPath(arcS(GOB.cx, GOB.baseY, GOB.baseRX, GOB.baseRY, a, a + rand(0.4, 1.0)), {
+          n: 9, w: 8, a: 0.18, stretch: 0.5, fade: 0.3, vary: 2,
+          c1: [165, 108, 62]
+        });
+      }
+      for (let i = 0; i < 18; i++) {
+        const x = rand(0, 1000), y = rand(0, 1200);
+        const inner = Math.exp(-(Math.pow((x - 500) / 450, 2) + Math.pow((y - 600) / 540, 2)));
+        if (inner > 0.72) continue;
+        paintPath(lineS(x, y, x + rand(-60, 60), y + rand(-90, 90), rand(4, 14), rand(0, 6), 2), {
+          n: 16, w: rand(55, 110), a: 0.16 + (1 - inner) * 0.10,
+          stretch: 0.55, fade: 0.28, vary: 2,
+          c1: [21, 14, 10]
+        });
+      }
+      for (const p of PEACHES) {
+        paintPath(arcS(p.cx + 4, p.cy + p.ry * 0.74, p.rx * 0.62, p.ry * 0.18, 0.1, 2.9), {
+          n: 14, w: 11, a: 0.20, stretch: 0.5, fade: 0.3, vary: 2,
+          c1: [43, 28, 19]
+        });
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Strict painting order: linen → grisaille → colour → glazes.
+  // ---------------------------------------------------------------------------
+  function pause(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function paint() {
+    layer1Linen();
+    await pause(24);
+    layer2Grisaille();
+    await pause(24);
+    layer3Color();
+    await pause(24);
+    layer4Glazing();
+  }
+
+  paint();
+})();
+</script>
+</body>
+</html>
