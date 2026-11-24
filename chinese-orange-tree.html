@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>写意橘子树 · 重彩</title>
+<style>
+  :root {
+    --ink: #2b231b;
+    --paper: #f3e9d6;
+    --bar: rgba(246, 239, 226, 0.92);
+    --line: rgba(76, 60, 43, 0.28);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: #1d1813;
+    color: var(--ink);
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  #painting {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: calc(100vw - 28px);
+    max-height: calc(100vh - 92px);
+    background: var(--paper);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.52);
+  }
+  #bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bar);
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(4px);
+  }
+  button {
+    appearance: none;
+    border: 1px solid rgba(61, 47, 33, 0.48);
+    background: rgba(255, 252, 243, 0.55);
+    color: #31271d;
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  button:hover { background: rgba(255, 252, 243, 0.95); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  #status {
+    min-width: 150px;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: #554838;
+    user-select: none;
+  }
+  @media (max-width: 560px) {
+    #status { width: 100%; }
+    button { font-size: 13px; padding: 6px 11px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="painting" width="1000" height="1300"></canvas>
+<div id="bar">
+  <button id="redraw" type="button">重新绘制</button>
+  <button id="speed" type="button">加速 ×1</button>
+  <button id="save" type="button">保存 PNG</button>
+  <span id="status">准备作画</span>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  // ==========================================================================
+  // 一、可调参数区：画布、速度、墨色、颜料、笔刷
+  // ==========================================================================
+  const W = 1000;
+  const H = 1300;
+  const MAX_STROKES = 2000;      // 总笔触上限（不含宣纸肌理）
+  const BASE_SPEED = 0.9;        // 每帧执行笔数（1 为每帧约一笔）
+  const SPEED_STEPS = [1, 2, 4]; // 加速档位
+  const PAPER_COLOR = '#f3e9d6';
+
+  // 墨分五色（焦、浓、重、淡、清），带一点暖褐，避免死黑
+  const INK = {
+    jiao: '#17120e',
+    nong: '#241c16',
+    zhong: '#3a2e24',
+    dan: '#5a4a39',
+    qing: '#7b6a56'
+  };
+
+  // 树干、枝、根的颜色（赭石、赭褐、藤黄调）
+  const WOOD = {
+    deep: '#3f2d1e',
+    mid: '#5b412b',
+    warm: '#7b5839',
+    light: '#9d744a'
+  };
+
+  // 叶：石绿、花青、汁绿、赭黄，低饱和重彩
+  const LEAF = {
+    back: ['#2c4638', '#345441', '#2f4d4a', '#3b5a45'],
+    mid: ['#476647', '#55734f', '#3f5f58', '#617a4d'],
+    front: ['#7b854c', '#918e4f', '#a27f45', '#6e8a5b'],
+    ink: ['#26392e', '#2e4033', '#334a3b']
+  };
+
+  // 橘：朱磦、赭石、藤黄、土红
+  const FRUIT = {
+    base: ['#d8782a', '#df8231', '#ce6926', '#e08b38'],
+    red: ['#b84c1d', '#c25721', '#a9431a'],
+    light: ['#efa94f', '#f3b961', '#e89a3e'],
+    calyx: '#4e5b32'
+  };
+
+  // 笔刷参数：软边、洇染、枯笔、飞白
+  const BRUSH = {
+    tipSize: 96,
+    bleedAlpha: 0.06,   // 生宣洇染外晕
+    drySkip: 0.38,      // 枯笔随机断墨
+    jitter: 0.15,       // 笔迹边缘抖动
+    bristleAlpha: 0.16  // 飞白细丝
+  };
+
+  // 三种笔尖：湿染、浓墨、叶片。墨线硬一点，颜色才不会糊成一片。
+  const TIP_STYLES = {
+    wash: [[0, 1], [0.38, 0.82], [0.68, 0.34], [0.88, 0.07], [1, 0]],
+    ink:  [[0, 1], [0.46, 1], [0.74, 0.74], [0.91, 0.18], [1, 0]],
+    leaf: [[0, 1], [0.48, 0.98], [0.72, 0.66], [0.89, 0.18], [1, 0]]
+  };
+
+  // ==========================================================================
+  // 二、基础工具
+  // ==========================================================================
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0;
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  let R = mulberry32(0x5eed2026);
+  const rand = (a = 0, b = 1) => a + R() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const pick = arr => arr[Math.floor(R() * arr.length)];
+
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16)
+    ];
+  }
+  function rgba(hex, a) {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // ==========================================================================
+  // 三、宣纸基底：淡米黄 + 纸纤维 + 细微噪点
+  // ==========================================================================
+  const paperCanvas = document.createElement('canvas');
+  paperCanvas.width = W;
+  paperCanvas.height = H;
+
+  function buildPaper() {
+    const g = paperCanvas.getContext('2d');
+    const pr = mulberry32(0x0a1e5eed);
+    const rnd = (a, b) => a + pr() * (b - a);
+
+    g.fillStyle = PAPER_COLOR;
+    g.fillRect(0, 0, W, H);
+
+    // 纸色不匀：极淡的暖、冷色斑，模拟手工纸的云絮感
+    for (let i = 0; i < 46; i++) {
+      const x = rnd(0, W), y = rnd(0, H);
+      const rx = rnd(80, 260), ry = rnd(60, 210);
+      g.globalAlpha = rnd(0.02, 0.048);
+      g.fillStyle = pr() < 0.5 ? '#e6d7bc' : '#f8efdd';
+      g.beginPath();
+      g.ellipse(x, y, rx, ry, rnd(-0.4, 0.4), 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // 长纤维：横向、斜向都有，避免机械网格
+    g.lineCap = 'round';
+    for (let i = 0; i < 10500; i++) {
+      const x = rnd(-10, W + 10), y = rnd(-10, H + 10);
+      const len = rnd(3, 26);
+      const ang = rnd(-0.45, 0.45) + (pr() < 0.16 ? Math.PI / 2 : 0);
+      g.globalAlpha = rnd(0.028, 0.075);
+      g.strokeStyle = pr() < 0.62 ? '#b7a487' : '#d9cbb2';
+      g.lineWidth = rnd(0.45, 1.15);
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(
+        x + Math.cos(ang) * len * 0.55 + rnd(-2, 2),
+        y + Math.sin(ang) * len * 0.55 + rnd(-2, 2),
+        x + Math.cos(ang) * len,
+        y + Math.sin(ang) * len
+      );
+      g.stroke();
+    }
+
+    // 细碎纸屑/噪点
+    for (let i = 0; i < 7000; i++) {
+      const x = rnd(0, W), y = rnd(0, H);
+      g.globalAlpha = rnd(0.03, 0.09);
+      g.fillStyle = pr() < 0.55 ? '#a89476' : '#fff9eb';
+      const s = rnd(0.35, 1.5);
+      g.fillRect(x, y, s, s);
+    }
+
+    // 四边极淡的旧纸气息
+    for (let i = 0; i < 20; i++) {
+      const side = i % 4;
+      g.globalAlpha = rnd(0.02, 0.04);
+      g.fillStyle = '#a78e69';
+      if (side === 0) g.fillRect(0, 0, W, rnd(8, 28));
+      if (side === 1) g.fillRect(0, H - rnd(8, 28), W, 28);
+      if (side === 2) g.fillRect(0, 0, rnd(8, 26), H);
+      if (side === 3) g.fillRect(W - rnd(8, 26), 0, 26, H);
+    }
+    g.globalAlpha = 1;
+  }
+
+  // ==========================================================================
+  // 四、毛笔笔刷：软边径向渐变笔尖、洇染、枯笔、飞白
+  // ==========================================================================
+  const tipCache = new Map();
+
+  function getTip(color, kind = 'wash', dry = false) {
+    const key = kind + (dry ? ':d:' : ':w:') + color;
+    if (tipCache.has(key)) return tipCache.get(key);
+
+    const s = BRUSH.tipSize;
+    const c = document.createElement('canvas');
+    c.width = c.height = s;
+    const g = c.getContext('2d');
+    const [r, gg, b] = hexToRgb(color);
+    const cx = s / 2, cy = s / 2, rad = s / 2;
+    const stops = TIP_STYLES[kind] || TIP_STYLES.wash;
+
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    for (const [t, a] of stops) {
+      grad.addColorStop(t, `rgba(${r},${gg},${b},${a})`);
+    }
+    g.fillStyle = grad;
+    g.fillRect(0, 0, s, s);
+
+    // 笔尖内部留一点毛糙的笔毫纹，避免每一笔都像喷枪
+    if (kind !== 'wash') {
+      g.globalCompositeOperation = 'source-atop';
+      for (let i = 0; i < 13; i++) {
+        const x = rand(4, s - 4), y = rand(4, s - 4);
+        const len = rand(10, s * 0.7);
+        const a = rand(-0.7, 0.7);
+        g.globalAlpha = rand(0.04, 0.13);
+        g.strokeStyle = R() < 0.55 ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.35)';
+        g.lineWidth = rand(0.5, 1.5);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    // 枯笔：在笔尖上切出细碎缺口，落下时自带飞白
+    if (dry) {
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 28; i++) {
+        const x = rand(-4, s + 4);
+        const y = rand(-4, s + 4);
+        const len = rand(10, s * 1.1);
+        const ang = rand(-0.55, 0.55);
+        g.globalAlpha = rand(0.25, 0.85);
+        g.strokeStyle = '#000';
+        g.lineWidth = rand(0.6, 2.4);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    tipCache.set(key, c);
+    return c;
+  }
+
+  function stampTip(x, y, r, color, alpha, dry = false, kind = 'wash') {
+    if (r < 0.35 || alpha <= 0.002) return;
+    const tip = getTip(color, kind, dry);
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.drawImage(tip, x - r, y - r, r * 2, r * 2);
+  }
+
+  // 二次贝塞尔采样，返回位置与切线角
+  function sampleQuad(p0, p1, p2, step = 3.5) {
+    const approx = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) +
+      Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    const n = clamp(Math.round(approx / step), 7, 80);
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, mt = 1 - t;
+      const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0];
+      const y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1];
+      const dx = 2 * mt * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]);
+      const dy = 2 * mt * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]);
+      out.push({ x, y, a: Math.atan2(dy, dx) });
+    }
+    return out;
+  }
+
+  function sampleLine(p0, p1, step = 4) {
+    const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    const n = clamp(Math.round(len / step), 3, 48);
+    const a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]);
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      out.push({ x: lerp(p0[0], p1[0], t), y: lerp(p0[1], p1[1], t), a });
+    }
+    return out;
+  }
+
+  // Catmull-Rom 采样，适用于树干、长枝
+  function sampleSpline(points, step = 4) {
+    if (points.length === 2) return sampleLine(points[0], points[1], step);
+    if (points.length === 3) return sampleQuad(points[0], points[1], points[2], step);
+
+    const pts = [points[0], ...points, points[points.length - 1]];
+    const out = [];
+    for (let i = 1; i < pts.length - 2; i++) {
+      const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+      const segLen = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      const n = clamp(Math.round(segLen / step), 3, 48);
+      for (let j = 0; j < n; j++) {
+        const t = j / n;
+        const t2 = t * t, t3 = t2 * t;
+        const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t +
+          (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+          (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+        const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t +
+          (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+          (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+        const dx = 0.5 * ((-p0[0] + p2[0]) +
+          2 * (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t +
+          3 * (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t2);
+        const dy = 0.5 * ((-p0[1] + p2[1]) +
+          2 * (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t +
+          3 * (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t2);
+        out.push({ x, y, a: Math.atan2(dy, dx) });
+      }
+    }
+    out.push({
+      x: points[points.length - 1][0],
+      y: points[points.length - 1][1],
+      a: out.length ? out[out.length - 1].a : 0
+    });
+    return out;
+  }
+
+  function drawBrush(samples, o) {
+    if (!samples.length) return;
+    const w0 = o.w0 == null ? 8 : o.w0;
+    const w1 = o.w1 == null ? w0 : o.w1;
+    const color = o.color || INK.zhong;
+    const alpha = o.alpha == null ? 0.7 : o.alpha;
+    const dry = o.dry || 0;
+    const bleed = o.bleed || 0;
+    const broken = o.broken || 0;
+    const bristle = o.bristle || 0;
+    const taper = o.taper == null ? 0.12 : o.taper;
+    const kind = o.kind || 'wash';
+    const useDryTip = dry > 0.42;
+    const n = samples.length;
+
+    for (let i = 0; i < n; i++) {
+      const p = samples[i];
+      const u = n === 1 ? 0.5 : i / (n - 1);
+      const edge = Math.min(1, u / taper, (1 - u) / taper);
+      const endFade = 0.58 + 0.42 * Math.sin(clamp(edge, 0, 1) * Math.PI / 2);
+
+      // 笔锋：起笔略重，行笔中段饱满，收笔渐尖
+      let width = lerp(w0, w1, u);
+      width *= 0.78 + 0.22 * Math.sin(Math.min(1, u * 1.15) * Math.PI);
+      width *= endFade;
+      if (width < 0.5) continue;
+
+      if (dry > 0 && R() < dry * BRUSH.drySkip) continue;
+      if (broken > 0 && R() < broken) continue;
+
+      const nx = Math.cos(p.a + Math.PI / 2);
+      const ny = Math.sin(p.a + Math.PI / 2);
+      const jit = (R() - 0.5) * width * BRUSH.jitter;
+      const x = p.x + nx * jit + (R() - 0.5) * 0.7;
+      const y = p.y + ny * jit + (R() - 0.5) * 0.7;
+      const r = width * 0.5;
+
+      // 生宣洇染：笔迹外圈先落一层极淡湿晕
+      if (bleed > 0 && i % 3 === 0) {
+        stampTip(x, y, r * 1.75, color, alpha * bleed * BRUSH.bleedAlpha, false, kind);
+      }
+
+      stampTip(x, y, r, color, alpha * (dry ? 0.78 : 1), useDryTip, kind);
+
+      // 飞白：顺着笔势拖出细丝，带一点随机断墨
+      if ((dry > 0.18 || bristle > 0) && i % 2 === 0 && R() < (dry * 0.55 + bristle * 0.35)) {
+        const off = (R() - 0.5) * width * 0.72;
+        const bx = x + nx * off;
+        const by = y + ny * off;
+        const len = rand(3, Math.max(5, width * 0.75));
+        ctx.globalAlpha = alpha * (BRUSH.bristleAlpha + R() * 0.12);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = rand(0.45, 1.15);
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.quadraticCurveTo(
+          bx + Math.cos(p.a) * len * 0.5 + rand(-1.5, 1.5),
+          by + Math.sin(p.a) * len * 0.5 + rand(-1.5, 1.5),
+          bx + Math.cos(p.a + rand(-0.1, 0.1)) * len,
+          by + Math.sin(p.a + rand(-0.1, 0.1)) * len
+        );
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ==========================================================================
+  // 五、动作队列：所有笔触按顺序排队
+  // ==========================================================================
+  let queue = [];
+  let strokeCount = 0;
+  let drawCallCount = 0;
+
+  function addStroke(points, opts) {
+    if (strokeCount >= MAX_STROKES) return false;
+    // 细笔要密采样，否则会变成一串墨点；粗笔可疏一些
+    const w = opts.w0 == null ? 8 : opts.w0;
+    const step = w < 3 ? 0.9 : w < 6 ? 1.3 : w < 12 ? 1.9 : w < 24 ? 2.5 : 3.1;
+    let samples;
+    if (points.length === 2) samples = sampleLine(points[0], points[1], step);
+    else samples = sampleSpline(points, step);
+    if (samples.length < 2) return false;
+    strokeCount++;
+    const optsCopy = Object.assign({}, opts);
+    queue.push({
+      type: 'stroke',
+      draw: () => {
+        drawCallCount++;
+        drawBrush(samples, optsCopy);
+      }
+    });
+    return true;
+  }
+
+  function addDab(x, y, r, color, alpha, dry = false, kind = 'wash') {
+    if (strokeCount >= MAX_STROKES) return false;
+    strokeCount++;
+    queue.push({
+      type: 'stroke',
+      draw: () => {
+        drawCallCount++;
+        stampTip(x, y, r, color, alpha, dry, kind);
+        ctx.globalAlpha = 1;
+      }
+    });
+    return true;
+  }
+
+  function addAction(fn) {
+    if (strokeCount >= MAX_STROKES) return false;
+    strokeCount++;
+    queue.push({
+      type: 'stroke',
+      draw: () => {
+        drawCallCount++;
+        fn();
+      }
+    });
+    return true;
+  }
+
+  function addPause(frames) {
+    queue.push({ type: 'pause', frames });
+  }
+
+  // ==========================================================================
+  // 六、构图数据：树干、枝、叶簇、橘子
+  // ==========================================================================
+  // 树干主段与分枝（从下往上、从主干到枝梢）
+  const TRUNK_PATHS = [
+    // 主干：从右下向中上斜伸，先分两股，再散枝
+    { pts: [[612, 1278], [601, 1180], [576, 1080], [549, 990], [529, 900]], w0: 102, w1: 52 },
+    { pts: [[663, 1270], [684, 1170], [702, 1070], [719, 980]], w0: 62, w1: 28 },
+    // 左股
+    { pts: [[576, 1080], [520, 1000], [470, 910], [431, 820]], w0: 44, w1: 16 },
+    // 左低长枝
+    { pts: [[520, 1000], [435, 950], [340, 880], [241, 800]], w0: 25, w1: 6 },
+    // 左中枝
+    { pts: [[470, 910], [390, 840], [310, 760], [246, 680]], w0: 19, w1: 4 },
+    // 左上枝
+    { pts: [[431, 820], [366, 740], [306, 660], [256, 580]], w0: 15, w1: 3 },
+    // 中枝
+    { pts: [[529, 900], [533, 800], [540, 700], [550, 600]], w0: 23, w1: 4 },
+    // 中上枝
+    { pts: [[540, 700], [610, 620], [665, 540], [705, 460]], w0: 15, w1: 3 },
+    // 右低长枝
+    { pts: [[719, 980], [790, 900], [850, 810], [890, 720]], w0: 21, w1: 4 },
+    // 右下枝
+    { pts: [[702, 1070], [780, 990], [850, 910]], w0: 17, w1: 4 },
+    // 右中枝
+    { pts: [[663, 900], [740, 820], [805, 740], [860, 660]], w0: 15, w1: 3 },
+    // 交叉枝：让枝干在树冠里互相穿插，不是一把扇子
+    { pts: [[529, 1000], [610, 930], [690, 860], [748, 800]], w0: 19, w1: 6 },
+    { pts: [[702, 1060], [630, 990], [550, 915], [480, 850]], w0: 17, w1: 5 },
+    // 伸出树冠的枯枝，破掉圆球轮廓
+    { pts: [[241, 800], [170, 770], [120, 730], [92, 690]], w0: 20, w1: 3 },
+    { pts: [[860, 660], [920, 610], [962, 548]], w0: 16, w1: 3 },
+    { pts: [[705, 460], [742, 370], [762, 300]], w0: 12, w1: 2 }
+  ];
+
+  const ROOTS = [
+    [[612, 1278], [540, 1292]],
+    [[620, 1278], [690, 1290]],
+    [[650, 1272], [600, 1296]],
+    [[672, 1268], [742, 1284]],
+    [[606, 1282], [575, 1298]],
+    [[666, 1276], [636, 1298]]
+  ];
+
+  const CLUSTERS = [
+    // 后层：大块暗绿，先压出树冠的体积
+    [170, 720, 60, 10, 'back'], [210, 650, 65, 11, 'back'],
+    [260, 590, 64, 11, 'back'], [310, 530, 62, 10, 'back'],
+    [360, 480, 66, 11, 'back'], [410, 430, 60, 10, 'back'],
+    [460, 390, 62, 10, 'back'], [520, 360, 62, 10, 'back'],
+    [580, 350, 64, 10, 'back'], [640, 370, 62, 10, 'back'],
+    [700, 400, 65, 11, 'back'], [750, 450, 62, 10, 'back'],
+    [800, 500, 62, 10, 'back'], [850, 560, 60, 10, 'back'],
+    [880, 630, 58, 9, 'back'],
+    [220, 800, 58, 9, 'back'], [280, 760, 62, 10, 'back'],
+    [340, 720, 60, 10, 'back'], [400, 690, 62, 10, 'back'],
+    [460, 660, 58, 9, 'back'], [520, 640, 60, 10, 'back'],
+    [580, 640, 60, 10, 'back'], [640, 660, 62, 10, 'back'],
+    [700, 690, 60, 10, 'back'], [760, 730, 60, 10, 'back'],
+    [820, 780, 58, 9, 'back'], [860, 830, 54, 8, 'back'],
+    [360, 860, 56, 9, 'back'], [420, 850, 58, 9, 'back'],
+    [480, 860, 56, 9, 'back'], [540, 870, 58, 9, 'back'],
+    [600, 880, 56, 9, 'back'], [660, 900, 54, 8, 'back'],
+    [720, 920, 52, 8, 'back'],
+    // 中层：石绿、花青穿插，叶形更清楚
+    [250, 690, 54, 9, 'mid'], [310, 640, 56, 9, 'mid'],
+    [370, 590, 55, 8, 'mid'], [430, 550, 56, 9, 'mid'],
+    [490, 520, 54, 8, 'mid'], [550, 500, 56, 9, 'mid'],
+    [610, 510, 54, 8, 'mid'], [670, 540, 56, 9, 'mid'],
+    [730, 580, 55, 8, 'mid'], [790, 630, 54, 8, 'mid'],
+    [840, 690, 52, 8, 'mid'],
+    [270, 830, 52, 8, 'mid'], [330, 800, 54, 8, 'mid'],
+    [390, 770, 52, 8, 'mid'], [450, 750, 54, 8, 'mid'],
+    [510, 730, 52, 8, 'mid'], [570, 720, 54, 8, 'mid'],
+    [630, 740, 52, 8, 'mid'], [690, 770, 54, 8, 'mid'],
+    [750, 810, 52, 8, 'mid'], [800, 860, 50, 7, 'mid'],
+    [430, 900, 50, 7, 'mid'], [490, 920, 50, 7, 'mid'],
+    [550, 930, 50, 7, 'mid'], [610, 930, 50, 7, 'mid'],
+    [670, 950, 48, 7, 'mid'],
+    // 前层：亮绿、赭黄，最后压上
+    [330, 700, 46, 7, 'front'], [390, 660, 48, 7, 'front'],
+    [450, 630, 46, 7, 'front'], [510, 610, 48, 7, 'front'],
+    [570, 600, 46, 7, 'front'], [630, 620, 48, 7, 'front'],
+    [690, 650, 46, 7, 'front'], [750, 690, 44, 6, 'front'],
+    [800, 740, 44, 6, 'front'],
+    [300, 770, 44, 6, 'front'], [360, 740, 46, 6, 'front'],
+    [420, 720, 44, 6, 'front'], [480, 700, 46, 6, 'front'],
+    [540, 690, 44, 6, 'front'], [600, 700, 46, 6, 'front'],
+    [660, 730, 44, 6, 'front'], [720, 760, 44, 6, 'front'],
+    [780, 800, 42, 6, 'front'],
+    [380, 840, 42, 6, 'front'], [440, 860, 44, 6, 'front'],
+    [500, 870, 42, 6, 'front'], [560, 880, 44, 6, 'front'],
+    [620, 890, 42, 6, 'front'], [680, 910, 40, 6, 'front'],
+    [520, 460, 42, 6, 'front'], [580, 450, 42, 6, 'front'],
+    [640, 470, 40, 6, 'front']
+  ];
+
+  // 树冠取斜势：切掉左上、右下两角，留出枝干和纸白，避免成为圆球
+  const CLUSTER_CUTS = [
+    [0, 0, 405, 565],
+    [725, 770, 1000, 1010]
+  ];
+  const ACTIVE_CLUSTERS = CLUSTERS.filter(c =>
+    !CLUSTER_CUTS.some(([x0, y0, x1, y1]) =>
+      c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1)
+  );
+
+  const FRUITS = [
+    [210, 730, 22, 0.8], [246, 700, 19, 0.7], [230, 766, 20, 0.9],
+    [300, 690, 21, 0.8], [336, 660, 18, 0.7], [316, 722, 19, 0.9],
+    [390, 650, 22, 0.8], [430, 680, 20, 0.9], [406, 712, 18, 0.7],
+    [490, 640, 23, 0.8], [526, 670, 20, 0.9], [501, 702, 19, 0.7],
+    [560, 650, 22, 0.9], [596, 680, 20, 0.8], [576, 716, 21, 0.7],
+    [640, 690, 21, 0.8], [676, 720, 19, 0.7], [651, 750, 20, 0.9],
+    [720, 720, 22, 0.8], [756, 760, 19, 0.7], [736, 790, 18, 0.6],
+    [790, 760, 21, 0.8], [826, 800, 18, 0.7], [801, 830, 19, 0.6],
+    [300, 810, 20, 0.7], [270, 840, 18, 0.6],
+    [370, 790, 19, 0.8], [400, 822, 21, 0.9],
+    [450, 800, 20, 0.8], [486, 830, 22, 0.9],
+    [536, 820, 21, 0.8], [571, 846, 19, 0.7],
+    [610, 820, 20, 0.8], [646, 850, 18, 0.7],
+    [690, 840, 19, 0.8], [721, 870, 18, 0.6],
+    [500, 500, 18, 0.8], [550, 520, 20, 0.9],
+    [600, 540, 18, 0.8], [650, 570, 17, 0.7],
+    [420, 580, 17, 0.7], [460, 610, 18, 0.8]
+  ];
+
+  // ==========================================================================
+  // 七、建画：严格按 干 → 枝 → 叶 → 橘 的顺序入队
+  // ==========================================================================
+  function offsetPolyline(pts, dist) {
+    return pts.map((p, i) => {
+      const a = pts[Math.max(0, i - 1)];
+      const b = pts[Math.min(pts.length - 1, i + 1)];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len = Math.max(0.001, Math.hypot(dx, dy));
+      return [p[0] - dy / len * dist, p[1] + dx / len * dist];
+    });
+  }
+
+  function nearBranch(x, y, dist) {
+    for (const t of TRUNK_PATHS) {
+      for (let i = 0; i < t.pts.length - 1; i++) {
+        const x1 = t.pts[i][0], y1 = t.pts[i][1];
+        const x2 = t.pts[i + 1][0], y2 = t.pts[i + 1][1];
+        const dx = x2 - x1, dy = y2 - y1;
+        const l2 = dx * dx + dy * dy;
+        let u = l2 > 0.0001 ? ((x - x1) * dx + (y - y1) * dy) / l2 : 0;
+        u = clamp(u, 0, 1);
+        const px = x1 + dx * u, py = y1 + dy * u;
+        if (Math.hypot(x - px, y - py) < dist) return true;
+      }
+    }
+    return false;
+  }
+
+  function buildTrunk() {
+    // ① 树干湿染：赭褐打底，先立骨，再上墨
+    for (const t of TRUNK_PATHS) {
+      addStroke(t.pts, {
+        w0: t.w0, w1: t.w1, color: WOOD.mid, alpha: 0.19,
+        bleed: 0.55, kind: 'wash', taper: 0.17
+      });
+      addStroke(t.pts, {
+        w0: t.w0 * 0.56, w1: t.w1 * 0.52, color: WOOD.light,
+        alpha: 0.10, bleed: 0.22, kind: 'wash', taper: 0.2
+      });
+    }
+
+    // ② 背光/迎光：给树干圆柱体积
+    for (const t of TRUNK_PATHS.slice(0, 6)) {
+      const darkSide = offsetPolyline(t.pts, t.w0 * 0.17);
+      const lightSide = offsetPolyline(t.pts, -t.w0 * 0.20);
+      addStroke(darkSide, {
+        w0: t.w0 * 0.34, w1: t.w1 * 0.38, color: WOOD.deep,
+        alpha: 0.24, bleed: 0.3, kind: 'wash', taper: 0.2
+      });
+      addStroke(lightSide, {
+        w0: t.w0 * 0.18, w1: t.w1 * 0.2, color: WOOD.light,
+        alpha: 0.17, bleed: 0.25, kind: 'wash', taper: 0.22
+      });
+    }
+
+    // ③ 浓墨边线：左右各一笔，线条要有枯涩感
+    for (const t of TRUNK_PATHS) {
+      const left = offsetPolyline(t.pts, t.w0 * 0.30);
+      const right = offsetPolyline(t.pts, -t.w0 * 0.30);
+      addStroke(left, {
+        w0: Math.max(6.5, t.w0 * 0.12), w1: Math.max(2.2, t.w1 * 0.16),
+        color: INK.nong, alpha: 0.92, dry: 0.10, broken: 0,
+        kind: 'ink', taper: 0.12, bristle: 0.4
+      });
+      addStroke(right, {
+        w0: Math.max(5, t.w0 * 0.09), w1: Math.max(1.6, t.w1 * 0.12),
+        color: INK.zhong, alpha: 0.82, dry: 0.15, broken: 0,
+        kind: 'ink', taper: 0.15, bristle: 0.3
+      });
+    }
+
+    // ③ 树皮皴：短、斜、干，贴着树干走势
+    for (const t of TRUNK_PATHS.slice(0, 7)) {
+      for (let i = 0; i < 8; i++) {
+        const u = rand(0.06, 0.94);
+        const p = pointOnPolyline(t.pts, u);
+        const q = pointOnPolyline(t.pts, Math.min(0.98, u + 0.06));
+        const baseAng = Math.atan2(q[1] - p[1], q[0] - p[0]);
+        const ang = baseAng + rand(-0.55, 0.55);
+        const off = rand(-t.w0 * 0.26, t.w0 * 0.26);
+        const len = rand(35, 95);
+        addStroke([
+          [p[0] + rand(-4, 4), p[1] + rand(-4, 4)],
+          [p[0] + Math.cos(ang) * len + off * 0.2, p[1] + Math.sin(ang) * len]
+        ], {
+          w0: rand(4, 11), w1: rand(0.8, 2.4),
+          color: R() < 0.5 ? INK.zhong : WOOD.deep,
+          alpha: rand(0.30, 0.58), dry: 0.48, broken: 0.04,
+          kind: 'ink', taper: 0.22, bristle: 0.45
+        });
+      }
+    }
+
+    // ③b 大笔干擦：让树干有老皮、有笔痕，而不是一根光溜溜的褐管
+    for (const t of TRUNK_PATHS.slice(0, 4)) {
+      for (let i = 0; i < 15; i++) {
+        const u = rand(0.08, 0.92);
+        const p = pointOnPolyline(t.pts, u);
+        const q = pointOnPolyline(t.pts, Math.min(0.98, u + 0.08));
+        const ang = Math.atan2(q[1] - p[1], q[0] - p[0]) + rand(-0.25, 0.25);
+        const len = rand(35, 85);
+        addStroke([
+          [p[0] + rand(-8, 8), p[1] + rand(-6, 6)],
+          [p[0] + Math.cos(ang) * len, p[1] + Math.sin(ang) * len]
+        ], {
+          w0: rand(9, 19), w1: rand(2, 5),
+          color: R() < 0.5 ? WOOD.deep : INK.zhong,
+          alpha: rand(0.32, 0.56), dry: 0.42, broken: 0.03,
+          kind: 'ink', taper: 0.2, bristle: 0.35
+        });
+      }
+    }
+
+    // ③c 主干中缝：一道较深的墨线，增加苍老感
+    for (const t of TRUNK_PATHS.slice(0, 3)) {
+      const center = offsetPolyline(t.pts, rand(-4, 4));
+      addStroke(center, {
+        w0: Math.max(3, t.w0 * 0.045), w1: Math.max(1, t.w1 * 0.06),
+        color: INK.zhong, alpha: 0.48, dry: 0.35, broken: 0.05,
+        kind: 'ink', taper: 0.18
+      });
+    }
+
+    // ④ 树瘤、断枝、节疤
+    for (let i = 0; i < 12; i++) {
+      const t = TRUNK_PATHS[randInt(0, 3)];
+      const p = pointOnPolyline(t.pts, rand(0.12, 0.82));
+      const r = rand(3.5, 9);
+      addDab(p[0] + rand(-9, 9), p[1] + rand(-7, 7), r, INK.jiao, 0.55, true, 'ink');
+      addDab(p[0] + rand(-6, 6), p[1] + rand(-6, 6), r * 0.5, INK.dan, 0.3, false, 'wash');
+    }
+
+    // ⑤ 细枝省略：以主枝为主，避免出现细碎的虚线
+
+    // ⑥ 根、坡岸、草
+    for (const r of ROOTS) {
+      addStroke(r, {
+        w0: 13, w1: 2.5, color: WOOD.deep, alpha: 0.42,
+        dry: 0.62, broken: 0.1, kind: 'ink', taper: 0.25
+      });
+      addStroke(r, {
+        w0: 4, w1: 0.8, color: INK.zhong, alpha: 0.44,
+        dry: 0.68, broken: 0.12, kind: 'ink', taper: 0.3
+      });
+    }
+    addStroke([[330, 1260], [470, 1250], [620, 1256], [740, 1268]], {
+      w0: 52, w1: 24, color: INK.qing, alpha: 0.075,
+      bleed: 0.55, kind: 'wash', taper: 0.3
+    });
+    addStroke([[300, 1272], [500, 1268], [730, 1276]], {
+      w0: 38, w1: 14, color: WOOD.deep, alpha: 0.07,
+      bleed: 0.45, kind: 'wash', taper: 0.3
+    });
+    addDab(835, 1246, 26, INK.qing, 0.12, false, 'wash');
+    addDab(796, 1250, 18, INK.qing, 0.10, false, 'wash');
+
+    for (let i = 0; i < 32; i++) {
+      const x = rand(330, 820);
+      const y = rand(1208, 1278);
+      const h = rand(12, 40);
+      const lean = rand(-0.5, 0.5);
+      addStroke([
+        [x, y],
+        [x + Math.sin(lean) * h * 0.45, y - h * 0.58],
+        [x + Math.sin(lean) * h, y - h]
+      ], {
+        w0: rand(2.2, 4.6), w1: 0.4,
+        color: R() < 0.40 ? INK.zhong : (R() < 0.55 ? LEAF.mid[0] : LEAF.front[0]),
+        alpha: rand(0.28, 0.65), dry: 0.22, broken: 0.04,
+        kind: 'ink', taper: 0.2
+      });
+    }
+
+    // ⑦ 点苔：树根与石边的焦墨点，先点苔再画叶
+    for (let i = 0; i < 20; i++) {
+      const x = rand(420, 760);
+      const y = rand(1190, 1272);
+      addDab(x, y, rand(1.6, 4.2), INK.jiao, rand(0.35, 0.72), true, 'ink');
+    }
+  }
+
+  function pointOnPolyline(pts, u) {
+    if (pts.length === 1) return pts[0].slice();
+    const total = [];
+    let sum = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+      total.push(l);
+      sum += l;
+    }
+    let d = u * sum;
+    for (let i = 0; i < total.length; i++) {
+      if (d <= total[i]) {
+        const t = total[i] ? d / total[i] : 0;
+        return [lerp(pts[i][0], pts[i + 1][0], t), lerp(pts[i][1], pts[i + 1][1], t)];
+      }
+      d -= total[i];
+    }
+    return pts[pts.length - 1].slice();
+  }
+
+
+
+  function buildLeaves() {
+    // ① 大团叶气：先用湿笔把树冠的团块压出来，纸白就不会碎
+    const lobes = [
+      [310, 700, 190], [500, 510, 210], [700, 620, 190],
+      [540, 840, 175], [760, 760, 150], [220, 790, 125]
+    ];
+    for (const [lx, ly, lr] of lobes) {
+      for (let i = 0; i < 12; i++) {
+        const a = rand(-Math.PI, Math.PI);
+        const d = rand(0, lr * 0.55);
+        const x = lx + Math.cos(a) * d;
+        const y = ly + Math.sin(a) * d * 0.75;
+        addDab(x, y, rand(65, 125), R() < 0.5 ? LEAF.back[0] : LEAF.mid[0],
+          rand(0.12, 0.18), false, 'wash');
+      }
+    }
+
+    // ② 写意点叶：成团、成组，大小错落
+    for (const c of ACTIVE_CLUSTERS) {
+      const [cx, cy, radius] = c;
+      const layer = c[4];
+
+      // 一笔大叶团，压住整个叶簇
+      const lang = rand(-Math.PI, Math.PI);
+      const llen = rand(radius * 1.0, radius * 1.65);
+      const lbx = cx + rand(-15, 15), lby = cy + rand(-12, 12);
+      if (nearBranch(cx, cy, 12)) continue;
+      const ltx = lbx + Math.cos(lang) * llen;
+      const lty = lby + Math.sin(lang) * llen;
+      const lmx = (lbx + ltx) / 2 + Math.cos(lang + Math.PI / 2) * rand(-22, 22);
+      const lmy = (lby + lty) / 2 + Math.sin(lang + Math.PI / 2) * rand(-22, 22);
+      const massColor = layer === 'front'
+        ? pick([LEAF.mid[1], LEAF.mid[3], LEAF.front[0]])
+        : (layer === 'back'
+          ? pick([LEAF.back[0], LEAF.back[2], LEAF.ink[0]])
+          : pick([LEAF.mid[0], LEAF.mid[1], LEAF.mid[2]]));
+      const massSamples = sampleSpline([[lbx, lby], [lmx, lmy], [ltx, lty]], 3.2);
+      if (massSamples.length > 1) {
+        const massW = rand(48, 68);
+        strokeCount++;
+        queue.push({
+          type: 'stroke',
+          draw: () => {
+            drawCallCount++;
+            drawBrush(massSamples, {
+              w0: massW * 1.08, w1: rand(15, 26), color: '#20392c',
+              alpha: 0.20, kind: 'leaf', taper: 0.26, bleed: 0.06
+            });
+            drawBrush(massSamples, {
+              w0: massW, w1: rand(14, 24),
+              color: massColor, alpha: rand(0.36, 0.52),
+              kind: 'leaf', taper: 0.25, bleed: 0.12
+            });
+          }
+        });
+      }
+
+      // 叶团里的写意点厾：短而厚的笔触，不描单片叶形
+      const daubs = randInt(6, 10);
+      for (let i = 0; i < daubs; i++) {
+        const a = rand(0, Math.PI * 2);
+        const d = rand(0, radius * 0.8);
+        const dx = cx + Math.cos(a) * d;
+        const dy = cy + Math.sin(a) * d * 0.8;
+        if (nearBranch(dx, dy, 10)) continue;
+        const ang = rand(0, Math.PI * 2);
+        const len = rand(22, 52);
+        const w = rand(18, 36);
+        const color = R() < 0.16 ? pick(LEAF.ink) : (R() < 0.12 ? '#a6783d' : (layer === 'back' ? pick(LEAF.back) : (layer === 'mid' ? pick(LEAF.mid) : pick(LEAF.front))));
+        addStroke([
+          [dx - Math.cos(ang) * len * 0.4, dy - Math.sin(ang) * len * 0.4],
+          [dx + Math.cos(ang + rand(-0.3, 0.3)) * len * 0.1, dy + Math.sin(ang + rand(-0.3, 0.3)) * len * 0.1],
+          [dx + Math.cos(ang) * len * 0.6, dy + Math.sin(ang) * len * 0.6]
+        ], {
+          w0: w, w1: rand(3, 8), color,
+          alpha: rand(0.38, 0.66), kind: 'leaf',
+          taper: 0.3, dry: R() < 0.2 ? 0.2 : 0, bleed: 0.06
+        });
+      }
+
+      // 三到五片边缘叶，方向拉开
+      const n = randInt(4, 6);
+      for (let i = 0; i < n; i++) {
+        const ang = rand(0, Math.PI * 2);
+        const dist = rand(radius * 0.35, radius * 0.95);
+        const bx = cx + Math.cos(ang) * dist + rand(-8, 8);
+        const by = cy + Math.sin(ang) * dist + rand(-8, 8);
+        if (nearBranch(bx, by, 9)) continue;
+        const dir = ang + rand(-0.8, 0.8);
+        const len = rand(60, 105);
+        const width = rand(27, 40);
+        const tx = bx + Math.cos(dir) * len;
+        const ty = by + Math.sin(dir) * len;
+        const bend = rand(-0.35, 0.35);
+        const mx = (bx + tx) / 2 + Math.cos(dir + Math.PI / 2) * len * bend;
+        const my = (by + ty) / 2 + Math.sin(dir + Math.PI / 2) * len * bend;
+
+        let color;
+        if (R() < 0.12) color = pick(LEAF.ink);
+        else if (R() < 0.18) color = '#a6783d';
+        else color = layer === 'back' ? pick(LEAF.back) : (layer === 'mid' ? pick(LEAF.mid) : pick(LEAF.front));
+
+        const samples = sampleSpline([[bx, by], [mx, my], [tx, ty]], 3.2);
+        if (samples.length < 2) continue;
+        const darkOpts = {
+          w0: width * 1.04, w1: 1.6, color: '#233c2e',
+          alpha: 0.22, kind: 'leaf', taper: 0.24, bleed: 0.06
+        };
+        const mainOpts = {
+          w0: width, w1: rand(0.8, 1.6), color,
+          alpha: rand(0.8, 0.94), kind: 'leaf', taper: 0.22, bleed: 0.1
+        };
+        strokeCount++;
+        queue.push({
+          type: 'stroke',
+          draw: () => {
+            drawCallCount++;
+            drawBrush(samples, darkOpts);
+            drawBrush(samples, mainOpts);
+            drawBrush(sampleLine([bx, by], [tx, ty], 1.1), {
+              w0: 2.2, w1: 0.35, color: R() < 0.5 ? INK.dan : INK.zhong,
+              alpha: 0.20, kind: 'ink', taper: 0.3, dry: 0.1
+            });
+          }
+        });
+      }
+    }
+
+    // ③ 边缘大叶，破形
+    for (let i = 0; i < 28; i++) {
+      const c = ACTIVE_CLUSTERS[randInt(0, ACTIVE_CLUSTERS.length - 1)];
+      const ang = rand(0, Math.PI * 2);
+      const bx = c[0] + Math.cos(ang) * c[2] * rand(0.8, 1.05);
+      const by = c[1] + Math.sin(ang) * c[2] * rand(0.7, 1.0);
+      const dir = ang + rand(-0.6, 0.6);
+      const len = rand(55, 105);
+      const tx = bx + Math.cos(dir) * len;
+      const ty = by + Math.sin(dir) * len;
+      addStroke([[bx, by], [(bx + tx) / 2 + rand(-12, 12), (by + ty) / 2 + rand(-12, 12)], [tx, ty]], {
+        w0: rand(18, 28), w1: 1.2,
+        color: R() < 0.6 ? pick(LEAF.front) : pick(LEAF.mid),
+        alpha: rand(0.65, 0.88), kind: 'leaf', taper: 0.26
+      });
+    }
+
+    // ③b 枝梢点叶：让伸出去的枯枝有收束
+    const tipLeaves = [
+      [120, 718, -0.4, 34], [96, 690, -0.9, 30], [140, 700, -1.6, 26],
+      [928, 590, -1.0, 30], [958, 552, -1.3, 26],
+      [742, 344, -1.5, 28], [760, 306, -0.6, 24]
+    ];
+    for (const [x, y, ang, len] of tipLeaves) {
+      addStroke([[x, y], [x + Math.cos(ang) * len * 0.5, y + Math.sin(ang) * len * 0.5], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], {
+        w0: rand(9, 14), w1: 0.8, color: R() < 0.5 ? pick(LEAF.mid) : pick(LEAF.front),
+        alpha: 0.7, kind: 'leaf', taper: 0.28
+      });
+    }
+
+    // ④ 几片飘落的叶
+    for (let i = 0; i < 4; i++) {
+      const x = rand(170, 300), y = rand(1000, 1130);
+      const ang = rand(-1.0, 0.2);
+      const len = rand(30, 46);
+      addStroke([[x, y], [x + Math.cos(ang) * len * 0.5, y + Math.sin(ang) * len * 0.5], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], {
+        w0: rand(6, 9), w1: 0.8, color: pick(LEAF.front),
+        alpha: 0.55, kind: 'leaf', taper: 0.3
+      });
+    }
+  }
+
+  function buildOranges() {
+    for (const f of FRUITS.filter((_, i) => i % 5 !== 2 && i % 5 !== 4)) {
+      const [fx, fy, r0, light] = f;
+      const x = fx + rand(-7, 7), y = fy + rand(-6, 6);
+      const r = r0 * rand(1.28, 1.48);
+      const base = pick(FRUIT.base);
+      const red = light < 0.7 ? pick(FRUIT.red) : base;
+      const hi = pick(FRUIT.light);
+
+      // ⓪ 落在叶上的果影，先压住再画果
+      addDab(x + r * 0.28, y + r * 0.52, r * 0.82, '#2c3b2b', 0.12, false, 'wash');
+
+      // ① 橘身：两笔湿染，略偏椭圆
+      addAction(() => {
+        stampTip(x - r * 0.20, y + r * 0.03, r * 1.00, base, 0.92, false, 'wash');
+        stampTip(x + r * 0.25, y + r * 0.02, r * 0.78, base, 0.66, false, 'wash');
+      });
+
+      // ② 背光面
+      addAction(() => {
+        stampTip(x + r * 0.30, y + r * 0.32, r * 0.70, red, 0.68, false, 'wash');
+        stampTip(x + r * 0.05, y + r * 0.46, r * 0.50, FRUIT.red[0], 0.45, false, 'wash');
+      });
+
+      // ③ 迎光面
+      addAction(() => {
+        stampTip(x - r * 0.34, y - r * 0.32, r * 0.52, hi, 0.88, false, 'wash');
+        stampTip(x - r * 0.46, y - r * 0.40, r * 0.24, FRUIT.light[1], 0.95, false, 'wash');
+      });
+
+      // ④ 果蒂与三片小萼
+      addAction(() => {
+        const topY = y - r * 0.94;
+        drawBrush(sampleLine([x, topY + 2], [x + rand(-2, 2), topY - rand(5, 10)]), {
+          w0: 2.2, w1: 0.5, color: INK.nong, alpha: 0.75, kind: 'ink', taper: 0.2
+        });
+        const a0 = rand(-1.1, -0.15), a1 = rand(0.35, 1.4);
+        drawBrush(sampleLine([x, topY], [x + Math.cos(a0) * rand(8, 14), topY + Math.sin(a0) * rand(5, 10)]), {
+          w0: 4.8, w1: 0.6, color: FRUIT.calyx, alpha: 0.9, kind: 'leaf', taper: 0.25
+        });
+        drawBrush(sampleLine([x, topY], [x + Math.cos(a1) * rand(8, 14), topY + Math.sin(a1) * rand(5, 10)]), {
+          w0: 4.8, w1: 0.6, color: FRUIT.calyx, alpha: 0.85, kind: 'leaf', taper: 0.25
+        });
+        drawBrush(sampleLine([x, topY], [x + rand(-1, 1), topY - rand(2, 5)]), {
+          w0: 1.6, w1: 0.4, color: INK.nong, alpha: 0.8, kind: 'ink', taper: 0.2
+        });
+      });
+
+      // ⑤ 局部干笔/墨线，收住颜色
+      if (true) {
+        for (let k = 0; k < 4; k++) {
+          const a0 = rand(0, Math.PI * 2);
+          const span = rand(0.35, 0.8);
+          addStroke([
+            [x + Math.cos(a0) * r * 1.02, y + Math.sin(a0) * r * 1.02],
+            [x + Math.cos(a0 + span / 2) * r * 1.07, y + Math.sin(a0 + span / 2) * r * 1.07],
+            [x + Math.cos(a0 + span) * r * 1.02, y + Math.sin(a0 + span) * r * 1.02]
+          ], {
+            w0: rand(1.6, 2.8), w1: 0.5,
+            color: R() < 0.6 ? INK.dan : red,
+            alpha: 0.46, dry: 0.15, broken: 0.01, kind: 'ink', taper: 0.22
+          });
+        }
+      }
+    }
+  }
+
+  function buildSeal() {
+    // 左下角留白处的小小朱文印，抽象刻痕，不写字
+    const x = 76, y = 1180, s = 34;
+    addAction(() => {
+      ctx.save();
+      ctx.globalAlpha = 0.84;
+      ctx.fillStyle = '#b7442d';
+      for (let i = 0; i < 62; i++) {
+        const px = x + rand(0, s), py = y + rand(0, s);
+        ctx.fillRect(px, py, rand(1.5, 4), rand(1, 3));
+      }
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#b7442d';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(x + 1, y + 1, s - 2, s - 2);
+      // 印面留白刻线（用纸色提亮，避免挖穿画布）
+      ctx.strokeStyle = PAPER_COLOR;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(x + 7, y + 8);
+      ctx.lineTo(x + 7, y + s - 8);
+      ctx.moveTo(x + 15, y + 7);
+      ctx.lineTo(x + 15, y + s - 7);
+      ctx.moveTo(x + 7, y + 15);
+      ctx.lineTo(x + s - 7, y + 15);
+      ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  function buildPainting() {
+    queue = [];
+    strokeCount = 0;
+    drawCallCount = 0;
+    R = mulberry32(0x5eed2026);
+
+    addPause(12);
+    buildTrunk();          // 第一段：树干、枝、根、坡草
+    addPause(22);
+    buildLeaves();         // 第二段：叶
+    addPause(22);
+    buildOranges();        // 第三段：橘
+    addPause(16);
+    buildSeal();
+  }
+
+  // ==========================================================================
+  // 八、渲染与动画
+  // ==========================================================================
+  const canvas = document.getElementById('painting');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const statusEl = document.getElementById('status');
+  const speedBtn = document.getElementById('speed');
+  const redrawBtn = document.getElementById('redraw');
+  const saveBtn = document.getElementById('save');
+
+  let rafId = 0;
+  let queueIndex = 0;
+  let doneStrokes = 0;
+  let pauseLeft = 0;
+  let acc = 0;
+  let speedLevel = 0;
+  let painting = false;
+  let autoDownloaded = false;
+
+  function paperBackdrop() {
+    ctx.globalAlpha = 1;
+    ctx.drawImage(paperCanvas, 0, 0);
+  }
+
+  function updateStatus() {
+    if (!painting && doneStrokes >= strokeCount && strokeCount > 0) {
+      statusEl.textContent = `绘制完成 · 共 ${strokeCount} 笔`;
+    } else {
+      statusEl.textContent = `绘制中 · ${doneStrokes} / ${strokeCount} 笔`;
+    }
+  }
+
+  function startPainting() {
+    cancelAnimationFrame(rafId);
+    paperBackdrop();
+    queueIndex = 0;
+    doneStrokes = 0;
+    pauseLeft = 0;
+    acc = 0;
+    painting = true;
+    speedBtn.disabled = false;
+    updateStatus();
+    rafId = requestAnimationFrame(step);
+  }
+
+  function step() {
+    if (!painting) return;
+
+    if (pauseLeft > 0) {
+      pauseLeft--;
+    } else {
+      acc += BASE_SPEED * SPEED_STEPS[speedLevel];
+      while (acc >= 1 && queueIndex < queue.length) {
+        const action = queue[queueIndex++];
+        if (action.type === 'pause') {
+          pauseLeft = action.frames;
+          acc = 0;
+          break;
+        }
+        action.draw();
+        doneStrokes++;
+        acc -= 1;
+      }
+    }
+
+    if (doneStrokes % 5 === 0 || doneStrokes === strokeCount) updateStatus();
+
+    if (queueIndex >= queue.length && pauseLeft === 0) {
+      painting = false;
+      updateStatus();
+      if (!autoDownloaded) {
+        autoDownloaded = true;
+        setTimeout(() => savePNG(true), 700);
+      }
+      return;
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  function savePNG(auto = false) {
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '写意橘子树.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1200);
+    }, 'image/png');
+  }
+
+  // ==========================================================================
+  // 九、控件
+  // ==========================================================================
+  speedBtn.addEventListener('click', () => {
+    speedLevel = (speedLevel + 1) % SPEED_STEPS.length;
+    speedBtn.textContent = `加速 ×${SPEED_STEPS[speedLevel]}`;
+  });
+
+  redrawBtn.addEventListener('click', () => {
+    if (painting) painting = false;
+    cancelAnimationFrame(rafId);
+    buildPainting();       // 重新生成同一构图的动作队列
+    startPainting();
+  });
+
+  saveBtn.addEventListener('click', () => savePNG(false));
+
+  // ==========================================================================
+  // 十、启动
+  // ==========================================================================
+  buildPaper();
+  buildPainting();
+  startPainting();
+})();
+</script>
+</body>
+</html>
