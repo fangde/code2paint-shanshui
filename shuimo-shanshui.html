@@ -105,6 +105,24 @@
       color: #f4eee0;
       border-color: #2f2f2d;
     }
+
+    a.home-link {
+      display: inline-block;
+      background: #f5efe2;
+      color: #262522;
+      border: 1px solid #9f9684;
+      padding: 7px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    }
+
+    a.home-link:hover {
+      background: #ebe2cf;
+      border-color: #575248;
+    }
   </style>
 </head>
 <body>
@@ -120,6 +138,7 @@
     <div class="btn-group">
       <button id="redrawBtn" type="button">重新绘制</button>
       <button id="speedBtn" type="button">加速</button>
+      <a class="home-link" href="./index.html">← 回画廊首页</a>
     </div>
   </div>
 

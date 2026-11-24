@@ -65,6 +65,19 @@
   button:hover { background: rgba(255, 252, 243, 0.95); }
   button:active { transform: translateY(1px); }
   button:disabled { opacity: 0.45; cursor: default; }
+  a.home-link {
+    display: inline-block;
+    border: 1px solid rgba(61, 47, 33, 0.48);
+    background: rgba(255, 252, 243, 0.55);
+    color: #31271d;
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    padding: 7px 14px;
+    text-decoration: none;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  a.home-link:hover { background: rgba(255, 252, 243, 0.95); }
   #status {
     min-width: 150px;
     text-align: center;
@@ -85,6 +98,7 @@
   <button id="redraw" type="button">重新绘制</button>
   <button id="speed" type="button">加速 ×1</button>
   <button id="save" type="button">保存 PNG</button>
+  <a class="home-link" href="./index.html">← 回画廊首页</a>
   <span id="status">准备作画</span>
 </div>
 <script>

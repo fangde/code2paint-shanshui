@@ -158,6 +158,24 @@
       border-color: #6bc0d6;
     }
 
+    a.home-link {
+      display: inline-block;
+      background: #4a3a2c;
+      color: #f4e7cf;
+      border: 1px solid #8a7055;
+      padding: 7px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    }
+
+    a.home-link:hover {
+      background: #5c4837;
+      border-color: #bfa07c;
+    }
+
     .layer-chip {
       padding: 4px 10px;
       font-size: 12px;
@@ -258,6 +276,7 @@
       <button id="redrawBtn" type="button">重新绘制</button>
       <button id="speedBtn" type="button">加速</button>
       <button id="downloadBtn" class="download-btn" type="button">下载 PNG</button>
+      <a class="home-link" href="./index.html">← 回画廊首页</a>
     </div>
   </div>
 
