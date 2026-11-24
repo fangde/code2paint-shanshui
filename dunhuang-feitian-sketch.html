@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>敦煌散花飞天 · 纯代码写意版 (Canvas 2D)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #2c241d;
+      background-image: radial-gradient(circle at 50% 42%, #3d3228 0%, #241d17 100%);
+      color: #e8dcc6;
+      font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", Georgia, serif;
+      padding: 20px 16px;
+      user-select: none;
+    }
+
+    .mural-frame {
+      background: #46382b;
+      padding: 14px;
+      border: 1px solid #6b5642;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(236, 218, 186, 0.14);
+      max-width: 100%;
+    }
+
+    #muralCanvas {
+      display: block;
+      width: min(1160px, 93vw);
+      height: auto;
+      aspect-ratio: 16 / 10;
+      background: #e6d5b8;
+      border: 1px solid rgba(52, 39, 28, 0.55);
+    }
+
+    .toolbar {
+      margin-top: 14px;
+      width: min(1188px, 93vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 0 4px;
+    }
+
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+      color: #d6c5a9;
+      letter-spacing: 0.08em;
+    }
+
+    .status-layer {
+      font-weight: 600;
+      color: #f3e4c8;
+    }
+
+    .status-count {
+      font-size: 13px;
+      color: #bfa988;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      background: #4a3a2c;
+      color: #f0e2c8;
+      border: 1px solid #8a7055;
+      padding: 7px 18px;
+      font-size: 14px;
+      font-family: inherit;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    }
+
+    button:hover {
+      background: #5c4837;
+      border-color: #bfa07c;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.active {
+      background: #9f4c36;
+      color: #fbf2e1;
+      border-color: #c87a5e;
+    }
+
+    button.small-btn {
+      padding: 6px 12px;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+    }
+
+    button.download-btn {
+      background: #355863;
+      border-color: #5b8d9c;
+      color: #eef5f7;
+    }
+
+    button.download-btn:hover {
+      background: #436e7b;
+      border-color: #7eb3c2;
+    }
+
+    .progress-panel {
+      margin-top: 12px;
+      width: min(1188px, 93vw);
+      padding: 10px 12px;
+      background: rgba(58, 46, 36, 0.72);
+      border: 1px solid #6b5642;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #progressSlider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: linear-gradient(90deg, #9f4c36 0%, #c9a15a var(--pct, 0%), #352a20 var(--pct, 0%));
+      border: 1px solid #755e47;
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    #progressSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e5c687;
+      border: 2px solid #4a3728;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    #progressSlider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    #progressSlider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e5c687;
+      border: 2px solid #4a3728;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+      cursor: pointer;
+    }
+
+    .progress-percent {
+      min-width: 52px;
+      text-align: right;
+      font-size: 13px;
+      color: #e4cfa9;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .layer-steps {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .layer-chip {
+      padding: 4px 10px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      background: #3a2e23;
+      color: #bfa988;
+      border: 1px solid #64503d;
+    }
+
+    .layer-chip.done {
+      color: #ebd8b8;
+      border-color: #8a7055;
+      background: #48392b;
+    }
+
+    .layer-chip.current {
+      background: #8c4430;
+      color: #fbf2e1;
+      border-color: #c87a5e;
+    }
+
+    .hint-text {
+      margin-left: auto;
+      font-size: 11px;
+      color: #9e8a6f;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="mural-frame">
+    <canvas id="muralCanvas" width="1280" height="800"></canvas>
+  </div>
+
+  <div class="progress-panel">
+    <div class="progress-row">
+      <input id="progressSlider" type="range" min="0" max="0" value="0" step="1" aria-label="作画进度条" />
+      <span id="progressPercent" class="progress-percent">0.0%</span>
+    </div>
+    <div class="layer-steps" id="layerSteps">
+      <button class="layer-chip" type="button" data-layer="1">一层·起稿</button>
+      <button class="layer-chip" type="button" data-layer="2">二层·平涂</button>
+      <button class="layer-chip" type="button" data-layer="3">三层·凹凸</button>
+      <button class="layer-chip" type="button" data-layer="4">四层·线描</button>
+      <button class="layer-chip" type="button" data-layer="5">五层·描金</button>
+      <button class="layer-chip" type="button" data-layer="6">六层·散花</button>
+      <button class="layer-chip" type="button" data-layer="7">七层·包浆</button>
+      <span class="hint-text">支持拖拽进度条 / ← → 键逐段微调（按住 Shift 步进更宽）</span>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="status-group">
+      <span id="layerStatus" class="status-layer">制泥壁白粉地仗…</span>
+      <span id="strokeStatus" class="status-count">0 / 0 笔</span>
+    </div>
+    <div class="btn-group">
+      <button id="playPauseBtn" class="small-btn" type="button">暂停</button>
+      <button id="stepBackBtn" class="small-btn" type="button">退一步</button>
+      <button id="stepForwardBtn" class="small-btn" type="button">进一步</button>
+      <button id="redrawBtn" type="button">重新绘制</button>
+      <button id="speedBtn" type="button">加速</button>
+      <button id="downloadBtn" class="download-btn" type="button">下载 PNG</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 顶部常量、敦煌传统矿物颜料、泥壁地仗与笔刷参数配置区（统一管理）
+    // =========================================================================
+    const CONFIG = {
+      // 画布尺寸（16:10 敦煌石窟横幅壁画比例）
+      CANVAS_WIDTH: 1280,
+      CANVAS_HEIGHT: 800,
+
+      // 总笔触硬上限（约 3 万笔精细呈现，严格不截断后层细节）
+      MAX_STROKES: 30000,
+
+      // 各层笔触安全配额上限（每层自然笔触数均低于上限，确保所有细节完整绘制）
+      LAYER_CAPS: [0, 2600, 7800, 7200, 6800, 5000, 2600, 1800],
+
+      // 敦煌泥壁白粉地仗参数（暖土米黄底色 + 矿物斑驳 + 细砂颗粒 + 麦草纤维 + 岁纹）
+      WALL: {
+        BASE_COLOR: '#e6d5b8',
+        EDGE_VIGNETTE: 'rgba(116, 88, 60, 0.28)',
+        NOISE_INTENSITY: 11,
+        PATCH_COUNT: 140,
+        STRAW_COUNT: 520,
+        CRACK_COUNT: 42
+      },
+
+      // 敦煌传统矿物与植物颜料（低饱和古雅矿石色，严禁刺眼高饱和荧光色）
+      PIGMENT: {
+        TU_HONG:   { rgb: [162, 74, 52],   baseAlpha: 0.42 }, // 土红：起稿线、凹凸暗部晕染、壁面暖赭
+        ZHU_SHA:   { rgb: [196, 78, 56],   baseAlpha: 0.56 }, // 朱砂：胸巾、裙身主色、莲瓣与花钿点唇
+        SHI_LV:    { rgb: [74, 134, 108],  baseAlpha: 0.52 }, // 石绿：飘带、裙褶层次与头光主环
+        ER_LV:     { rgb: [118, 168, 138], baseAlpha: 0.48 }, // 二绿：飘带翻折面、祥云淡绿与头光过渡
+        SHI_QING:  { rgb: [54, 92, 128],   baseAlpha: 0.54 }, // 石青：下飘带、裙褶深谷与宝冠嵌珠
+        SAN_QING:  { rgb: [96, 134, 162],  baseAlpha: 0.44 }, // 三青：头光外环、祥云淡青与散花点缀
+        ZHE_SHI:   { rgb: [148, 92, 58],   baseAlpha: 0.40 }, // 赭石：肌肤边缘分染、祥云暖影与泥壁岁斑
+        SKIN:      { rgb: [224, 194, 158], baseAlpha: 0.64 }, // 古雅肉色：面庞、肩臂、腰腹与双足铺底
+        NI_JIN:    { rgb: [214, 174, 94],  baseAlpha: 0.72 }, // 泥金：宝冠、璎珞、臂钏、衣纹描金与团花
+        QIAN_BAI:  { rgb: [238, 226, 200], baseAlpha: 0.68 }, // 铅白/蛤粉：西域凹凸提亮、祥云提白、连珠莲尖
+        GU_MO:     { rgb: [38, 32, 28],    baseAlpha: 0.78 }, // 古墨：铁线描、兰叶描复勾定形
+        JIAO_MO:   { rgb: [22, 18, 16],    baseAlpha: 0.88 }, // 焦墨：眸瞳、发髻深处与关键顿挫线
+        WALL_DUST: { rgb: [224, 206, 176], baseAlpha: 0.24 }  // 壁画风化粉尘：第七层岁韵包浆与微剥落
+      },
+
+      // 毛笔笔刷默认参数
+      BRUSH: {
+        SOFTNESS: 0.56,          // 软边径向渐变实度
+        BLEED_SCALE: 1.42,       // 地仗粉层微晕染倍数
+        BLEED_ALPHA_RATIO: 0.24, // 晕染边缘透明度占比
+        DRY_BRISTLES: 4,         // 枯笔/风化飞白笔毫数
+        DRY_SKIP_BASE: 0.45,     // 飞白留白基础概率
+        PRESSURE_JITTER: 0.12    // 运笔自然压力微颤
+      },
+
+      // 动画速度档位（1x / ×3 / ×8 / ×16 四档切换）
+      SPEED_LEVELS: [
+        { label: '加速',     dabsPerFrame: 35 },
+        { label: '加速 ×3',  dabsPerFrame: 105 },
+        { label: '加速 ×8',  dabsPerFrame: 280 },
+        { label: '加速 ×16', dabsPerFrame: 560 }
+      ],
+
+      // 严格敦煌壁画七层作画阶段名称
+      LAYER_NAMES: [
+        '',
+        '第一层：土红起稿 · 淡土红定形骨法',
+        '第二层：平涂设色 · 石绿石青朱砂肉色铺底',
+        '第三层：凹凸晕染 · 西域凹凸法与渐变退晕',
+        '第四层：铁线兰叶描 · 古墨焦墨复勾神韵',
+        '第五层：宝冠璎珞 · 泥金描边与唐草暗纹',
+        '第六层：散花提白 · 宝相莲华与祥云提白',
+        '第七层：壁画岁韵 · 矿物风化与千年包浆'
+      ]
+    };
+
+    // =========================================================================
+    // 全局状态与 DOM 引用
+    // =========================================================================
+    const canvas = document.getElementById('muralCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: false });
+    const layerStatusEl = document.getElementById('layerStatus');
+    const strokeStatusEl = document.getElementById('strokeStatus');
+    const progressSlider = document.getElementById('progressSlider');
+    const progressPercentEl = document.getElementById('progressPercent');
+    const layerChips = Array.from(document.querySelectorAll('.layer-chip'));
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const stepBackBtn = document.getElementById('stepBackBtn');
+    const stepForwardBtn = document.getElementById('stepForwardBtn');
+    const redrawBtn = document.getElementById('redrawBtn');
+    const speedBtn = document.getElementById('speedBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const CHECKPOINT_INTERVAL = 2500;
+    const STEP_DELTA = 150;
+
+    let wallCanvas = null;
+    let strokeQueue = [];
+    let layerCounts = [0, 0, 0, 0, 0, 0, 0, 0];
+    let layerEndIndices = [0, 0, 0, 0, 0, 0, 0, 0];
+    let layerEndSet = new Set();
+    let checkpoints = new Map();
+    let currentIndex = 0;
+    let speedIndex = 0;
+    let animFrameId = null;
+    let isPaused = false;
+    let pendingSeek = null;
+    let seekRafId = null;
+    let rng = Math.random;
+
+    // =========================================================================
+    // 基础数学、随机与平滑插值工具
+    // =========================================================================
+    function createPRNG(seed) {
+      let s = seed >>> 0;
+      return function () {
+        s += 0x6D2B79F5;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function randRange(min, max) {
+      return min + (max - min) * rng();
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    // 三次样条/Catmull-Rom 平滑曲线采样，保证飘带、裙褶与身躯弧线婉转流畅
+    function sampleCatmullRom(ctrlPts, samplesPerSeg = 14) {
+      if (ctrlPts.length < 2) return ctrlPts.slice();
+      const pts = [ctrlPts[0], ...ctrlPts, ctrlPts[ctrlPts.length - 1]];
+      const out = [];
+      for (let i = 1; i < pts.length - 2; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+        for (let s = 0; s < samplesPerSeg; s++) {
+          const t = s / samplesPerSeg;
+          const t2 = t * t;
+          const t3 = t2 * t;
+          const x = 0.5 * (
+            (2 * p1.x) +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+          );
+          const y = 0.5 * (
+            (2 * p1.y) +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+          );
+          out.push({ x, y });
+        }
+      }
+      out.push({ ...ctrlPts[ctrlPts.length - 1] });
+      return out;
+    }
+
+    // 沿中心曲线计算左右包络边缘与法向点
+    function buildRibbonGeometry(centerPts, widthFn) {
+      const leftEdge = [];
+      const rightEdge = [];
+      const normals = [];
+      const n = centerPts.length;
+      for (let i = 0; i < n; i++) {
+        const prev = centerPts[Math.max(0, i - 1)];
+        const next = centerPts[Math.min(n - 1, i + 1)];
+        const dx = next.x - prev.x;
+        const dy = next.y - prev.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const t = i / (n - 1);
+        const halfW = widthFn(t) * 0.5;
+        normals.push({ nx, ny, halfW, t });
+        leftEdge.push({ x: centerPts[i].x + nx * halfW, y: centerPts[i].y + ny * halfW });
+        rightEdge.push({ x: centerPts[i].x - nx * halfW, y: centerPts[i].y - ny * halfW });
+      }
+      return { centerPts, leftEdge, rightEdge, normals };
+    }
+
+    function sampleArcPoints(cx, cy, rx, ry, startAng, endAng, steps = 28, rot = 0) {
+      const pts = [];
+      const cosR = Math.cos(rot);
+      const sinR = Math.sin(rot);
+      for (let i = 0; i <= steps; i++) {
+        const a = lerp(startAng, endAng, i / steps);
+        const lx = Math.cos(a) * rx;
+        const ly = Math.sin(a) * ry;
+        pts.push({
+          x: cx + lx * cosR - ly * sinR,
+          y: cy + lx * sinR + ly * cosR
+        });
+      }
+      return pts;
+    }
+
+    // =========================================================================
+    // 1. 敦煌泥壁白粉地仗基底生成
+    // =========================================================================
+    function buildDunhuangWall() {
+      const off = document.createElement('canvas');
+      off.width = CONFIG.CANVAS_WIDTH;
+      off.height = CONFIG.CANVAS_HEIGHT;
+      const octx = off.getContext('2d');
+      const w = off.width;
+      const h = off.height;
+
+      // 1) 暖土米黄白粉地仗底色
+      octx.fillStyle = CONFIG.WALL.BASE_COLOR;
+      octx.fillRect(0, 0, w, h);
+
+      // 2) 石窟柔和光照与四壁昏暗晕边
+      const light = octx.createRadialGradient(w * 0.45, h * 0.42, w * 0.08, w * 0.48, h * 0.48, w * 0.68);
+      light.addColorStop(0, 'rgba(248, 238, 218, 0.34)');
+      light.addColorStop(0.58, 'rgba(226, 206, 174, 0.08)');
+      light.addColorStop(1, CONFIG.WALL.EDGE_VIGNETTE);
+      octx.fillStyle = light;
+      octx.fillRect(0, 0, w, h);
+
+      // 3) 多层泥壁矿物暗斑与白粉潮斑
+      for (let i = 0; i < CONFIG.WALL.PATCH_COUNT; i++) {
+        const px = rng() * w;
+        const py = rng() * h;
+        const pr = randRange(18, 95);
+        const g = octx.createRadialGradient(px, py, 0, px, py, pr);
+        const warm = rng() > 0.42 ? '168, 134, 96' : '242, 232, 212';
+        const alpha = randRange(0.025, 0.075);
+        g.addColorStop(0, `rgba(${warm}, ${alpha.toFixed(4)})`);
+        g.addColorStop(1, `rgba(${warm}, 0)`);
+        octx.fillStyle = g;
+        octx.beginPath();
+        octx.arc(px, py, pr, 0, Math.PI * 2);
+        octx.fill();
+      }
+
+      // 4) 像素级细砂颗粒噪点（模拟澄板土与白粉涂层质感）
+      const imgData = octx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+      const amp = CONFIG.WALL.NOISE_INTENSITY;
+      for (let i = 0; i < data.length; i += 4) {
+        const delta = (rng() - 0.5) * 2 * amp;
+        data[i]     = clamp(data[i] + delta, 0, 255);
+        data[i + 1] = clamp(data[i + 1] + delta * 0.94, 0, 255);
+        data[i + 2] = clamp(data[i + 2] + delta * 0.82, 0, 255);
+      }
+      octx.putImageData(imgData, 0, 0);
+
+      // 5) 麦草泥短纤维痕（敦煌地仗典型肌理）
+      octx.save();
+      octx.lineCap = 'round';
+      for (let i = 0; i < CONFIG.WALL.STRAW_COUNT; i++) {
+        const sx = rng() * w;
+        const sy = rng() * h;
+        const len = randRange(7, 26);
+        const ang = randRange(-Math.PI, Math.PI);
+        const bend = randRange(-4, 4);
+        const alpha = randRange(0.03, 0.085);
+        octx.strokeStyle = rng() > 0.35
+          ? `rgba(138, 108, 76, ${alpha.toFixed(4)})`
+          : `rgba(246, 238, 222, ${(alpha * 0.9).toFixed(4)})`;
+        octx.lineWidth = randRange(0.45, 1.15);
+        octx.beginPath();
+        octx.moveTo(sx, sy);
+        octx.quadraticCurveTo(
+          sx + Math.cos(ang) * len * 0.5 + bend,
+          sy + Math.sin(ang) * len * 0.5 - bend,
+          sx + Math.cos(ang) * len,
+          sy + Math.sin(ang) * len
+        );
+        octx.stroke();
+      }
+
+      // 6) 微细岁纹冰裂（极浅的干裂纹理，增添千年古壁氛围）
+      for (let c = 0; c < CONFIG.WALL.CRACK_COUNT; c++) {
+        let cx = rng() * w;
+        let cy = rng() * h;
+        let ang = randRange(-Math.PI, Math.PI);
+        const segs = Math.floor(randRange(4, 11));
+        octx.strokeStyle = `rgba(98, 76, 56, ${randRange(0.035, 0.08).toFixed(4)})`;
+        octx.lineWidth = randRange(0.4, 0.85);
+        octx.beginPath();
+        octx.moveTo(cx, cy);
+        for (let s = 0; s < segs; s++) {
+          ang += randRange(-0.55, 0.55);
+          const step = randRange(8, 22);
+          cx += Math.cos(ang) * step;
+          cy += Math.sin(ang) * step;
+          octx.lineTo(cx, cy);
+        }
+        octx.stroke();
+      }
+      octx.restore();
+
+      return off;
+    }
+
+    // =========================================================================
+    // 2. 毛笔与矿物颜料笔刷渲染引擎
+    // =========================================================================
+    function drawSoftRadialDab(targetCtx, x, y, radius, rgb, alpha, angle, aspect, softness, compositeOp) {
+      if (radius <= 0.25 || alpha <= 0.002) return;
+      targetCtx.save();
+      if (compositeOp && compositeOp !== 'source-over') {
+        targetCtx.globalCompositeOperation = compositeOp;
+      }
+      targetCtx.translate(x, y);
+      if (angle) targetCtx.rotate(angle);
+      if (aspect && aspect !== 1) targetCtx.scale(aspect, 1);
+
+      const grad = targetCtx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      const [r, g, b] = rgb;
+      const midStop = clamp(softness, 0.14, 0.85);
+
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(4)})`);
+      grad.addColorStop(midStop, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.62).toFixed(4)})`);
+      grad.addColorStop(lerp(midStop, 1, 0.58), `rgba(${r}, ${g}, ${b}, ${(alpha * 0.18).toFixed(4)})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+      targetCtx.fillStyle = grad;
+      targetCtx.beginPath();
+      targetCtx.arc(0, 0, radius, 0, Math.PI * 2);
+      targetCtx.fill();
+      targetCtx.restore();
+    }
+
+    function executeStrokeAction(action) {
+      const pig = CONFIG.PIGMENT[action.ink] || CONFIG.PIGMENT.TU_HONG;
+      const pressure = action.pressure ?? 1;
+      const alpha = clamp(pig.baseAlpha * (action.alphaScale ?? 1) * pressure, 0.004, 0.96);
+      const radius = Math.max(0.55, action.r * (0.72 + 0.28 * pressure));
+      const angle = action.angle ?? 0;
+      const aspect = action.aspect ?? 1;
+      const bleed = action.bleed ?? 0;
+      const dryness = action.dryness ?? 0;
+      const softness = action.softness ?? CONFIG.BRUSH.SOFTNESS;
+      const compositeOp = action.composite || 'source-over';
+
+      // 地仗白粉层微晕染
+      if (bleed > 0.02) {
+        const bleedR = radius * (1 + (CONFIG.BRUSH.BLEED_SCALE - 1) * bleed);
+        const bleedAlpha = alpha * CONFIG.BRUSH.BLEED_ALPHA_RATIO * bleed;
+        drawSoftRadialDab(
+          ctx,
+          action.x + (action.bx ?? 0),
+          action.y + (action.by ?? 0),
+          bleedR,
+          pig.rgb,
+          bleedAlpha,
+          angle,
+          aspect * 1.05,
+          0.32,
+          compositeOp
+        );
+      }
+
+      // 枯笔飞白 / 岁韵微剥落
+      if (dryness > 0.15) {
+        const bristles = CONFIG.BRUSH.DRY_BRISTLES;
+        const perpX = -Math.sin(angle);
+        const perpY = Math.cos(angle);
+        const seedHash = Math.abs(Math.sin(action.x * 12.9898 + action.y * 78.233) * 43758.5453);
+
+        for (let i = 0; i < bristles; i++) {
+          const h = (seedHash * (i + 1.41)) % 1;
+          if (h < dryness * (CONFIG.BRUSH.DRY_SKIP_BASE + 0.32)) continue;
+
+          const offsetRatio = (i / (bristles - 1) - 0.5) * 1.4;
+          const ox = perpX * radius * offsetRatio;
+          const oy = perpY * radius * offsetRatio;
+          const subR = Math.max(0.6, radius * (0.34 + 0.16 * (1 - Math.abs(offsetRatio))));
+          const subAlpha = alpha * (0.60 + 0.40 * (1 - dryness * 0.4));
+
+          drawSoftRadialDab(
+            ctx,
+            action.x + ox,
+            action.y + oy,
+            subR,
+            pig.rgb,
+            subAlpha,
+            angle,
+            Math.max(1.2, aspect * 1.25),
+            0.50,
+            compositeOp
+          );
+        }
+        return;
+      }
+
+      drawSoftRadialDab(ctx, action.x, action.y, radius, pig.rgb, alpha, angle, aspect, softness, compositeOp);
+    }
+
+    // =========================================================================
+    // 队列构造辅助函数（带总上限与每层配额保护，确保七层精细笔触不互抢配额）
+    // =========================================================================
+    function pushAction(action) {
+      if (strokeQueue.length >= CONFIG.MAX_STROKES) return false;
+      const layer = action.layer;
+      if (layerCounts[layer] >= CONFIG.LAYER_CAPS[layer]) return false;
+      layerCounts[layer]++;
+      strokeQueue.push(action);
+      return true;
+    }
+
+    /**
+     * 沿路径生成细腻毛笔笔触（支持铁线描均匀线质、兰叶描轻重顿挫）
+     */
+    function enqueueBrushPath(points, opts) {
+      if (!points || points.length < 2) return;
+      const {
+        layer,
+        ink = 'GU_MO',
+        radiusStart = 2.0,
+        radiusEnd = 2.0,
+        alphaScale = 1,
+        spacing = 0.55,
+        minStep = null,
+        bleed = 0.12,
+        dryness = 0,
+        aspect = 1.25,
+        softness = CONFIG.BRUSH.SOFTNESS,
+        breakProb = 0,
+        jitter = 0.35,
+        taperEnds = true,
+        orchidStyle = false, // 兰叶描：中段略丰厚、两端灵动收尖
+        composite = null
+      } = opts;
+
+      const segLens = [];
+      const cumLens = [0];
+      let totalLen = 0;
+      for (let i = 1; i < points.length; i++) {
+        const len = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+        segLens.push(len);
+        totalLen += len;
+        cumLens.push(totalLen);
+      }
+      if (totalLen < 0.5) return;
+
+      const effectiveMinStep = minStep !== null ? minStep : (layer === 2 ? 5.85 : 0.9);
+      let skipCounter = 0;
+      let segIdx = 0;
+      let dist = 0;
+
+      while (true) {
+        const d = Math.min(dist, totalLen);
+        while (segIdx < segLens.length - 1 && cumLens[segIdx + 1] < d) {
+          segIdx++;
+        }
+        const p0 = points[segIdx];
+        const p1 = points[segIdx + 1];
+        const segLen = segLens[segIdx];
+        const localT = segLen > 1e-4 ? clamp((d - cumLens[segIdx]) / segLen, 0, 1) : 0;
+        const globalT = clamp(d / totalLen, 0, 1);
+        const angle = segLen > 1e-4 ? Math.atan2(p1.y - p0.y, p1.x - p0.x) : 0;
+
+        let skipped = false;
+        if (breakProb > 0) {
+          if (skipCounter > 0) {
+            skipCounter--;
+            skipped = true;
+          } else if (globalT > 0.12 && globalT < 0.88 && rng() < breakProb) {
+            skipCounter = Math.floor(randRange(1, 2.8));
+            skipped = true;
+          }
+        }
+
+        const baseR = lerp(radiusStart, radiusEnd, globalT);
+
+        if (!skipped) {
+          let env = 1;
+          if (orchidStyle) {
+            // 兰叶描典型顿挫韵律：起笔微顿，中腹丰腴，收锋锐利飘逸
+            const wave = Math.sin(globalT * Math.PI);
+            env = 0.42 + 0.82 * Math.pow(wave, 0.72) + 0.16 * Math.sin(globalT * Math.PI * 3);
+          } else if (taperEnds) {
+            env = 0.36 + 0.64 * Math.pow(Math.sin(globalT * Math.PI), 0.5);
+          }
+
+          const pressure = clamp(
+            env * (1 + (rng() - 0.5) * 2 * CONFIG.BRUSH.PRESSURE_JITTER),
+            0.25,
+            1.35
+          );
+          const r = orchidStyle ? baseR * (0.68 + 0.48 * Math.sin(globalT * Math.PI)) : baseR;
+
+          const ok = pushAction({
+            layer,
+            ink,
+            x: lerp(p0.x, p1.x, localT) + (rng() - 0.5) * jitter,
+            y: lerp(p0.y, p1.y, localT) + (rng() - 0.5) * jitter,
+            r,
+            angle,
+            aspect,
+            pressure,
+            alphaScale,
+            bleed,
+            dryness,
+            softness,
+            composite,
+            bx: bleed > 0 ? (rng() - 0.5) * r * 0.35 : 0,
+            by: bleed > 0 ? (rng() - 0.5) * r * 0.35 : 0
+          });
+          if (!ok) return;
+        }
+
+        if (d >= totalLen) break;
+        const step = Math.max(effectiveMinStep, baseR * spacing);
+        dist = Math.min(totalLen, d + step);
+      }
+    }
+
+    /**
+     * 沿多边形内部扫描或丝带条带纵向密排平涂/退晕笔触（避免整块硬填充，保持手工涂染肌理）
+     */
+    function enqueueRibbonWash(geom, opts) {
+      const {
+        layer,
+        ink,
+        lanes = 4,
+        uRange = [-0.85, 0.85],
+        radius = 6,
+        alphaScale = 0.75,
+        spacing = 0.65,
+        minStep = null,
+        bleed = 0.35,
+        softness = 0.42,
+        composite = null
+      } = opts;
+
+      for (let l = 0; l < lanes; l++) {
+        const u = lanes === 1 ? (uRange[0] + uRange[1]) * 0.5 : lerp(uRange[0], uRange[1], l / (lanes - 1));
+        const lanePts = geom.centerPts.map((p, idx) => {
+          const n = geom.normals[idx];
+          return {
+            x: p.x + n.nx * n.halfW * u,
+            y: p.y + n.ny * n.halfW * u
+          };
+        });
+        enqueueBrushPath(lanePts, {
+          layer,
+          ink,
+          radiusStart: radius,
+          radiusEnd: radius * 0.78,
+          alphaScale,
+          spacing,
+          minStep,
+          bleed,
+          aspect: 1.4,
+          softness,
+          jitter: 0.9,
+          taperEnds: true,
+          composite
+        });
+      }
+    }
+
+    /**
+     * 填充多边形区域（通过沿主轴平滑插值流线逐笔涂染，保持国画工笔平涂与退晕笔意）
+     */
+    function enqueuePolygonWash(topBoundary, bottomBoundary, opts) {
+      const {
+        layer,
+        ink,
+        rows = 6,
+        tStart = 0,
+        tEnd = 1,
+        vRange = [0.06, 0.94],
+        radius = 7,
+        alphaScale = 0.8,
+        spacing = 0.68,
+        minStep = null,
+        bleed = 0.35,
+        softness = 0.40,
+        composite = null
+      } = opts;
+
+      const steps = Math.max(topBoundary.length, bottomBoundary.length, 24);
+      for (let r = 0; r < rows; r++) {
+        const v = rows === 1 ? 0.5 : lerp(vRange[0], vRange[1], r / (rows - 1));
+        const pts = [];
+        for (let s = 0; s <= steps; s++) {
+          const t = lerp(tStart, tEnd, s / steps);
+          const idxA = clamp(Math.floor(t * (topBoundary.length - 1)), 0, topBoundary.length - 1);
+          const idxB = clamp(Math.floor(t * (bottomBoundary.length - 1)), 0, bottomBoundary.length - 1);
+          const pa = topBoundary[idxA];
+          const pb = bottomBoundary[idxB];
+          pts.push({
+            x: lerp(pa.x, pb.x, v),
+            y: lerp(pa.y, pb.y, v)
+          });
+        }
+        enqueueBrushPath(pts, {
+          layer,
+          ink,
+          radiusStart: radius,
+          radiusEnd: radius * 0.9,
+          alphaScale,
+          spacing,
+          minStep,
+          bleed,
+          aspect: 1.35,
+          softness,
+          jitter: 0.9,
+          taperEnds: true,
+          composite
+        });
+      }
+    }
+
+    /**
+     * 填充椭圆区域（同心螺旋笔触平涂与凹凸晕染）
+     */
+    function enqueueEllipseFill(cx, cy, rx, ry, rot, opts) {
+      const {
+        layer,
+        ink,
+        rings = 4,
+        rFracStart = 0.15,
+        rFracEnd = 0.92,
+        radius = 5.5,
+        alphaScale = 0.85,
+        spacing = 0.65,
+        minStep = null,
+        bleed = 0.25,
+        softness = 0.45,
+        composite = null
+      } = opts;
+
+      for (let i = 0; i < rings; i++) {
+        const frac = rings === 1 ? rFracEnd : lerp(rFracStart, rFracEnd, i / (rings - 1));
+        const arc = sampleArcPoints(cx, cy, rx * frac, ry * frac, 0, Math.PI * 2, Math.max(18, Math.round(28 * frac)), rot);
+        enqueueBrushPath(arc, {
+          layer,
+          ink,
+          radiusStart: radius,
+          radiusEnd: radius,
+          alphaScale,
+          spacing,
+          minStep,
+          bleed,
+          aspect: 1.2,
+          softness,
+          jitter: 0.6,
+          taperEnds: false,
+          composite
+        });
+      }
+    }
+
+    // =========================================================================
+    // 3. 盛唐敦煌散花飞天几何结构与七层绘制队列构建
+    // =========================================================================
+    function buildFeitianQueue() {
+      strokeQueue = [];
+      layerCounts = [0, 0, 0, 0, 0, 0, 0, 0];
+
+      // -----------------------------------------------------------------------
+      // 核心身姿骨架与局部坐标定义（面向左下，S 形三道弯凌空腾跃）
+      // -----------------------------------------------------------------------
+      const headCx = 432, headCy = 294, headRot = -0.22;
+      const haloCx = 445, haloCy = 282;
+
+      function headPt(lx, ly) {
+        const c = Math.cos(headRot), s = Math.sin(headRot);
+        return { x: headCx + lx * c - ly * s, y: headCy + lx * s + ly * c };
+      }
+
+      // 脸部外廓曲线（盛唐鹅蛋丰腴面庞，略向左转呈 3/4 优雅视角）
+      const faceLeftContour = sampleCatmullRom([
+        headPt(-2, -29), headPt(-18, -22), headPt(-24, -4), headPt(-22, 14), headPt(-10, 26), headPt(-1, 30)
+      ], 8);
+      const faceRightContour = sampleCatmullRom([
+        headPt(-2, -29), headPt(15, -24), headPt(25, -8), headPt(25, 11), headPt(15, 24), headPt(-1, 30)
+      ], 8);
+      const faceFullLoop = [...faceLeftContour, ...faceRightContour.slice().reverse().slice(1)];
+
+      // 高髻与云鬓
+      const topknotCenter = headPt(14, -42);
+      const leftBunCenter = headPt(-18, -24);
+      const rightBunCenter = headPt(24, -15);
+
+      // 颈肩与三道弯躯干轮廓
+      const neckTopL = { x: 432, y: 321 }, neckTopR = { x: 452, y: 317 };
+      const neckBotL = { x: 448, y: 350 }, neckBotR = { x: 478, y: 342 };
+
+      const torsoUpperEdge = sampleCatmullRom([
+        { x: 450, y: 352 }, { x: 486, y: 344 }, { x: 538, y: 364 }, { x: 598, y: 388 }, { x: 642, y: 394 }
+      ], 12);
+      const torsoLowerEdge = sampleCatmullRom([
+        { x: 450, y: 352 }, { x: 462, y: 386 }, { x: 512, y: 414 }, { x: 576, y: 428 }, { x: 634, y: 424 }
+      ], 12);
+
+      // 左臂（前伸托莲）
+      const leftArmCenter = sampleCatmullRom([
+        { x: 456, y: 358 }, { x: 422, y: 384 }, { x: 384, y: 394 }, { x: 344, y: 384 }
+      ], 12);
+      const leftArmGeom = buildRibbonGeometry(leftArmCenter, (t) => lerp(25, 13, Math.pow(t, 0.85)));
+
+      // 右臂（高举散花）
+      const rightArmCenter = sampleCatmullRom([
+        { x: 494, y: 350 }, { x: 534, y: 320 }, { x: 566, y: 292 }, { x: 592, y: 266 }
+      ], 12);
+      const rightArmGeom = buildRibbonGeometry(rightArmCenter, (t) => lerp(24, 12, Math.pow(t, 0.85)));
+
+      // 曳地长裙（从腰胯向右上凌空舞动，裙尾舒展波浪翻卷，不收死角）
+      const skirtUpperEdge = sampleCatmullRom([
+        { x: 582, y: 386 }, { x: 664, y: 384 }, { x: 742, y: 370 }, { x: 826, y: 368 }, { x: 924, y: 348 }, { x: 1018, y: 306 }, { x: 1068, y: 282 }
+      ], 14);
+      const skirtMidFold1 = sampleCatmullRom([
+        { x: 590, y: 402 }, { x: 678, y: 408 }, { x: 768, y: 398 }, { x: 862, y: 386 }, { x: 958, y: 358 }, { x: 1054, y: 322 }
+      ], 14);
+      const skirtMidFold2 = sampleCatmullRom([
+        { x: 582, y: 416 }, { x: 676, y: 432 }, { x: 780, y: 430 }, { x: 886, y: 412 }, { x: 980, y: 382 }, { x: 1076, y: 356 }
+      ], 14);
+      const skirtLowerEdge = sampleCatmullRom([
+        { x: 572, y: 426 }, { x: 668, y: 452 }, { x: 778, y: 458 }, { x: 892, y: 444 }, { x: 992, y: 414 }, { x: 1064, y: 388 }
+      ], 14);
+      // 裙尾波浪荷叶收口线（连接裙摆上下缘）
+      const skirtHemWave = sampleCatmullRom([
+        { x: 1068, y: 282 }, { x: 1046, y: 304 }, { x: 1054, y: 322 }, { x: 1044, y: 340 }, { x: 1076, y: 356 }, { x: 1050, y: 372 }, { x: 1064, y: 388 }
+      ], 8);
+
+      // 凌空翘起双足（自长裙上方翩然探出，清晰秀美）
+      const upperFootCenter = sampleCatmullRom([
+        { x: 794, y: 360 }, { x: 824, y: 336 }, { x: 854, y: 312 }
+      ], 10);
+      const upperFootGeom = buildRibbonGeometry(upperFootCenter, (t) => 17 * Math.sin(lerp(0.28, 0.90, t) * Math.PI) + 2);
+
+      const lowerFootCenter = sampleCatmullRom([
+        { x: 834, y: 378 }, { x: 866, y: 356 }, { x: 898, y: 334 }
+      ], 10);
+      const lowerFootGeom = buildRibbonGeometry(lowerFootCenter, (t) => 17 * Math.sin(lerp(0.28, 0.90, t) * Math.PI) + 2);
+
+      // 裤脚/裙裾脚踝褶袖（交代双足穿出位置）
+      const upperCuff = sampleArcPoints(795, 361, 6, 13, -Math.PI * 0.48, Math.PI * 0.48, 12, -0.58);
+      const lowerCuff = sampleArcPoints(835, 379, 6, 13, -Math.PI * 0.48, Math.PI * 0.48, 12, -0.55);
+
+      // 吴带当风：上长飘带（宽舒环抱头光左侧并向右上凌空回旋卷尾）
+      const upperRibbonCenter = sampleCatmullRom([
+        { x: 448, y: 348 },
+        { x: 348, y: 288 },
+        { x: 348, y: 198 },
+        { x: 456, y: 152 },
+        { x: 604, y: 186 },
+        { x: 760, y: 148 },
+        { x: 916, y: 204 },
+        { x: 1054, y: 156 },
+        { x: 1138, y: 182 },
+        { x: 1118, y: 206 }
+      ], 18);
+      const upperRibbonGeom = buildRibbonGeometry(upperRibbonCenter, (t) => {
+        const wave = 0.54 + 0.46 * Math.abs(Math.sin(t * Math.PI * 2.6 + 0.4));
+        const taper = Math.pow(Math.sin(clamp(t * 0.92 + 0.08, 0.05, 0.99) * Math.PI), 0.35);
+        return 25 * wave * taper + 3.5;
+      });
+
+      // 吴带当风：下长飘带（绕左臂垂落再凌空扬起至画幅右缘卷尾）
+      const lowerRibbonCenter = sampleCatmullRom([
+        { x: 382, y: 392 },
+        { x: 344, y: 454 },
+        { x: 404, y: 516 },
+        { x: 544, y: 534 },
+        { x: 702, y: 492 },
+        { x: 862, y: 424 },
+        { x: 1018, y: 392 },
+        { x: 1142, y: 332 },
+        { x: 1192, y: 360 },
+        { x: 1166, y: 382 }
+      ], 18);
+      const lowerRibbonGeom = buildRibbonGeometry(lowerRibbonCenter, (t) => {
+        const wave = 0.52 + 0.48 * Math.abs(Math.cos(t * Math.PI * 2.4));
+        const taper = Math.pow(Math.sin(clamp(t * 0.90 + 0.08, 0.05, 0.99) * Math.PI), 0.35);
+        return 27 * wave * taper + 3.5;
+      });
+
+      // 胸前副披帛（掠过右臂向后扬起，增加层次）
+      const chestRibbonCenter = sampleCatmullRom([
+        { x: 486, y: 356 },
+        { x: 552, y: 332 },
+        { x: 642, y: 274 },
+        { x: 734, y: 286 },
+        { x: 794, y: 262 }
+      ], 14);
+      const chestRibbonGeom = buildRibbonGeometry(chestRibbonCenter, (t) => 17 * Math.sin(clamp(t * 0.85 + 0.12, 0.08, 0.96) * Math.PI) + 3);
+
+      // 盛唐如意卷云纹（采用连续云带 + 螺旋卷涡云头，彻底替代椭圆泡泡）
+      function makeSpiral(cx, cy, rMax, startAng, turns = 1.35, dir = 1, steps = 20) {
+        const pts = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const r = lerp(rMax, 2.5, Math.pow(t, 0.85));
+          const a = startAng + dir * t * Math.PI * 2 * turns;
+          pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r * 0.72 });
+        }
+        return pts;
+      }
+
+      function makeCloudBand(ctrlPts, maxW, inkMain, inkSub, spiralCfg) {
+        const center = sampleCatmullRom(ctrlPts, 14);
+        const geom = buildRibbonGeometry(center, (t) => {
+          // 前段膨起为如意云头，后段流云彗尾收尖
+          const headSwell = Math.exp(-Math.pow((t - 0.16) * 4.2, 2)) * maxW * 0.45;
+          const body = maxW * Math.pow(Math.sin(clamp(t * 0.9 + 0.08, 0.05, 0.99) * Math.PI), 0.65) * (1 - t * 0.65);
+          return Math.max(3.5, body + headSwell);
+        });
+        const spiral = makeSpiral(spiralCfg.cx, spiralCfg.cy, spiralCfg.r, spiralCfg.ang, 1.3, spiralCfg.dir, 22);
+        return { geom, inkMain, inkSub, spiral };
+      }
+
+      const cloudBands = [
+        // 左下托云（双股如意流云托举莲华）
+        makeCloudBand(
+          [{ x: 334, y: 542 }, { x: 282, y: 516 }, { x: 224, y: 540 }, { x: 158, y: 564 }, { x: 96, y: 554 }],
+          34, 'SAN_QING', 'ER_LV', { cx: 294, cy: 536, r: 21, ang: -1.8, dir: -1 }
+        ),
+        makeCloudBand(
+          [{ x: 276, y: 564 }, { x: 230, y: 552 }, { x: 182, y: 582 }, { x: 120, y: 596 }, { x: 64, y: 584 }],
+          24, 'TU_HONG', 'SAN_QING', { cx: 236, cy: 566, r: 15, ang: -2.0, dir: -1 }
+        ),
+        // 中下飞云（随下长飘带流动）
+        makeCloudBand(
+          [{ x: 544, y: 618 }, { x: 604, y: 588 }, { x: 676, y: 616 }, { x: 758, y: 632 }, { x: 842, y: 610 }, { x: 904, y: 588 }],
+          36, 'ER_LV', 'SAN_QING', { cx: 616, cy: 608, r: 22, ang: -1.4, dir: 1 }
+        ),
+        makeCloudBand(
+          [{ x: 656, y: 636 }, { x: 706, y: 610 }, { x: 766, y: 642 }, { x: 836, y: 648 }, { x: 896, y: 628 }],
+          24, 'TU_HONG', 'ER_LV', { cx: 714, cy: 626, r: 15, ang: -1.5, dir: 1 }
+        ),
+        // 右上回云（高空流岚）
+        makeCloudBand(
+          [{ x: 890, y: 142 }, { x: 944, y: 114 }, { x: 1008, y: 136 }, { x: 1086, y: 142 }, { x: 1166, y: 118 }, { x: 1218, y: 98 }],
+          32, 'SAN_QING', 'ER_LV', { cx: 954, cy: 132, r: 20, ang: -1.6, dir: 1 }
+        ),
+        makeCloudBand(
+          [{ x: 992, y: 154 }, { x: 1038, y: 134 }, { x: 1094, y: 158 }, { x: 1154, y: 154 }],
+          20, 'TU_HONG', 'SAN_QING', { cx: 1044, cy: 148, r: 13, ang: -1.7, dir: 1 }
+        )
+      ];
+
+      // -----------------------------------------------------------------------
+      // 第一层：土红起稿（淡土红定形，约 2,000 笔）
+      // -----------------------------------------------------------------------
+      const draftStyle = {
+        layer: 1, ink: 'TU_HONG', radiusStart: 1.5, radiusEnd: 1.4,
+        alphaScale: 0.42, spacing: 0.85, minStep: 6.4, bleed: 0.25, jitter: 0.4, taperEnds: false
+      };
+
+      // 头光起稿圆
+      enqueueBrushPath(sampleArcPoints(haloCx, haloCy, 76, 76, 0, Math.PI * 2, 42), draftStyle);
+      enqueueBrushPath(sampleArcPoints(haloCx, haloCy, 56, 56, 0, Math.PI * 2, 34), draftStyle);
+      // 脸部与发髻起稿
+      enqueueBrushPath(faceFullLoop, draftStyle);
+      enqueueBrushPath(sampleArcPoints(topknotCenter.x, topknotCenter.y, 17, 15, 0, Math.PI * 2, 20), draftStyle);
+      // 躯干与双臂起稿
+      enqueueBrushPath(torsoUpperEdge, draftStyle);
+      enqueueBrushPath(torsoLowerEdge, draftStyle);
+      enqueueBrushPath(leftArmGeom.leftEdge, draftStyle);
+      enqueueBrushPath(leftArmGeom.rightEdge, draftStyle);
+      enqueueBrushPath(rightArmGeom.leftEdge, draftStyle);
+      enqueueBrushPath(rightArmGeom.rightEdge, draftStyle);
+      // 长裙与双足起稿
+      enqueueBrushPath(skirtUpperEdge, draftStyle);
+      enqueueBrushPath(skirtLowerEdge, draftStyle);
+      enqueueBrushPath(skirtMidFold1, draftStyle);
+      enqueueBrushPath(skirtHemWave, draftStyle);
+      enqueueBrushPath(upperFootGeom.leftEdge, draftStyle);
+      enqueueBrushPath(upperFootGeom.rightEdge, draftStyle);
+      enqueueBrushPath(lowerFootGeom.leftEdge, draftStyle);
+      enqueueBrushPath(lowerFootGeom.rightEdge, draftStyle);
+      // 双长飘带起稿
+      enqueueBrushPath(upperRibbonGeom.leftEdge, draftStyle);
+      enqueueBrushPath(upperRibbonGeom.rightEdge, draftStyle);
+      enqueueBrushPath(lowerRibbonGeom.leftEdge, draftStyle);
+      enqueueBrushPath(lowerRibbonGeom.rightEdge, draftStyle);
+      enqueueBrushPath(chestRibbonGeom.leftEdge, draftStyle);
+      enqueueBrushPath(chestRibbonGeom.rightEdge, draftStyle);
+      // 如意流云起稿
+      cloudBands.forEach((cb) => {
+        enqueueBrushPath(cb.geom.leftEdge, draftStyle);
+        enqueueBrushPath(cb.geom.rightEdge, draftStyle);
+        enqueueBrushPath(cb.spiral, draftStyle);
+      });
+
+      // -----------------------------------------------------------------------
+      // 第二层：平涂设色（石绿、石青、朱砂、肉色铺底，约 7,000 笔）
+      // -----------------------------------------------------------------------
+
+      // 2.1 盛唐如意流云淡彩铺底（位于人物之后，渐细彗尾不呈椭圆泡泡）
+      cloudBands.forEach((cb) => {
+        enqueueRibbonWash(cb.geom, {
+          layer: 2, ink: cb.inkMain, lanes: 4, uRange: [-0.72, 0.72],
+          radius: 7.5, alphaScale: 0.56, spacing: 0.65, minStep: 6.2, bleed: 0.55, softness: 0.30
+        });
+        enqueueRibbonWash(cb.geom, {
+          layer: 2, ink: cb.inkSub, lanes: 2, uRange: [-0.65, 0.15],
+          radius: 5.5, alphaScale: 0.42, spacing: 0.70, minStep: 6.8, bleed: 0.50, softness: 0.30
+        });
+      });
+
+      // 2.2 同心圆头光平涂（外环三青、中环二绿、内芯暖金）
+      enqueueEllipseFill(haloCx, haloCy, 74, 74, 0, {
+        layer: 2, ink: 'SAN_QING', rings: 3, rFracStart: 0.78, rFracEnd: 0.96,
+        radius: 8.5, alphaScale: 0.54, spacing: 0.72, bleed: 0.45, softness: 0.35
+      });
+      enqueueEllipseFill(haloCx, haloCy, 56, 56, 0, {
+        layer: 2, ink: 'ER_LV', rings: 3, rFracStart: 0.68, rFracEnd: 0.95,
+        radius: 7.8, alphaScale: 0.56, spacing: 0.72, bleed: 0.42, softness: 0.36
+      });
+      enqueueEllipseFill(haloCx, haloCy, 38, 38, 0, {
+        layer: 2, ink: 'NI_JIN', rings: 3, rFracStart: 0.25, rFracEnd: 0.90,
+        radius: 7.5, alphaScale: 0.34, spacing: 0.74, bleed: 0.45, softness: 0.32
+      });
+
+      // 2.3 上长飘带平涂（石绿主面 + 二绿衬色）
+      enqueueRibbonWash(upperRibbonGeom, {
+        layer: 2, ink: 'SHI_LV', lanes: 4, uRange: [-0.65, 0.65],
+        radius: 6.5, alphaScale: 0.78, spacing: 0.62, bleed: 0.28
+      });
+      enqueueRibbonWash(upperRibbonGeom, {
+        layer: 2, ink: 'ER_LV', lanes: 2, uRange: [-0.75, 0.15],
+        radius: 4.8, alphaScale: 0.58, spacing: 0.68, bleed: 0.25
+      });
+
+      // 2.4 胸前披帛平涂（朱砂）
+      enqueueRibbonWash(chestRibbonGeom, {
+        layer: 2, ink: 'ZHU_SHA', lanes: 3, uRange: [-0.6, 0.6],
+        radius: 5.5, alphaScale: 0.76, spacing: 0.64, bleed: 0.25
+      });
+
+      // 2.5 曳地长裙平涂（舒展波浪裙尾：石绿、朱砂、石青层叠铺彩）
+      enqueuePolygonWash(skirtUpperEdge, skirtMidFold1, {
+        layer: 2, ink: 'SHI_LV', rows: 6, radius: 7.6, alphaScale: 0.82, spacing: 0.65, minStep: 6.0, bleed: 0.28
+      });
+      enqueuePolygonWash(skirtMidFold1, skirtMidFold2, {
+        layer: 2, ink: 'ZHU_SHA', rows: 7, radius: 8.0, alphaScale: 0.88, spacing: 0.62, minStep: 5.8, bleed: 0.28
+      });
+      enqueuePolygonWash(skirtMidFold2, skirtLowerEdge, {
+        layer: 2, ink: 'ZHU_SHA', rows: 6, radius: 7.6, alphaScale: 0.82, spacing: 0.64, minStep: 5.8, bleed: 0.28
+      });
+      enqueuePolygonWash(skirtMidFold2, skirtLowerEdge, {
+        layer: 2, ink: 'SHI_QING', rows: 3, vRange: [0.55, 0.94],
+        radius: 6.8, alphaScale: 0.52, spacing: 0.70, minStep: 6.2, bleed: 0.30
+      });
+
+      // 2.6 飞天身躯肉色平涂（高覆盖密排，彻底消除抹胸与腰腹条纹）
+      enqueueEllipseFill(headCx, headCy, 23, 29, headRot, {
+        layer: 2, ink: 'SKIN', rings: 5, rFracStart: 0.16, rFracEnd: 0.90,
+        radius: 5.8, alphaScale: 0.94, spacing: 0.58, bleed: 0.20, softness: 0.45
+      });
+      // 高髻与云鬓古墨底色
+      enqueueEllipseFill(topknotCenter.x, topknotCenter.y, 16, 14, headRot, {
+        layer: 2, ink: 'GU_MO', rings: 3, rFracStart: 0.25, rFracEnd: 0.85,
+        radius: 4.8, alphaScale: 0.84, spacing: 0.60, bleed: 0.12
+      });
+      enqueueEllipseFill(leftBunCenter.x, leftBunCenter.y, 8, 12, headRot - 0.15, {
+        layer: 2, ink: 'GU_MO', rings: 2, rFracStart: 0.30, rFracEnd: 0.80,
+        radius: 4.2, alphaScale: 0.84, spacing: 0.62, bleed: 0.12
+      });
+      enqueueEllipseFill(rightBunCenter.x, rightBunCenter.y, 9, 13, headRot + 0.15, {
+        layer: 2, ink: 'GU_MO', rings: 2, rFracStart: 0.30, rFracEnd: 0.80,
+        radius: 4.2, alphaScale: 0.84, spacing: 0.62, bleed: 0.12
+      });
+
+      // 颈部与躯干肉色（rows: 10 密排丝滑覆盖）
+      enqueuePolygonWash([neckTopL, neckBotL], [neckTopR, neckBotR], {
+        layer: 2, ink: 'SKIN', rows: 4, radius: 5.8, alphaScale: 0.92, spacing: 0.60, bleed: 0.18
+      });
+      enqueuePolygonWash(torsoUpperEdge, torsoLowerEdge, {
+        layer: 2, ink: 'SKIN', rows: 10, tStart: 0.0, tEnd: 0.82,
+        radius: 7.8, alphaScale: 0.94, spacing: 0.60, minStep: 6.4, bleed: 0.24
+      });
+
+      // 朱砂抹胸/胸巾与石青锦带（rows: 9 + 大半径柔滑重叠，无条纹）
+      enqueuePolygonWash(torsoUpperEdge, torsoLowerEdge, {
+        layer: 2, ink: 'ZHU_SHA', rows: 9, tStart: 0.14, tEnd: 0.48, vRange: [0.06, 0.95],
+        radius: 7.5, alphaScale: 0.86, spacing: 0.60, minStep: 6.2, bleed: 0.26
+      });
+      enqueuePolygonWash(torsoUpperEdge, torsoLowerEdge, {
+        layer: 2, ink: 'SHI_QING', rows: 6, tStart: 0.72, tEnd: 0.98, vRange: [0.04, 0.96],
+        radius: 7.0, alphaScale: 0.82, spacing: 0.62, minStep: 6.2, bleed: 0.24
+      });
+
+      // 左臂、右臂肉色平涂
+      enqueueRibbonWash(leftArmGeom, {
+        layer: 2, ink: 'SKIN', lanes: 4, uRange: [-0.58, 0.58],
+        radius: 5.8, alphaScale: 0.92, spacing: 0.58, bleed: 0.16
+      });
+      enqueueRibbonWash(rightArmGeom, {
+        layer: 2, ink: 'SKIN', lanes: 4, uRange: [-0.58, 0.58],
+        radius: 5.6, alphaScale: 0.92, spacing: 0.58, bleed: 0.16
+      });
+
+      // 双足肉色平涂（置于长裙摆上方外缘，凌空翘足清晰灵动）
+      enqueueRibbonWash(upperFootGeom, {
+        layer: 2, ink: 'SKIN', lanes: 3, uRange: [-0.45, 0.45],
+        radius: 5.0, alphaScale: 0.96, spacing: 0.58, minStep: 4.5, bleed: 0.14
+      });
+      enqueueRibbonWash(lowerFootGeom, {
+        layer: 2, ink: 'SKIN', lanes: 3, uRange: [-0.45, 0.45],
+        radius: 5.0, alphaScale: 0.96, spacing: 0.58, minStep: 4.5, bleed: 0.14
+      });
+
+      // 2.7 下长飘带平涂（石青主调 + 三青过渡）
+      enqueueRibbonWash(lowerRibbonGeom, {
+        layer: 2, ink: 'SHI_QING', lanes: 4, uRange: [-0.65, 0.65],
+        radius: 6.5, alphaScale: 0.78, spacing: 0.62, bleed: 0.28
+      });
+      enqueueRibbonWash(lowerRibbonGeom, {
+        layer: 2, ink: 'SAN_QING', lanes: 2, uRange: [-0.75, 0.15],
+        radius: 4.8, alphaScale: 0.58, spacing: 0.68, bleed: 0.25
+      });
+
+      // -----------------------------------------------------------------------
+      // 第三层：凹凸晕染（西域凹凸法 + 渐变退晕法，约 6,500 笔）
+      // -----------------------------------------------------------------------
+
+      // 3.1 肌肤西域凹凸法：外廓淡土红/赭石分染，中央部位铅白提亮立体感
+      const shadeInk = { layer: 3, ink: 'TU_HONG', alphaScale: 0.30, spacing: 0.38, minStep: 1.4, bleed: 0.45, softness: 0.32, composite: 'multiply' };
+      const highlightInk = { layer: 3, ink: 'QIAN_BAI', alphaScale: 0.38, spacing: 0.40, minStep: 1.4, bleed: 0.40, softness: 0.34 };
+
+      // 面部边缘分染（两侧颊缘与下颌微染淡土红，鼻梁额心颊部提白）
+      enqueueBrushPath(faceLeftContour, { ...shadeInk, radiusStart: 5.5, radiusEnd: 4.2 });
+      enqueueBrushPath(faceRightContour, { ...shadeInk, radiusStart: 6.5, radiusEnd: 5.0 });
+      enqueueEllipseFill(headPt(-2, -13).x, headPt(-2, -13).y, 8, 5, headRot, {
+        layer: 3, ink: 'QIAN_BAI', rings: 3, radius: 4.2, alphaScale: 0.40, spacing: 0.42, minStep: 1.4, bleed: 0.35
+      });
+      enqueueBrushPath([headPt(-2, -8), headPt(-4, 6)], { ...highlightInk, radiusStart: 2.6, radiusEnd: 2.2 });
+      enqueueEllipseFill(headPt(-10, 8).x, headPt(-10, 8).y, 5, 4, headRot, {
+        layer: 3, ink: 'ZHU_SHA', rings: 2, radius: 4.5, alphaScale: 0.14, spacing: 0.45, minStep: 1.5, bleed: 0.45
+      });
+      enqueueEllipseFill(headPt(10, 8).x, headPt(10, 8).y, 6, 5, headRot, {
+        layer: 3, ink: 'ZHU_SHA', rings: 2, radius: 4.8, alphaScale: 0.16, spacing: 0.45, minStep: 1.5, bleed: 0.45
+      });
+
+      // 躯干与双臂边缘凹凸晕染
+      enqueueBrushPath(torsoLowerEdge.slice(0, Math.floor(torsoLowerEdge.length * 0.8)), {
+        ...shadeInk, radiusStart: 6.5, radiusEnd: 7.5
+      });
+      enqueueBrushPath(torsoUpperEdge.slice(0, Math.floor(torsoUpperEdge.length * 0.75)), {
+        ...highlightInk, radiusStart: 4.5, radiusEnd: 4.0
+      });
+      // 腰腹肌理中心柔亮
+      enqueuePolygonWash(torsoUpperEdge, torsoLowerEdge, {
+        layer: 3, ink: 'QIAN_BAI', rows: 3, tStart: 0.48, tEnd: 0.74, vRange: [0.32, 0.68],
+        radius: 5.0, alphaScale: 0.30, spacing: 0.42, minStep: 1.8, bleed: 0.35
+      });
+
+      // 左臂、右臂边缘凹凸分染 + 臂腹提亮
+      enqueueRibbonWash(leftArmGeom, { layer: 3, ink: 'TU_HONG', lanes: 2, uRange: [0.55, 0.85], radius: 4.2, alphaScale: 0.30, spacing: 0.42, minStep: 1.5, bleed: 0.38, composite: 'multiply' });
+      enqueueRibbonWash(leftArmGeom, { layer: 3, ink: 'QIAN_BAI', lanes: 2, uRange: [-0.28, -0.02], radius: 3.8, alphaScale: 0.34, spacing: 0.42, minStep: 1.5, bleed: 0.35 });
+      enqueueRibbonWash(rightArmGeom, { layer: 3, ink: 'TU_HONG', lanes: 2, uRange: [0.55, 0.85], radius: 4.0, alphaScale: 0.30, spacing: 0.42, minStep: 1.5, bleed: 0.38, composite: 'multiply' });
+      enqueueRibbonWash(rightArmGeom, { layer: 3, ink: 'QIAN_BAI', lanes: 2, uRange: [-0.28, -0.02], radius: 3.6, alphaScale: 0.34, spacing: 0.42, minStep: 1.5, bleed: 0.35 });
+
+      // 双足微染淡土红足踝轮廓
+      enqueueRibbonWash(upperFootGeom, { layer: 3, ink: 'TU_HONG', lanes: 2, uRange: [0.45, 0.78], radius: 3.2, alphaScale: 0.28, spacing: 0.45, minStep: 1.4, bleed: 0.3, composite: 'multiply' });
+      enqueueRibbonWash(lowerFootGeom, { layer: 3, ink: 'TU_HONG', lanes: 2, uRange: [0.45, 0.78], radius: 3.2, alphaScale: 0.28, spacing: 0.45, minStep: 1.4, bleed: 0.3, composite: 'multiply' });
+
+      // 3.2 长裙与双飘带退晕法（由褶谷深色渐晕向阳面亮部）
+      enqueuePolygonWash(skirtUpperEdge, skirtMidFold1, {
+        layer: 3, ink: 'SHI_QING', rows: 3, vRange: [0.65, 0.96],
+        radius: 6.0, alphaScale: 0.32, spacing: 0.44, minStep: 2.85, bleed: 0.40, composite: 'multiply'
+      });
+      enqueuePolygonWash(skirtMidFold1, skirtMidFold2, {
+        layer: 3, ink: 'TU_HONG', rows: 4, vRange: [0.55, 0.95],
+        radius: 6.2, alphaScale: 0.34, spacing: 0.44, minStep: 2.85, bleed: 0.42, composite: 'multiply'
+      });
+      enqueuePolygonWash(skirtMidFold2, skirtLowerEdge, {
+        layer: 3, ink: 'TU_HONG', rows: 3, vRange: [0.60, 0.96],
+        radius: 6.0, alphaScale: 0.34, spacing: 0.44, minStep: 2.85, bleed: 0.42, composite: 'multiply'
+      });
+
+      // 飘带折转面退晕
+      enqueueRibbonWash(upperRibbonGeom, {
+        layer: 3, ink: 'SHI_QING', lanes: 3, uRange: [0.32, 0.82],
+        radius: 4.8, alphaScale: 0.32, spacing: 0.44, minStep: 2.85, bleed: 0.38, composite: 'multiply'
+      });
+      enqueueRibbonWash(lowerRibbonGeom, {
+        layer: 3, ink: 'ZHU_SHA', lanes: 3, uRange: [-0.75, -0.22],
+        radius: 4.8, alphaScale: 0.26, spacing: 0.44, minStep: 2.85, bleed: 0.40, composite: 'multiply'
+      });
+
+      // 3.3 如意流云腹底退晕（底部浅染石青/赭石，增加蓬松层次）
+      cloudBands.forEach((cb) => {
+        enqueueRibbonWash(cb.geom, {
+          layer: 3, ink: cb.inkMain === 'TU_HONG' ? 'ZHE_SHI' : 'SHI_QING',
+          lanes: 2, uRange: [0.32, 0.85], radius: 5.2, alphaScale: 0.34,
+          spacing: 0.50, minStep: 2.85, bleed: 0.45, softness: 0.30, composite: 'multiply'
+        });
+      });
+
+      // -----------------------------------------------------------------------
+      // 第四层：铁线描与兰叶描（古墨/焦墨复勾定形，约 5,800 笔）
+      // -----------------------------------------------------------------------
+      const ironLine = {
+        layer: 4, ink: 'GU_MO', radiusStart: 1.55, radiusEnd: 1.45,
+        alphaScale: 0.95, spacing: 0.56, minStep: 1.55, bleed: 0.06, jitter: 0.18, taperEnds: true
+      };
+      const orchidLine = {
+        layer: 4, ink: 'GU_MO', radiusStart: 2.1, radiusEnd: 1.6,
+        alphaScale: 0.92, spacing: 0.54, minStep: 2.75, bleed: 0.08, jitter: 0.25, orchidStyle: true
+      };
+
+      // 4.1 铁线描精勾面庞、五官、发丝与耳饰
+      enqueueBrushPath(faceLeftContour, ironLine);
+      enqueueBrushPath(faceRightContour, { ...ironLine, radiusStart: 1.4, radiusEnd: 1.3, alphaScale: 0.85 });
+
+      // 柳叶眉（焦墨精勾）
+      enqueueBrushPath(sampleCatmullRom([headPt(-17, -6), headPt(-11, -9.5), headPt(-5, -8)], 6), {
+        ...ironLine, ink: 'JIAO_MO', radiusStart: 1.15, radiusEnd: 0.85
+      });
+      enqueueBrushPath(sampleCatmullRom([headPt(2, -8), headPt(10, -9.5), headPt(17, -5)], 6), {
+        ...ironLine, ink: 'JIAO_MO', radiusStart: 1.15, radiusEnd: 0.85
+      });
+
+      // 含情凤眼（上睑略粗、下睑极细、黑漆点瞳）
+      enqueueBrushPath(sampleCatmullRom([headPt(-16, -1), headPt(-11, -3.2), headPt(-6, -1.5)], 5), {
+        ...ironLine, ink: 'JIAO_MO', radiusStart: 1.25, radiusEnd: 0.9
+      });
+      enqueueBrushPath(sampleCatmullRom([headPt(-15, -0.5), headPt(-11, 0.6), headPt(-7, -1)], 5), {
+        ...ironLine, radiusStart: 0.75, radiusEnd: 0.65, alphaScale: 0.7
+      });
+      enqueueBrushPath(sampleCatmullRom([headPt(3, -1.5), headPt(9, -3.2), headPt(16, -0.5)], 5), {
+        ...ironLine, ink: 'JIAO_MO', radiusStart: 1.25, radiusEnd: 0.9
+      });
+      enqueueBrushPath(sampleCatmullRom([headPt(4, -0.8), headPt(9, 0.7), headPt(15, -0.4)], 5), {
+        ...ironLine, radiusStart: 0.75, radiusEnd: 0.65, alphaScale: 0.7
+      });
+      // 双瞳与耳垂
+      pushAction({ layer: 4, ink: 'JIAO_MO', x: headPt(-11.5, -1.2).x, y: headPt(-11.5, -1.2).y, r: 1.85, pressure: 1.1, alphaScale: 1 });
+      pushAction({ layer: 4, ink: 'JIAO_MO', x: headPt(8.5, -1.2).x, y: headPt(8.5, -1.2).y, r: 1.85, pressure: 1.1, alphaScale: 1 });
+      enqueueBrushPath(sampleArcPoints(headPt(24, 5).x, headPt(24, 5).y, 3.2, 6.2, -0.8, 2.2, 10, headRot), ironLine);
+
+      // 秀鼻、朱砂花钿与樱唇
+      enqueueBrushPath(sampleCatmullRom([headPt(-2, -7), headPt(-4, 1), headPt(-5.5, 6), headPt(-2, 7.5)], 6), {
+        ...ironLine, radiusStart: 1.05, radiusEnd: 0.95, alphaScale: 0.82
+      });
+      // 花钿
+      pushAction({ layer: 4, ink: 'ZHU_SHA', x: headPt(-3.5, -14).x, y: headPt(-3.5, -14).y, r: 2.0, pressure: 1.0, alphaScale: 0.92 });
+      // 朱唇
+      enqueueBrushPath([headPt(-7, 14.5), headPt(-2, 13.8), headPt(3.5, 14.5)], {
+        layer: 4, ink: 'ZHU_SHA', radiusStart: 1.8, radiusEnd: 1.5, alphaScale: 0.95, spacing: 0.5
+      });
+      enqueueBrushPath([headPt(-6.5, 15.2), headPt(-1.8, 16.5), headPt(3, 15.2)], {
+        layer: 4, ink: 'ZHU_SHA', radiusStart: 1.6, radiusEnd: 1.4, alphaScale: 0.90, spacing: 0.5
+      });
+      enqueueBrushPath([headPt(-7.5, 14.8), headPt(-2, 14.9), headPt(3.5, 14.8)], {
+        ...ironLine, ink: 'TU_HONG', radiusStart: 0.85, radiusEnd: 0.8, alphaScale: 0.85
+      });
+
+      // 高髻、发际线与细发丝
+      enqueueBrushPath(sampleArcPoints(topknotCenter.x, topknotCenter.y, 17, 15, 0, Math.PI * 2, 24, headRot), {
+        ...ironLine, ink: 'JIAO_MO', radiusStart: 1.6, radiusEnd: 1.5
+      });
+      for (let h = -2; h <= 2; h++) {
+        enqueueBrushPath(sampleArcPoints(topknotCenter.x, topknotCenter.y, 12 + h * 1.5, 10 + h, -2.5, -0.6, 12, headRot), {
+          ...ironLine, ink: 'JIAO_MO', radiusStart: 0.9, radiusEnd: 0.8, alphaScale: 0.72
+        });
+      }
+      enqueueBrushPath(sampleArcPoints(leftBunCenter.x, leftBunCenter.y, 9, 13, 0.5, Math.PI * 1.6, 14, headRot), ironLine);
+      enqueueBrushPath(sampleArcPoints(rightBunCenter.x, rightBunCenter.y, 10, 14, -1.6, Math.PI * 0.7, 14, headRot), ironLine);
+
+      // 4.2 铁线描精勾颈肩、手臂、兰花指与双足
+      enqueueBrushPath([neckTopL, neckBotL], ironLine);
+      enqueueBrushPath([neckTopR, neckBotR], ironLine);
+      enqueueBrushPath(torsoUpperEdge.slice(0, Math.floor(torsoUpperEdge.length * 0.85)), ironLine);
+      enqueueBrushPath(torsoLowerEdge.slice(0, Math.floor(torsoLowerEdge.length * 0.85)), ironLine);
+      // 抹胸与腰带束线
+      const bustIdx = Math.floor(torsoUpperEdge.length * 0.14);
+      const bustEndIdx = Math.floor(torsoUpperEdge.length * 0.48);
+      enqueueBrushPath([torsoUpperEdge[bustIdx], torsoLowerEdge[bustIdx]], ironLine);
+      enqueueBrushPath([torsoUpperEdge[bustEndIdx], torsoLowerEdge[bustEndIdx]], ironLine);
+
+      // 双臂与纤细兰花指手势
+      enqueueBrushPath(leftArmGeom.leftEdge, ironLine);
+      enqueueBrushPath(leftArmGeom.rightEdge, ironLine);
+      // 左手托莲五指轮廓
+      [
+        [{ x: 344, y: 382 }, { x: 326, y: 379 }, { x: 310, y: 369 }],
+        [{ x: 340, y: 386 }, { x: 322, y: 386 }, { x: 306, y: 377 }],
+        [{ x: 342, y: 377 }, { x: 332, y: 368 }, { x: 325, y: 358 }]
+      ].forEach((fPts) => enqueueBrushPath(fPts, { ...ironLine, radiusStart: 1.2, radiusEnd: 0.85 }));
+
+      enqueueBrushPath(rightArmGeom.leftEdge, ironLine);
+      enqueueBrushPath(rightArmGeom.rightEdge, ironLine);
+      // 右手散花指轮廓
+      [
+        [{ x: 590, y: 266 }, { x: 604, y: 256 }, { x: 616, y: 244 }],
+        [{ x: 593, y: 269 }, { x: 609, y: 262 }, { x: 622, y: 254 }],
+        [{ x: 588, y: 262 }, { x: 595, y: 249 }, { x: 603, y: 242 }]
+      ].forEach((fPts) => enqueueBrushPath(fPts, { ...ironLine, radiusStart: 1.2, radiusEnd: 0.85 }));
+
+      // 双足轮廓与脚踝裙袖褶边
+      enqueueBrushPath(upperCuff, { ...orchidLine, radiusStart: 1.5, radiusEnd: 1.1 });
+      enqueueBrushPath(lowerCuff, { ...orchidLine, radiusStart: 1.5, radiusEnd: 1.1 });
+      enqueueBrushPath(upperFootGeom.leftEdge, ironLine);
+      enqueueBrushPath(upperFootGeom.rightEdge, ironLine);
+      enqueueBrushPath(lowerFootGeom.leftEdge, ironLine);
+      enqueueBrushPath(lowerFootGeom.rightEdge, ironLine);
+
+      // 4.3 兰叶描精勾双长飘带、长裙褶纹、波浪裙尾与如意流云卷涡
+      enqueueBrushPath(upperRibbonGeom.leftEdge, orchidLine);
+      enqueueBrushPath(upperRibbonGeom.rightEdge, orchidLine);
+      enqueueBrushPath(lowerRibbonGeom.leftEdge, orchidLine);
+      enqueueBrushPath(lowerRibbonGeom.rightEdge, orchidLine);
+      enqueueBrushPath(chestRibbonGeom.leftEdge, orchidLine);
+      enqueueBrushPath(chestRibbonGeom.rightEdge, orchidLine);
+
+      // 长裙外缘、波浪裙尾及内部衣纹褶线
+      enqueueBrushPath(skirtUpperEdge, orchidLine);
+      enqueueBrushPath(skirtLowerEdge, orchidLine);
+      enqueueBrushPath(skirtHemWave, { ...orchidLine, radiusStart: 1.75, radiusEnd: 1.25 });
+      enqueueBrushPath(skirtMidFold1, { ...orchidLine, radiusStart: 1.65, radiusEnd: 1.2, alphaScale: 0.82 });
+      enqueueBrushPath(skirtMidFold2, { ...orchidLine, radiusStart: 1.65, radiusEnd: 1.2, alphaScale: 0.82 });
+      for (let f = 0; f < 3; f++) {
+        const ratio = (f + 1) / 4;
+        const foldPts = skirtUpperEdge.map((p, i) => {
+          const j = Math.min(skirtLowerEdge.length - 1, Math.round(i * (skirtLowerEdge.length - 1) / (skirtUpperEdge.length - 1)));
+          return {
+            x: lerp(p.x, skirtLowerEdge[j].x, ratio) + Math.sin(i * 0.28 + f) * 5,
+            y: lerp(p.y, skirtLowerEdge[j].y, ratio)
+          };
+        }).slice(6);
+        enqueueBrushPath(foldPts, { ...orchidLine, radiusStart: 1.35, radiusEnd: 0.9, alphaScale: 0.68 });
+      }
+
+      // 盛唐如意卷云纹线条（流动云缘 + 螺旋如意云头）
+      cloudBands.forEach((cb) => {
+        enqueueBrushPath(cb.geom.leftEdge, { ...orchidLine, radiusStart: 1.65, radiusEnd: 0.9, alphaScale: 0.78 });
+        enqueueBrushPath(cb.geom.rightEdge, { ...orchidLine, ink: 'TU_HONG', radiusStart: 1.45, radiusEnd: 0.8, alphaScale: 0.65 });
+        enqueueBrushPath(cb.spiral, { ...ironLine, ink: cb.inkMain === 'TU_HONG' ? 'TU_HONG' : 'GU_MO', radiusStart: 1.35, radiusEnd: 0.85, alphaScale: 0.78 });
+      });
+
+      // -----------------------------------------------------------------------
+      // 第五层：宝冠璎珞与衣纹描金（泥金、铅白、石青精绘，约 4,200 笔）
+      // -----------------------------------------------------------------------
+      const goldFine = {
+        layer: 5, ink: 'NI_JIN', radiusStart: 1.35, radiusEnd: 1.2,
+        alphaScale: 0.95, spacing: 0.56, minStep: 1.88, bleed: 0.12, jitter: 0.15, taperEnds: true
+      };
+
+      // 5.1 高髻宝冠（繁缛金冠座 + 五瓣火焰宝冠 + 宝石嵌珠 + 飘动步摇流苏）
+      const crownBase = headPt(5, -28);
+      const crownArc = sampleArcPoints(crownBase.x, crownBase.y, 20, 8.5, Math.PI * 1.05, Math.PI * 1.95, 18, headRot);
+      enqueueBrushPath(crownArc, { ...goldFine, radiusStart: 2.3, radiusEnd: 2.1 });
+      // 五瓣华美火焰花冠尖
+      [
+        [headPt(-12, -30), headPt(-11, -43), headPt(-6, -32)],
+        [headPt(-6, -33), headPt(-4, -49), headPt(-1, -34)],
+        [headPt(-1, -35), headPt(4, -56), headPt(10, -34)],
+        [headPt(9, -33), headPt(15, -47), headPt(18, -32)],
+        [headPt(16, -30), headPt(22, -41), headPt(23, -29)]
+      ].forEach((petal) => enqueueBrushPath(petal, { ...goldFine, radiusStart: 1.85, radiusEnd: 1.35 }));
+      // 宝冠嵌珠（朱砂、石青宝珠 + 蛤粉连珠高光）
+      [
+        { pt: headPt(4, -40), r: 3.4, ink: 'ZHU_SHA' },
+        { pt: headPt(-5, -36), r: 2.4, ink: 'SHI_QING' },
+        { pt: headPt(14, -35), r: 2.4, ink: 'SHI_QING' }
+      ].forEach((gem) => {
+        pushAction({ layer: 5, ink: gem.ink, x: gem.pt.x, y: gem.pt.y, r: gem.r, pressure: 1.1, alphaScale: 1.0 });
+        pushAction({ layer: 5, ink: 'QIAN_BAI', x: gem.pt.x - 0.6, y: gem.pt.y - 0.6, r: gem.r * 0.45, pressure: 1.0, alphaScale: 0.95 });
+      });
+      // 发髻金簪与向后飘飞的泥金步摇流苏
+      enqueueBrushPath([headPt(2, -46), headPt(34, -34)], { ...goldFine, radiusStart: 1.5, radiusEnd: 1.1 });
+      enqueueBrushPath(sampleCatmullRom([headPt(22, -26), headPt(38, -32), headPt(54, -26)], 8), {
+        ...goldFine, radiusStart: 1.35, radiusEnd: 0.85, alphaScale: 0.85
+      });
+      enqueueBrushPath(sampleCatmullRom([headPt(22, -22), headPt(40, -24), headPt(58, -16)], 8), {
+        ...goldFine, radiusStart: 1.25, radiusEnd: 0.8, alphaScale: 0.80
+      });
+      pushAction({ layer: 5, ink: 'NI_JIN', x: headPt(24, 9).x, y: headPt(24, 9).y, r: 2.7, pressure: 1.1 });
+      pushAction({ layer: 5, ink: 'QIAN_BAI', x: headPt(24, 14).x, y: headPt(24, 14).y, r: 1.6, pressure: 1.0 });
+
+      // 5.2 头光放射金线与连珠外圈
+      const haloRayCount = 24;
+      for (let i = 0; i < haloRayCount; i++) {
+        const ang = (i / haloRayCount) * Math.PI * 2;
+        const pIn = { x: haloCx + Math.cos(ang) * 32, y: haloCy + Math.sin(ang) * 32 };
+        const pOut = { x: haloCx + Math.cos(ang) * 74, y: haloCy + Math.sin(ang) * 74 };
+        enqueueBrushPath([pIn, pOut], {
+          ...goldFine, radiusStart: 0.95, radiusEnd: 0.75, alphaScale: 0.45, spacing: 0.72
+        });
+      }
+      // 头光外圈连珠纹（48 颗蛤粉/泥金圆珠）
+      for (let i = 0; i < 48; i++) {
+        const ang = (i / 48) * Math.PI * 2;
+        pushAction({
+          layer: 5,
+          ink: i % 2 === 0 ? 'NI_JIN' : 'QIAN_BAI',
+          x: haloCx + Math.cos(ang) * 77,
+          y: haloCy + Math.sin(ang) * 77,
+          r: 1.7,
+          pressure: 1.0,
+          alphaScale: 0.78
+        });
+      }
+      enqueueBrushPath(sampleArcPoints(haloCx, haloCy, 57, 57, 0, Math.PI * 2, 40), {
+        ...goldFine, radiusStart: 1.2, radiusEnd: 1.2, alphaScale: 0.75
+      });
+
+      // 5.3 颈间璎珞、臂钏、手镯与脚钏
+      const neckBeads = sampleCatmullRom([
+        { x: 443, y: 344 }, { x: 454, y: 356 }, { x: 468, y: 358 }, { x: 478, y: 343 }
+      ], 6);
+      enqueueBrushPath(neckBeads, { ...goldFine, radiusStart: 1.7, radiusEnd: 1.7 });
+      neckBeads.forEach((pt, idx) => {
+        if (idx % 2 === 0) {
+          pushAction({ layer: 5, ink: idx === 6 ? 'ZHU_SHA' : 'QIAN_BAI', x: pt.x, y: pt.y + 2, r: idx === 6 ? 2.6 : 1.5, pressure: 1.05 });
+        }
+      });
+
+      // 左右臂钏、手镯与双足脚钏
+      [
+        sampleArcPoints(426, 376, 3, 11, -1.3, 1.5, 8, 0.45),  // 左臂钏
+        sampleArcPoints(352, 385, 2.5, 7, -1.4, 1.4, 8, 0.15), // 左手镯
+        sampleArcPoints(520, 326, 3, 10, -1.3, 1.5, 8, -0.65), // 右臂钏
+        sampleArcPoints(584, 274, 2.5, 7, -1.4, 1.4, 8, -0.75),// 右手镯
+        sampleArcPoints(802, 354, 2.5, 7.5, -1.3, 1.4, 8, -0.62),// 上脚钏
+        sampleArcPoints(842, 372, 2.5, 7.5, -1.3, 1.4, 8, -0.58) // 下脚钏
+      ].forEach((ringPts) => enqueueBrushPath(ringPts, { ...goldFine, radiusStart: 1.6, radiusEnd: 1.5 }));
+
+      // 5.4 双飘带、抹胸与长裙边缘描金 + 唐草团花暗纹
+      enqueueBrushPath([torsoUpperEdge[bustIdx], torsoLowerEdge[bustIdx]], { ...goldFine, alphaScale: 0.85 });
+      enqueueBrushPath([torsoUpperEdge[bustEndIdx], torsoLowerEdge[bustEndIdx]], { ...goldFine, alphaScale: 0.85 });
+      enqueueBrushPath(upperRibbonGeom.leftEdge, { ...goldFine, alphaScale: 0.72, spacing: 0.65 });
+      enqueueBrushPath(upperRibbonGeom.rightEdge, { ...goldFine, alphaScale: 0.64, spacing: 0.65 });
+      enqueueBrushPath(lowerRibbonGeom.leftEdge, { ...goldFine, alphaScale: 0.72, spacing: 0.65 });
+      enqueueBrushPath(lowerRibbonGeom.rightEdge, { ...goldFine, alphaScale: 0.64, spacing: 0.65 });
+      enqueueBrushPath(skirtUpperEdge, { ...goldFine, alphaScale: 0.76, spacing: 0.62 });
+      enqueueBrushPath(skirtLowerEdge, { ...goldFine, alphaScale: 0.76, spacing: 0.62 });
+      enqueueBrushPath(skirtHemWave, { ...goldFine, alphaScale: 0.82, spacing: 0.60 });
+
+      // 长裙与抹胸上的盛唐团花/联珠点金纹
+      const medallionPositions = [
+        { x: 505, y: 378, r: 9 },
+        { x: 645, y: 416, r: 12 },
+        { x: 706, y: 418, r: 13 },
+        { x: 768, y: 410, r: 12 },
+        { x: 896, y: 398, r: 11 },
+        { x: 966, y: 374, r: 11 }
+      ];
+      medallionPositions.forEach((m) => {
+        enqueueBrushPath(sampleArcPoints(m.x, m.y, m.r, m.r * 0.78, 0, Math.PI * 2, 16, -0.25), {
+          ...goldFine, radiusStart: 1.1, radiusEnd: 1.0, alphaScale: 0.68
+        });
+        for (let k = 0; k < 6; k++) {
+          const ang = (k / 6) * Math.PI * 2;
+          pushAction({
+            layer: 5,
+            ink: k % 2 === 0 ? 'NI_JIN' : 'QIAN_BAI',
+            x: m.x + Math.cos(ang) * m.r * 0.52,
+            y: m.y + Math.sin(ang) * m.r * 0.42,
+            r: 1.5,
+            pressure: 1.0,
+            alphaScale: 0.72
+          });
+        }
+      });
+
+      // -----------------------------------------------------------------------
+      // 第六层：散花莲瓣与祥云提白（约 2,600 笔）
+      // -----------------------------------------------------------------------
+      // 6.1 左手所托盛开宝相莲花 (308, 348) —— 9 瓣丰腴层叠莲瓣 + 石绿莲萼 + 泥金莲蓬
+      const lotusCx = 308, lotusCy = 350;
+      // 底部两片石绿莲萼
+      [
+        [{ x: lotusCx, y: lotusCy + 4 }, { x: lotusCx - 14, y: lotusCy + 5 }, { x: lotusCx - 24, y: lotusCy - 2 }],
+        [{ x: lotusCx, y: lotusCy + 4 }, { x: lotusCx + 14, y: lotusCy + 5 }, { x: lotusCx + 24, y: lotusCy - 2 }]
+      ].forEach((calyx) => {
+        enqueueBrushPath(calyx, { layer: 6, ink: 'SHI_LV', radiusStart: 3.4, radiusEnd: 1.4, alphaScale: 0.90, spacing: 0.55 });
+      });
+
+      const lotusPetals = [
+        { ang: -Math.PI * 0.90, len: 28, w: 11, ink: 'ZHU_SHA' },
+        { ang: -Math.PI * 0.74, len: 34, w: 12, ink: 'QIAN_BAI' },
+        { ang: -Math.PI * 0.58, len: 37, w: 13, ink: 'ZHU_SHA' },
+        { ang: -Math.PI * 0.42, len: 37, w: 13, ink: 'ZHU_SHA' },
+        { ang: -Math.PI * 0.26, len: 34, w: 12, ink: 'QIAN_BAI' },
+        { ang: -Math.PI * 0.10, len: 28, w: 11, ink: 'ZHU_SHA' },
+        { ang: -Math.PI * 0.66, len: 26, w: 10, ink: 'ZHU_SHA' },
+        { ang: -Math.PI * 0.50, len: 29, w: 11, ink: 'QIAN_BAI' },
+        { ang: -Math.PI * 0.34, len: 26, w: 10, ink: 'ZHU_SHA' }
+      ];
+      lotusPetals.forEach((pt) => {
+        const tx = lotusCx + Math.cos(pt.ang) * pt.len;
+        const ty = lotusCy + Math.sin(pt.ang) * pt.len;
+        const nx = -Math.sin(pt.ang) * pt.w * 0.55;
+        const ny = Math.cos(pt.ang) * pt.w * 0.55;
+        const midX = lotusCx + Math.cos(pt.ang) * pt.len * 0.56;
+        const midY = lotusCy + Math.sin(pt.ang) * pt.len * 0.56;
+
+        // 莲瓣饱满填色
+        enqueueBrushPath([{ x: lotusCx, y: lotusCy }, { x: midX, y: midY }, { x: tx, y: ty }], {
+          layer: 6, ink: pt.ink, radiusStart: pt.w * 0.55, radiusEnd: 2.2, alphaScale: 0.90, spacing: 0.48, bleed: 0.22
+        });
+        // 瓣尖铅白晕亮 + 弧形土红瓣廓
+        pushAction({ layer: 6, ink: 'QIAN_BAI', x: tx, y: ty, r: 3.4, pressure: 1.05, alphaScale: 0.92 });
+        enqueueBrushPath(sampleCatmullRom([{ x: lotusCx, y: lotusCy }, { x: midX + nx, y: midY + ny }, { x: tx, y: ty }], 6), {
+          layer: 6, ink: 'TU_HONG', radiusStart: 1.05, radiusEnd: 0.8, alphaScale: 0.85, spacing: 0.60, minStep: 1.5
+        });
+        enqueueBrushPath(sampleCatmullRom([{ x: lotusCx, y: lotusCy }, { x: midX - nx, y: midY - ny }, { x: tx, y: ty }], 6), {
+          layer: 6, ink: 'TU_HONG', radiusStart: 1.05, radiusEnd: 0.8, alphaScale: 0.85, spacing: 0.60, minStep: 1.5
+        });
+      });
+      // 莲台金蕊
+      pushAction({ layer: 6, ink: 'NI_JIN', x: lotusCx, y: lotusCy - 4, r: 5.5, pressure: 1.1 });
+      for (let s = 0; s < 6; s++) {
+        const a = lerp(-Math.PI * 0.82, -Math.PI * 0.18, s / 5);
+        pushAction({ layer: 6, ink: 'NI_JIN', x: lotusCx + Math.cos(a) * 10, y: lotusCy + Math.sin(a) * 10, r: 1.8, pressure: 1.05 });
+      }
+
+      // 6.2 漫天飞舞散花（饱满五瓣敦煌宝相小花 + 弧形月牙飘落花瓣，消除十字棍感）
+      const floatingFlowers = [
+        { x: 618, y: 230, size: 8.5, rot: 0.2, ink: 'ZHU_SHA' },
+        { x: 656, y: 204, size: 8.0, rot: -0.4, ink: 'QIAN_BAI' },
+        { x: 690, y: 242, size: 7.5, rot: 0.7, ink: 'SAN_QING' },
+        { x: 276, y: 308, size: 8.2, rot: -0.3, ink: 'ZHU_SHA' },
+        { x: 238, y: 368, size: 9.0, rot: 0.5, ink: 'QIAN_BAI' },
+        { x: 208, y: 426, size: 7.8, rot: -0.8, ink: 'ZHU_SHA' },
+        { x: 326, y: 224, size: 7.5, rot: 0.9, ink: 'ER_LV' },
+        { x: 760, y: 202, size: 8.2, rot: 0.3, ink: 'ZHU_SHA' },
+        { x: 852, y: 254, size: 7.8, rot: -0.5, ink: 'QIAN_BAI' },
+        { x: 952, y: 218, size: 8.5, rot: 0.4, ink: 'ZHU_SHA' },
+        { x: 1072, y: 222, size: 7.8, rot: -0.2, ink: 'SAN_QING' },
+        { x: 468, y: 472, size: 8.0, rot: 0.6, ink: 'ZHU_SHA' },
+        { x: 598, y: 478, size: 8.6, rot: -0.7, ink: 'QIAN_BAI' },
+        { x: 778, y: 466, size: 7.8, rot: 0.2, ink: 'ZHU_SHA' }
+      ];
+
+      floatingFlowers.forEach((fl) => {
+        const petals = 5;
+        for (let p = 0; p < petals; p++) {
+          const ang = fl.rot + (p / petals) * Math.PI * 2;
+          const cx = fl.x + Math.cos(ang) * fl.size * 0.72;
+          const cy = fl.y + Math.sin(ang) * fl.size * 0.72;
+          // 饱满水滴形花瓣 + 瓣尖微点白/土红轮廓
+          pushAction({
+            layer: 6, ink: fl.ink, x: cx, y: cy,
+            r: fl.size * 0.48, angle: ang, aspect: 1.75, pressure: 1.05, alphaScale: 0.92, bleed: 0.16, softness: 0.58
+          });
+          pushAction({
+            layer: 6, ink: fl.ink === 'QIAN_BAI' ? 'ZHU_SHA' : 'QIAN_BAI',
+            x: fl.x + Math.cos(ang) * fl.size * 1.15, y: fl.y + Math.sin(ang) * fl.size * 1.15,
+            r: 1.6, pressure: 0.95, alphaScale: 0.78
+          });
+        }
+        pushAction({ layer: 6, ink: 'NI_JIN', x: fl.x, y: fl.y, r: 2.8, pressure: 1.1 });
+      });
+
+      // 飘零弧形月牙莲瓣（柔和弯曲落瓣）
+      for (let i = 0; i < 24; i++) {
+        const px = randRange(180, 1140);
+        const py = randRange(140, 560);
+        const ang = randRange(-Math.PI, Math.PI);
+        const midAng = ang + randRange(-0.45, 0.45);
+        enqueueBrushPath(
+          sampleCatmullRom([
+            { x: px, y: py },
+            { x: px + Math.cos(midAng) * 7, y: py + Math.sin(midAng) * 7 },
+            { x: px + Math.cos(ang) * 14, y: py + Math.sin(ang) * 14 }
+          ], 5),
+          { layer: 6, ink: i % 3 === 0 ? 'QIAN_BAI' : 'ZHU_SHA', radiusStart: 1.5, radiusEnd: 3.4, alphaScale: 0.85, spacing: 0.65, minStep: 1.6 }
+        );
+      }
+
+      // 6.3 盛唐流云与飘带顶部铅白（蛤粉）提白
+      cloudBands.forEach((cb) => {
+        enqueueBrushPath(cb.geom.leftEdge.map((p) => ({ x: p.x, y: p.y - 1.5 })), {
+          layer: 6, ink: 'QIAN_BAI', radiusStart: 2.2, radiusEnd: 1.0, alphaScale: 0.78, spacing: 0.72, minStep: 2.1, bleed: 0.22
+        });
+        enqueueBrushPath(cb.spiral.slice(0, 14).map((p) => ({ x: p.x, y: p.y - 1.2 })), {
+          layer: 6, ink: 'QIAN_BAI', radiusStart: 1.8, radiusEnd: 0.9, alphaScale: 0.72, spacing: 0.75, minStep: 2.0, bleed: 0.18
+        });
+      });
+
+      // -----------------------------------------------------------------------
+      // 第七层：壁画岁韵包浆（矿物风化肌理与轻微剥落斑驳，约 1,500 笔）
+      // -----------------------------------------------------------------------
+      // 沿画面构图区撒布极清淡的壁画粉尘、轻微飞白擦痕与历史沉淀微斑
+      for (let i = 0; i < 880; i++) {
+        const dx = randRange(140, 1180);
+        const dy = randRange(100, 680);
+        const isLightDust = rng() > 0.38;
+        pushAction({
+          layer: 7,
+          ink: isLightDust ? 'WALL_DUST' : 'ZHE_SHI',
+          x: dx,
+          y: dy,
+          r: randRange(1.4, 5.8),
+          angle: randRange(-Math.PI, Math.PI),
+          aspect: randRange(1.1, 2.2),
+          pressure: randRange(0.45, 0.95),
+          alphaScale: isLightDust ? randRange(0.28, 0.68) : randRange(0.14, 0.34),
+          bleed: 0.35,
+          dryness: rng() > 0.55 ? 0.52 : 0,
+          softness: 0.38
+        });
+      }
+
+      // 极轻的横向与斜向千年壁面风化擦拭痕（轻微飞白感，让颜料与泥壁浑然一体）
+      for (let w = 0; w < 24; w++) {
+        const sx = randRange(160, 1080);
+        const sy = randRange(120, 620);
+        const len = randRange(40, 110);
+        const ang = randRange(-0.25, 0.25);
+        enqueueBrushPath(
+          [
+            { x: sx, y: sy },
+            { x: sx + Math.cos(ang) * len * 0.5, y: sy + Math.sin(ang) * len * 0.5 },
+            { x: sx + Math.cos(ang) * len, y: sy + Math.sin(ang) * len }
+          ],
+          {
+            layer: 7,
+            ink: 'WALL_DUST',
+            radiusStart: randRange(2.5, 4.8),
+            radiusEnd: randRange(1.8, 3.6),
+            alphaScale: randRange(0.22, 0.45),
+            spacing: 0.72,
+            bleed: 0.15,
+            dryness: 0.68,
+            aspect: 1.65,
+            breakProb: 0.20,
+            jitter: 1.5
+          }
+        );
+      }
+    }
+
+    // =========================================================================
+    // 4. 动作队列逐笔渲染循环、快照缓存与进度条跳转控制
+    // =========================================================================
+    function computeLayerBoundaries() {
+      let acc = 0;
+      layerEndIndices = [0];
+      layerEndSet = new Set();
+      for (let l = 1; l <= 7; l++) {
+        acc += layerCounts[l];
+        layerEndIndices.push(acc);
+        if (acc > 0) layerEndSet.add(acc);
+      }
+    }
+
+    function shouldCacheAt(idx) {
+      return idx > 0 && (idx % CHECKPOINT_INTERVAL === 0 || layerEndSet.has(idx));
+    }
+
+    function saveCheckpoint(idx) {
+      if (idx <= 0 || checkpoints.has(idx)) return;
+      const snap = document.createElement('canvas');
+      snap.width = CONFIG.CANVAS_WIDTH;
+      snap.height = CONFIG.CANVAS_HEIGHT;
+      const sctx = snap.getContext('2d');
+      sctx.drawImage(canvas, 0, 0);
+      checkpoints.set(idx, snap);
+    }
+
+    function getActiveLayerAt(idx) {
+      if (idx <= 0) return 1;
+      const clamped = Math.min(idx - 1, Math.max(0, strokeQueue.length - 1));
+      return strokeQueue[clamped] ? strokeQueue[clamped].layer : 1;
+    }
+
+    function downloadCanvasPNG() {
+      try {
+        const dataURL = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'dunhuang-feitian-sketch.png';
+        link.href = dataURL;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.warn('下载 PNG 失败：', err);
+      }
+    }
+
+    function updateStatusUI(layerNum, done = false) {
+      const total = strokeQueue.length;
+      if (currentIndex === 0) {
+        layerStatusEl.textContent = '泥壁白粉地仗就绪（等待起笔）';
+      } else if (done) {
+        layerStatusEl.textContent = '敦煌散花飞天绘制完成';
+      } else {
+        layerStatusEl.textContent = CONFIG.LAYER_NAMES[layerNum] || '施彩运笔中…';
+      }
+      strokeStatusEl.textContent = `${currentIndex} / ${total} 笔`;
+
+      // 同步进度条与百分比
+      progressSlider.max = String(total);
+      progressSlider.value = String(currentIndex);
+      const pct = total > 0 ? (currentIndex / total) * 100 : 0;
+      progressSlider.style.setProperty('--pct', `${pct.toFixed(2)}%`);
+      progressPercentEl.textContent = `${pct.toFixed(1)}%`;
+
+      // 同步七层快捷按钮高亮状态
+      layerChips.forEach((chip) => {
+        const l = Number(chip.dataset.layer);
+        const prevEnd = layerEndIndices[l - 1] || 0;
+        const thisEnd = layerEndIndices[l] || 0;
+        const isDone = total > 0 && currentIndex >= thisEnd && thisEnd > prevEnd;
+        const isCurrent = !done && currentIndex > prevEnd && currentIndex <= thisEnd;
+        chip.classList.toggle('done', isDone && !isCurrent);
+        chip.classList.toggle('current', isCurrent);
+      });
+    }
+
+    function advanceTo(targetIdx) {
+      while (currentIndex < targetIdx && currentIndex < strokeQueue.length) {
+        const action = strokeQueue[currentIndex++];
+        executeStrokeAction(action);
+        if (shouldCacheAt(currentIndex)) {
+          saveCheckpoint(currentIndex);
+        }
+      }
+    }
+
+    function seekToStroke(targetIdx) {
+      const total = strokeQueue.length;
+      const clamped = clamp(Math.round(targetIdx), 0, total);
+      if (clamped === currentIndex) {
+        updateStatusUI(getActiveLayerAt(currentIndex), currentIndex >= total && total > 0);
+        return;
+      }
+
+      if (clamped > currentIndex && clamped - currentIndex <= CHECKPOINT_INTERVAL) {
+        advanceTo(clamped);
+      } else {
+        // 从 <= clamped 的最近离屏快照还原，避免重绘全部 3 万笔造成卡顿
+        let bestIdx = 0;
+        for (const key of checkpoints.keys()) {
+          if (key <= clamped && key > bestIdx) {
+            bestIdx = key;
+          }
+        }
+        ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        if (bestIdx === 0) {
+          ctx.drawImage(wallCanvas, 0, 0);
+        } else {
+          ctx.drawImage(checkpoints.get(bestIdx), 0, 0);
+        }
+        currentIndex = bestIdx;
+        advanceTo(clamped);
+      }
+
+      updateStatusUI(getActiveLayerAt(currentIndex), currentIndex >= total && total > 0);
+    }
+
+    function pausePlayback() {
+      if (animFrameId !== null) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      isPaused = true;
+      playPauseBtn.textContent = currentIndex >= strokeQueue.length ? '重播' : '继续';
+    }
+
+    function resumePlayback() {
+      if (currentIndex >= strokeQueue.length) {
+        seekToStroke(0);
+      }
+      isPaused = false;
+      playPauseBtn.textContent = '暂停';
+      if (animFrameId === null) {
+        animFrameId = requestAnimationFrame(renderLoop);
+      }
+    }
+
+    function renderLoop() {
+      if (isPaused) {
+        animFrameId = null;
+        return;
+      }
+      const batch = CONFIG.SPEED_LEVELS[speedIndex].dabsPerFrame;
+      let lastLayer = getActiveLayerAt(currentIndex);
+
+      for (let i = 0; i < batch; i++) {
+        if (currentIndex >= strokeQueue.length) break;
+        const action = strokeQueue[currentIndex++];
+        lastLayer = action.layer;
+        executeStrokeAction(action);
+        if (shouldCacheAt(currentIndex)) {
+          saveCheckpoint(currentIndex);
+        }
+      }
+
+      if (currentIndex < strokeQueue.length) {
+        updateStatusUI(lastLayer, false);
+        animFrameId = requestAnimationFrame(renderLoop);
+      } else {
+        animFrameId = null;
+        isPaused = true;
+        playPauseBtn.textContent = '重播';
+        updateStatusUI(7, true);
+      }
+    }
+
+    // =========================================================================
+    // 5. 初始化与页面控制
+    // =========================================================================
+    function startPainting() {
+      if (animFrameId !== null) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      if (seekRafId !== null) {
+        cancelAnimationFrame(seekRafId);
+        seekRafId = null;
+      }
+
+      rng = createPRNG((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+      isPaused = false;
+      currentIndex = 0;
+      checkpoints.clear();
+      playPauseBtn.textContent = '暂停';
+
+      // 铺设敦煌泥壁白粉地仗
+      wallCanvas = buildDunhuangWall();
+      ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+      ctx.drawImage(wallCanvas, 0, 0);
+
+      // 严格按七层敦煌壁画法度生成动作队列并记录分层索引边界
+      buildFeitianQueue();
+      computeLayerBoundaries();
+      updateStatusUI(1, false);
+
+      animFrameId = requestAnimationFrame(renderLoop);
+    }
+
+    progressSlider.addEventListener('input', () => {
+      pausePlayback();
+      pendingSeek = Number(progressSlider.value);
+      if (seekRafId === null) {
+        seekRafId = requestAnimationFrame(() => {
+          seekRafId = null;
+          if (pendingSeek !== null) {
+            const val = pendingSeek;
+            pendingSeek = null;
+            seekToStroke(val);
+          }
+        });
+      }
+    });
+
+    layerChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const layerNum = Number(chip.dataset.layer);
+        const target = layerEndIndices[layerNum] || 0;
+        pausePlayback();
+        seekToStroke(target);
+      });
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      if (isPaused) {
+        resumePlayback();
+      } else {
+        pausePlayback();
+      }
+    });
+
+    stepBackBtn.addEventListener('click', () => {
+      pausePlayback();
+      seekToStroke(currentIndex - STEP_DELTA);
+    });
+
+    stepForwardBtn.addEventListener('click', () => {
+      pausePlayback();
+      seekToStroke(currentIndex + STEP_DELTA);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        pausePlayback();
+        seekToStroke(currentIndex - (e.shiftKey ? 500 : 50));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        pausePlayback();
+        seekToStroke(currentIndex + (e.shiftKey ? 500 : 50));
+      } else if (e.code === 'Space' && document.activeElement?.tagName !== 'BUTTON') {
+        e.preventDefault();
+        if (isPaused) resumePlayback();
+        else pausePlayback();
+      }
+    });
+
+    redrawBtn.addEventListener('click', () => {
+      startPainting();
+    });
+
+    speedBtn.addEventListener('click', () => {
+      speedIndex = (speedIndex + 1) % CONFIG.SPEED_LEVELS.length;
+      const level = CONFIG.SPEED_LEVELS[speedIndex];
+      speedBtn.textContent = level.label;
+      speedBtn.classList.toggle('active', speedIndex > 0);
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      downloadCanvasPNG();
+    });
+
+    // 页面加载后自动铺壁起稿绘制
+    startPainting();
+  </script>
+</body>
+</html>
