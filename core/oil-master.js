@@ -103,8 +103,8 @@
   // ===========================================================================
   // 1. HYBRID 3D ANALYTICAL + CANVAS2D REFERENCE SCENE ENGINE
   // ===========================================================================
-  function createScene(W, H, seed) {
-    const maxDim = 340;
+  function createScene(W, H, seed, sceneOpts = {}) {
+    const maxDim = (sceneOpts && sceneOpts.maxDim) || 340;
     const scale = maxDim / Math.max(W, H);
     const GW = Math.max(140, Math.round(W * scale));
     const GH = Math.max(140, Math.round(H * scale));
@@ -989,7 +989,7 @@
   // ===========================================================================
   // 2. MULTI-SCALE STRUCTURE TENSOR (ETF) + HERTZMANN 5,000-STROKE SYNTHESIZER
   // ===========================================================================
-  function computeBlurredPyramid(refRGB, gw, gh) {
+  function computeBlurredPyramid(refRGB, gw, gh, isMaster) {
     function boxBlurH(src, r) {
       const out = new Float32Array(src.length);
       const wSpan = r * 2 + 1;
@@ -1027,6 +1027,9 @@
     const bFine = blurR(1);
     const bMed = blurR(3);
     const bCoarse = blurR(7);
+    if (isMaster) {
+      return [blurR(8), blurR(4), blurR(2), bFine, refRGB, refRGB];
+    }
     return [bCoarse, bMed, bMed, bFine, refRGB];
   }
 
@@ -1177,6 +1180,7 @@
     const nPix = GW * GH;
     const style = opts.style || 'classic';
     const totalStrokes = opts.totalStrokes || 5000;
+    const isMaster = Boolean(opts.masterpiece || totalStrokes >= 15000);
     const layers = opts.layers || [
       { id: 1, name: '一 · 铺陈大色打底' },
       { id: 2, name: '二 · 形体明暗塑形' },
@@ -1195,8 +1199,37 @@
       refRGB[ri + 2] = scene.buf[bi + 2];
     }
 
-    const pyramid = computeBlurredPyramid(refRGB, GW, GH);
+    const pyramid = computeBlurredPyramid(refRGB, GW, GH, isMaster);
     const { tx, ty, gradNorm } = computeStructureTensor(refRGB, GW, GH, style);
+
+    // Master-style structural flow refinements
+    if (style === 'monet-broken') {
+      const yWater = Math.floor(GH * 0.48);
+      for (let gy = yWater; gy < GH; gy++) {
+        for (let gx = 0; gx < GW; gx++) {
+          const i = gy * GW + gx;
+          if (gradNorm[i] < 0.28) {
+            const sx = tx[i] * 0.30 + (tx[i] < 0 ? -0.70 : 0.70);
+            const sy = ty[i] * 0.30;
+            const len = Math.hypot(sx, sy) || 1;
+            tx[i] = sx / len;
+            ty[i] = sy / len;
+          }
+        }
+      }
+    } else if (style === 'cezanne-constructive') {
+      const cxDir = 0.788, cyDir = -0.616; // -38 deg parallel Cézanne constructive facets
+      for (let i = 0; i < nPix; i++) {
+        if (gradNorm[i] < 0.26) {
+          const align = tx[i] * cxDir + ty[i] * cyDir >= 0 ? 1 : -1;
+          const sx = tx[i] * 0.40 + cxDir * align * 0.60;
+          const sy = ty[i] * 0.40 + cyDir * align * 0.60;
+          const len = Math.hypot(sx, sy) || 1;
+          tx[i] = sx / len;
+          ty[i] = sy / len;
+        }
+      }
+    }
 
     // Initialize simulated canvas error tracker to initial dark imprimatura color
     const workRGB = new Float32Array(nPix * 3);
@@ -1206,66 +1239,161 @@
       workRGB[p] = initR; workRGB[p + 1] = initG; workRGB[p + 2] = initB;
     }
 
-    // 5-Pass Coarse-to-Fine Hertzmann Hierarchy summing strictly to totalStrokes (5,000)
     const layerCount = layers.length;
-    const p1 = Math.round(totalStrokes * 0.104);
-    const p2 = Math.round(totalStrokes * 0.180);
-    const p3 = Math.round(totalStrokes * 0.272);
-    const p4 = Math.round(totalStrokes * 0.276);
-    const p5 = totalStrokes - p1 - p2 - p3 - p4;
-
     const isKnife = style === 'knife';
     const isPoint = style === 'pointillism';
     const isSfumato = style === 'sfumato';
     const isScumble = style === 'scumbling';
 
-    const passes = [
-      {
-        count: p1, layerIdx: 0,
-        label: (layers[0] && layers[0].name) || '一 · 底层有色铺调与构图起稿',
-        blur: pyramid[0],
-        wMin: isPoint ? 34 : 52, wMax: isPoint ? 54 : 84,
-        lenMin: isPoint ? 3 : 12, lenMax: isPoint ? 6 : 22,
-        stepLen: 10.5, alpha: isSfumato ? 0.80 : 0.94, colorCut: 86, bevel: 0,
-        errThresh: 0, edgeBias: 0.15
-      },
-      {
-        count: p2, layerIdx: Math.min(1, layerCount - 1),
-        label: (layers[1] && layers[1].name) || '二 · 块面造型与冷暖明暗关系',
-        blur: pyramid[1],
-        wMin: isPoint ? 13 : 22, wMax: isPoint ? 20 : 38,
-        lenMin: isPoint ? 1.2 : 6, lenMax: isPoint ? 2.4 : 12,
-        stepLen: 5.2, alpha: isSfumato ? 0.72 : 0.88, colorCut: 56, bevel: isKnife ? 0.85 : 0.22,
-        errThresh: 8, edgeBias: 0.65
-      },
-      {
-        count: p3, layerIdx: Math.min(2, layerCount - 1),
-        label: (layers[2] && layers[2].name) || '三 · 中间调塑形与色彩韵律过渡',
-        blur: pyramid[2],
-        wMin: isPoint ? 7.5 : 10, wMax: isPoint ? 12 : 17,
-        lenMin: isPoint ? 0.9 : 4, lenMax: isPoint ? 1.8 : 8.5,
-        stepLen: 3.4, alpha: isSfumato ? 0.70 : 0.86, colorCut: 40, bevel: isKnife ? 1.15 : 0.52,
-        errThresh: 6, edgeBias: 1.4
-      },
-      {
-        count: p4, layerIdx: Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1),
-        label: (layers[Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1)] && layers[Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1)].name) || '四 · 边缘转折与高频细节刻画',
-        blur: pyramid[3],
-        wMin: isPoint ? 4.5 : 4.2, wMax: isPoint ? 7.2 : 7.8,
-        lenMin: isPoint ? 0.6 : 2.2, lenMax: isPoint ? 1.2 : 5.2,
-        stepLen: 2.3, alpha: isSfumato ? 0.74 : 0.90, colorCut: 26, bevel: isKnife ? 1.3 : 0.72,
-        errThresh: 4, edgeBias: 2.6
-      },
-      {
-        count: p5, layerIdx: layerCount - 1,
-        label: (layers[layerCount - 1] && layers[layerCount - 1].name) || '五 · 厚涂高光提神与收笔点睛',
-        blur: pyramid[4],
-        wMin: isPoint ? 3.2 : 1.7, wMax: isPoint ? 5.2 : 4.0,
-        lenMin: isPoint ? 0.4 : 1.1, lenMax: isPoint ? 0.9 : 3.2,
-        stepLen: 1.5, alpha: isScumble ? 0.78 : 0.94, colorCut: 18, bevel: isKnife ? 1.4 : 0.88,
-        errThresh: 2, edgeBias: 4.0
-      }
-    ];
+    const isSfumatoMaster = style === 'sfumato-master';
+    const isVermeerMaster = style === 'vermeer-pointille';
+    const isRembrandtMaster = style === 'rembrandt-impasto';
+    const isTurnerMaster = style === 'turner-atmospheric';
+    const isMonetMaster = style === 'monet-broken';
+    const isSeuratMaster = style === 'seurat-pointillism';
+    const isCezanneMaster = style === 'cezanne-constructive';
+    const isKlimtMaster = style === 'klimt-goldleaf';
+
+    let passes;
+    if (isMaster) {
+      const m1 = Math.round(totalStrokes * 0.055);
+      const m2 = Math.round(totalStrokes * 0.105);
+      const m3 = Math.round(totalStrokes * 0.175);
+      const m4 = Math.round(totalStrokes * 0.220);
+      const m5 = Math.round(totalStrokes * 0.245);
+      const m6 = totalStrokes - m1 - m2 - m3 - m4 - m5;
+      const flatCap = isMonetMaster || isCezanneMaster;
+
+      passes = [
+        {
+          count: m1, layerIdx: 0,
+          label: (layers[0] && layers[0].name) || '一 · 底层有色铺调',
+          blur: pyramid[0],
+          wMin: isSeuratMaster ? 26 : 38, wMax: isSeuratMaster ? 42 : 68,
+          lenMin: isSeuratMaster ? 4 : 10, lenMax: isSeuratMaster ? 8 : 20,
+          stepLen: 9.5, alpha: isSfumatoMaster ? 0.90 : 0.94, colorCut: 86, bevel: 0,
+          errThresh: 0, edgeBias: 0.15, capMode: 'round'
+        },
+        {
+          count: m2, layerIdx: Math.min(1, layerCount - 1),
+          label: (layers[1] && layers[1].name) || '二 · 块面造型与冷暖定调',
+          blur: pyramid[1],
+          wMin: isSeuratMaster ? 6.5 : 15, wMax: isSeuratMaster ? 9.5 : 26,
+          lenMin: isSeuratMaster ? 0.35 : 6, lenMax: isSeuratMaster ? 0.85 : 12,
+          stepLen: isSeuratMaster ? 1.0 : 5.0,
+          alpha: isSfumatoMaster ? 0.72 : (isTurnerMaster ? 0.74 : 0.88),
+          colorCut: 52, bevel: 0, errThresh: 7, edgeBias: 0.65,
+          capMode: flatCap ? 'butt' : 'round'
+        },
+        {
+          count: m3, layerIdx: Math.min(2, layerCount - 1),
+          label: (layers[2] && layers[2].name) || '三 · 中间调结构塑形',
+          blur: pyramid[2],
+          wMin: isSeuratMaster ? 3.8 : 7.2, wMax: isSeuratMaster ? 5.8 : 13.0,
+          lenMin: isSeuratMaster ? 0.30 : 4, lenMax: isSeuratMaster ? 0.75 : 9,
+          stepLen: isSeuratMaster ? 0.8 : 3.2,
+          alpha: isSfumatoMaster ? 0.58 : (isTurnerMaster ? 0.66 : 0.85),
+          colorCut: 38,
+          bevel: isSfumatoMaster || isSeuratMaster ? 0 : (isVermeerMaster ? 0.25 : (isKlimtMaster ? 0.75 : (isCezanneMaster ? 0.55 : 0.45))),
+          errThresh: 5, edgeBias: 1.4,
+          capMode: flatCap ? 'butt' : 'round'
+        },
+        {
+          count: m4, layerIdx: Math.min(3, layerCount - 1),
+          label: (layers[3] && layers[3].name) || '四 · 细部转折与质感叠色',
+          blur: pyramid[3],
+          wMin: isSeuratMaster ? 2.5 : 3.5, wMax: isSeuratMaster ? 3.8 : 6.4,
+          lenMin: isSeuratMaster ? 0.28 : 2.5, lenMax: isSeuratMaster ? 0.65 : 6.0,
+          stepLen: isSeuratMaster ? 0.6 : 2.1,
+          alpha: isSfumatoMaster ? 0.52 : (isTurnerMaster ? 0.72 : 0.86),
+          colorCut: 26,
+          bevel: isSfumatoMaster || isSeuratMaster ? 0 : (isVermeerMaster ? 0.25 : (isKlimtMaster ? 0.72 : (isCezanneMaster ? 0.52 : 0.62))),
+          errThresh: 3.5, edgeBias: 2.5,
+          capMode: flatCap ? 'butt' : 'round'
+        },
+        {
+          count: m5, layerIdx: Math.min(4, layerCount - 1),
+          label: (layers[4] && layers[4].name) || '五 · 高频纹理精刻',
+          blur: pyramid[4],
+          wMin: isSeuratMaster ? 1.7 : 1.6, wMax: isSeuratMaster ? 2.7 : 3.2,
+          lenMin: isSeuratMaster ? 0.24 : 1.4, lenMax: isSeuratMaster ? 0.55 : 4.0,
+          stepLen: isSeuratMaster ? 0.5 : 1.4,
+          alpha: isSfumatoMaster ? 0.56 : (isTurnerMaster ? 0.84 : 0.90),
+          colorCut: 18,
+          bevel: isRembrandtMaster || isTurnerMaster ? 0.55 : (isCezanneMaster ? 0.35 : 0),
+          errThresh: 2.0, edgeBias: 3.6,
+          capMode: isCezanneMaster ? 'butt' : 'round'
+        },
+        {
+          count: m6, layerIdx: layerCount - 1,
+          label: (layers[layerCount - 1] && layers[layerCount - 1].name) || '六 · 毫厘细节与光学高光收笔',
+          blur: pyramid[5],
+          wMin: isSeuratMaster ? 1.2 : 0.85, wMax: isSeuratMaster ? 2.0 : 1.95,
+          lenMin: isSeuratMaster ? 0.20 : 0.9, lenMax: isSeuratMaster ? 0.45 : 2.6,
+          stepLen: isSeuratMaster ? 0.4 : 1.0,
+          alpha: isSfumatoMaster ? 0.62 : 0.92,
+          colorCut: 12,
+          bevel: isRembrandtMaster || isTurnerMaster ? 0.65 : 0,
+          errThresh: 1.0, edgeBias: 4.8,
+          capMode: 'round'
+        }
+      ];
+    } else {
+      // Existing 5-pass pipeline strictly preserved for all 5,000-stroke paintings
+      const p1 = Math.round(totalStrokes * 0.104);
+      const p2 = Math.round(totalStrokes * 0.180);
+      const p3 = Math.round(totalStrokes * 0.272);
+      const p4 = Math.round(totalStrokes * 0.276);
+      const p5 = totalStrokes - p1 - p2 - p3 - p4;
+
+      passes = [
+        {
+          count: p1, layerIdx: 0,
+          label: (layers[0] && layers[0].name) || '一 · 底层有色铺调与构图起稿',
+          blur: pyramid[0],
+          wMin: isPoint ? 34 : 52, wMax: isPoint ? 54 : 84,
+          lenMin: isPoint ? 3 : 12, lenMax: isPoint ? 6 : 22,
+          stepLen: 10.5, alpha: isSfumato ? 0.80 : 0.94, colorCut: 86, bevel: 0,
+          errThresh: 0, edgeBias: 0.15
+        },
+        {
+          count: p2, layerIdx: Math.min(1, layerCount - 1),
+          label: (layers[1] && layers[1].name) || '二 · 块面造型与冷暖明暗关系',
+          blur: pyramid[1],
+          wMin: isPoint ? 13 : 22, wMax: isPoint ? 20 : 38,
+          lenMin: isPoint ? 1.2 : 6, lenMax: isPoint ? 2.4 : 12,
+          stepLen: 5.2, alpha: isSfumato ? 0.72 : 0.88, colorCut: 56, bevel: isKnife ? 0.85 : 0.22,
+          errThresh: 8, edgeBias: 0.65
+        },
+        {
+          count: p3, layerIdx: Math.min(2, layerCount - 1),
+          label: (layers[2] && layers[2].name) || '三 · 中间调塑形与色彩韵律过渡',
+          blur: pyramid[2],
+          wMin: isPoint ? 7.5 : 10, wMax: isPoint ? 12 : 17,
+          lenMin: isPoint ? 0.9 : 4, lenMax: isPoint ? 1.8 : 8.5,
+          stepLen: 3.4, alpha: isSfumato ? 0.70 : 0.86, colorCut: 40, bevel: isKnife ? 1.15 : 0.52,
+          errThresh: 6, edgeBias: 1.4
+        },
+        {
+          count: p4, layerIdx: Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1),
+          label: (layers[Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1)] && layers[Math.min(layerCount >= 5 ? 3 : 2, layerCount - 1)].name) || '四 · 边缘转折与高频细节刻画',
+          blur: pyramid[3],
+          wMin: isPoint ? 4.5 : 4.2, wMax: isPoint ? 7.2 : 7.8,
+          lenMin: isPoint ? 0.6 : 2.2, lenMax: isPoint ? 1.2 : 5.2,
+          stepLen: 2.3, alpha: isSfumato ? 0.74 : 0.90, colorCut: 26, bevel: isKnife ? 1.3 : 0.72,
+          errThresh: 4, edgeBias: 2.6
+        },
+        {
+          count: p5, layerIdx: layerCount - 1,
+          label: (layers[layerCount - 1] && layers[layerCount - 1].name) || '五 · 厚涂高光提神与收笔点睛',
+          blur: pyramid[4],
+          wMin: isPoint ? 3.2 : 1.7, wMax: isPoint ? 5.2 : 4.0,
+          lenMin: isPoint ? 0.4 : 1.1, lenMax: isPoint ? 0.9 : 3.2,
+          stepLen: 1.5, alpha: isScumble ? 0.78 : 0.94, colorCut: 18, bevel: isKnife ? 1.4 : 0.88,
+          errThresh: 2, edgeBias: 4.0
+        }
+      ];
+    }
 
     function roiBoostAt(gx, gy) {
       if (!rois.length) return 1;
@@ -1285,8 +1413,21 @@
       const p0 = idx0 * 3;
       let r0 = bArr[p0], g0 = bArr[p0 + 1], b0 = bArr[p0 + 2];
 
-      // Divisionism chromatic vibration for Pointillism / Impressionism / Fauve / Van Gogh
-      if (isPoint && passIdx >= 1) {
+      // Divisionism chromatic vibration for Pointillism / Impressionism / Fauve / Van Gogh / Seurat / Monet
+      if (isSeuratMaster && passIdx >= 1) {
+        const split = (seedRand() - 0.5) * 34;
+        const shiftType = seedRand();
+        if (shiftType < 0.34) {
+          r0 = clamp(r0 + split, 0, 255);
+          b0 = clamp(b0 - split * 0.85, 0, 255);
+        } else if (shiftType < 0.68) {
+          g0 = clamp(g0 + split * 0.8, 0, 255);
+          r0 = clamp(r0 - split * 0.6, 0, 255);
+        } else {
+          b0 = clamp(b0 + split * 0.85, 0, 255);
+          g0 = clamp(g0 - split * 0.55, 0, 255);
+        }
+      } else if (isPoint && passIdx >= 1) {
         const split = (seedRand() - 0.5) * 26;
         if (seedRand() < 0.5) {
           r0 = clamp(r0 + split, 0, 255);
@@ -1295,8 +1436,8 @@
           g0 = clamp(g0 + split * 0.7, 0, 255);
           r0 = clamp(r0 - split * 0.4, 0, 255);
         }
-      } else if (style === 'impressionist' && passIdx >= 2) {
-        const temp = (seedRand() - 0.5) * 14;
+      } else if ((style === 'impressionist' || isMonetMaster) && passIdx >= 2) {
+        const temp = (seedRand() - 0.5) * (isMonetMaster ? 18 : 14);
         r0 = clamp(r0 + temp, 0, 255);
         b0 = clamp(b0 - temp * 0.8, 0, 255);
       }
@@ -1347,7 +1488,7 @@
 
       if (pts.length === 2) {
         const jAng = Math.atan2(prevDy, prevDx);
-        const mini = Math.max(2.5, pass.wMin * 0.55);
+        const mini = isSeuratMaster && passIdx >= 1 ? 0.65 : Math.max(2.5, pass.wMin * 0.55);
         pts.push(pts[0] + Math.cos(jAng) * mini, pts[1] + Math.sin(jAng) * mini);
       }
 
@@ -1357,7 +1498,7 @@
       workRGB[p0 + 2] = lerp(workRGB[p0 + 2], b0, 0.82);
 
       const width = lerp(pass.wMin, pass.wMax, seedRand());
-      const radG = Math.max(1, Math.round(width * scale * 0.28));
+      const radG = Math.max(isMaster && passIdx >= 4 ? 0 : 1, Math.round(width * scale * 0.28));
       if (radG >= 1) {
         const mixD = clamp(pass.alpha * 0.78, 0.35, 0.88);
         for (let k = 0; k < pts.length; k += 2) {
@@ -1385,54 +1526,68 @@
       const cb = clamp(Math.round(b0 + (seedRand() - 0.5) * jit), 0, 255);
 
       const mainRgb = `rgb(${cr},${cg},${cb})`;
-      const alpha = pass.alpha * (0.9 + seedRand() * 0.1);
-      const cap = (isKnife && passIdx >= 1) ? 'butt' : 'round';
-      const bevel = pass.bevel;
-      const doRelief = !isPoint && passIdx >= 2 && bevel >= 0.4 && width >= 2.6;
-
-      let shRgb = null, hiRgb = null, offSh = 0, offHi = 0, hiW = 1;
-      if (doRelief) {
-        const sr = Math.max(0, cr - Math.round(24 * bevel));
-        const sg = Math.max(0, cg - Math.round(24 * bevel));
-        const sb = Math.max(0, cb - Math.round(20 * bevel));
-        shRgb = `rgb(${sr},${sg},${sb})`;
-        const hr = Math.min(255, cr + Math.round(22 * bevel));
-        const hg = Math.min(255, cg + Math.round(20 * bevel));
-        const hb = Math.min(255, cb + Math.round(16 * bevel));
-        hiRgb = `rgb(${hr},${hg},${hb})`;
-        offSh = clamp(width * 0.12, 0.5, 2.2);
-        offHi = clamp(width * 0.11, 0.5, 2.0);
-        hiW = Math.max(0.9, width * 0.30);
+      const lum0 = 0.299 * r0 + 0.587 * g0 + 0.114 * b0;
+      let alpha = pass.alpha * (0.9 + seedRand() * 0.1);
+      const cap = pass.capMode || ((isKnife && passIdx >= 1) ? 'butt' : 'round');
+      let bevel = pass.bevel;
+      if (isRembrandtMaster && passIdx >= 2) {
+        if (lum0 < 52) { bevel = 0; alpha *= 0.78; }
+        else if (lum0 >= 95) { bevel = 1.55; }
+      } else if (isTurnerMaster && passIdx >= 2) {
+        if (r0 - b0 > 55) bevel = 1.25;
+        else { bevel = 0; alpha *= 0.80; }
       }
+      const doRelief = !isPoint && !isSeuratMaster && !isSfumatoMaster && passIdx >= 2 && bevel >= 0.4 && width >= 2.6;
 
       const layerId = layers[pass.layerIdx].id;
-      const shPts = doRelief ? pts.map(v => v + offSh) : null;
-      const hiPts = doRelief ? pts.map(v => v - offHi) : null;
+      if (!doRelief) {
+        api.pushRawStroke(layerId, pass.label, (c) => {
+          c.lineCap = cap;
+          c.lineJoin = 'round';
+          c.globalAlpha = alpha;
+          c.strokeStyle = mainRgb;
+          c.lineWidth = width;
+          strokePath(c, pts);
+          c.globalAlpha = 1;
+        });
+        return;
+      }
+
+      const sr = Math.max(0, cr - Math.round(24 * bevel));
+      const sg = Math.max(0, cg - Math.round(24 * bevel));
+      const sb = Math.max(0, cb - Math.round(20 * bevel));
+      const shRgb = `rgb(${sr},${sg},${sb})`;
+      const hr = Math.min(255, cr + Math.round(22 * bevel));
+      const hg = Math.min(255, cg + Math.round(20 * bevel));
+      const hb = Math.min(255, cb + Math.round(16 * bevel));
+      const hiRgb = `rgb(${hr},${hg},${hb})`;
+      const offSh = clamp(width * 0.12, 0.5, 2.2);
+      const offHi = clamp(width * 0.11, 0.5, 2.0);
+      const hiW = Math.max(0.9, width * 0.30);
+
+      const shPts = pts.map(v => v + offSh);
+      const hiPts = pts.map(v => v - offHi);
 
       api.pushRawStroke(layerId, pass.label, (c) => {
         c.lineCap = cap;
         c.lineJoin = 'round';
-        if (doRelief) {
-          c.globalAlpha = alpha * (isKnife ? 0.32 : 0.22);
-          c.strokeStyle = shRgb;
-          c.lineWidth = width * 1.02;
-          strokePath(c, shPts);
-        }
+        c.globalAlpha = alpha * (isKnife ? 0.32 : 0.22);
+        c.strokeStyle = shRgb;
+        c.lineWidth = width * 1.02;
+        strokePath(c, shPts);
         c.globalAlpha = alpha;
         c.strokeStyle = mainRgb;
         c.lineWidth = width;
         strokePath(c, pts);
-        if (doRelief) {
-          c.globalAlpha = alpha * (isKnife ? 0.42 : 0.26);
-          c.strokeStyle = hiRgb;
-          c.lineWidth = hiW;
-          strokePath(c, hiPts);
-        }
+        c.globalAlpha = alpha * (isKnife ? 0.42 : 0.26);
+        c.strokeStyle = hiRgb;
+        c.lineWidth = hiW;
+        strokePath(c, hiPts);
         c.globalAlpha = 1;
       });
     }
 
-    // Run Passes 1..5 sequentially
+    // Run Passes 1..N sequentially (with linear-time O(N) 64-bin bucket selection for ultra-dense masterworks)
     for (let pi = 0; pi < passes.length; pi++) {
       const pass = passes[pi];
       const bArr = pass.blur;
@@ -1459,6 +1614,67 @@
           traceAndPushStroke(pt[0], pt[1], pass, pi);
           emitted++;
         }
+      } else if (isMaster) {
+        const stride = (pi >= 4 && GW > 360) ? 1 : (pi >= 2 ? 2 : 3);
+        const maxCands = Math.ceil(GW / stride) * Math.ceil(GH / stride);
+        const candX = new Uint16Array(maxCands);
+        const candY = new Uint16Array(maxCands);
+        const candScore = new Float32Array(maxCands);
+        let cCount = 0;
+        let maxS = 1e-3;
+        for (let gy = 0; gy < GH; gy += stride) {
+          for (let gx = 0; gx < GW; gx += stride) {
+            const jx = stride === 1 ? gx : clamp(gx + Math.floor(seedRand() * stride), 0, GW - 1);
+            const jy = stride === 1 ? gy : clamp(gy + Math.floor(seedRand() * stride), 0, GH - 1);
+            const gi = jy * GW + jx;
+            const gp = gi * 3;
+            const err = (Math.abs(bArr[gp] - workRGB[gp]) + Math.abs(bArr[gp + 1] - workRGB[gp + 1]) + Math.abs(bArr[gp + 2] - workRGB[gp + 2])) * 0.333;
+            if (err < pass.errThresh && gradNorm[gi] < 0.22 && pi < 4) continue;
+            const score = (err + 6) * (1 + gradNorm[gi] * pass.edgeBias) * roiBoostAt(jx, jy) * (0.65 + seedRand() * 0.7);
+            candX[cCount] = jx;
+            candY[cCount] = jy;
+            candScore[cCount] = score;
+            if (score > maxS) maxS = score;
+            cCount++;
+          }
+        }
+        const targetPool = Math.min(cCount, Math.round(pass.count * 1.25));
+        const NBINS = 64;
+        const binCounts = new Int32Array(NBINS);
+        const invMax = (NBINS - 1) / maxS;
+        for (let i = 0; i < cCount; i++) {
+          const b = clamp((candScore[i] * invMax) | 0, 0, NBINS - 1);
+          binCounts[b]++;
+        }
+        let cutoffBin = 0, accBin = 0;
+        for (let b = NBINS - 1; b >= 0; b--) {
+          accBin += binCounts[b];
+          cutoffBin = b;
+          if (accBin >= targetPool) break;
+        }
+        const picked = new Int32Array(Math.max(pass.count, accBin));
+        let pk = 0;
+        for (let i = 0; i < cCount; i++) {
+          if (((candScore[i] * invMax) | 0) >= cutoffBin) {
+            picked[pk++] = i;
+          }
+        }
+        if (pk === 0) {
+          for (let k = 0; k < pass.count; k++) {
+            traceAndPushStroke((seedRand() * GW) | 0, (seedRand() * GH) | 0, pass, pi);
+          }
+        } else {
+          for (let k = pk - 1; k > 0; k--) {
+            const j = (seedRand() * (k + 1)) | 0;
+            const tmp = picked[k]; picked[k] = picked[j]; picked[j] = tmp;
+          }
+          const selLen = Math.min(pk, targetPool);
+          while (emitted < pass.count) {
+            const ci = picked[emitted % selLen];
+            traceAndPushStroke(candX[ci], candY[ci], pass, pi);
+            emitted++;
+          }
+        }
       } else {
         // Build scored pool: sample candidate grid, rank by error + edge gradient + focal ROI
         const pool = [];
@@ -1481,7 +1697,6 @@
           }
         }
         pool.sort((a, b) => b.score - a.score);
-        // Slightly shuffle within top 1.4x window so painterliness feels organic rather than scanline-sorted
         const takePool = pool.slice(0, Math.min(pool.length, Math.round(pass.count * 1.25)));
         for (let k = takePool.length - 1; k > 0; k--) {
           const j = (seedRand() * (k + 1)) | 0;

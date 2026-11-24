@@ -18,6 +18,21 @@
     const prevHref = config.prevUrl || '';
     const nextHref = config.nextUrl || '';
 
+    const ana = config.analysis;
+    const analysisHtml = ana ? `
+      <section class="c2p-analysis-panel" id="analysisPanel" aria-label="原作风格与技法深度解析">
+        <div class="c2p-analysis-header">
+          <h2>大师原作风格与临摹技法深度解析</h2>
+          <span class="c2p-analysis-origin">${ana.original || ''}</span>
+        </div>
+        <div class="c2p-analysis-grid">
+          <div class="c2p-analysis-card"><h3>题材与流派定位</h3><p>${ana.movement || ''}</p></div>
+          <div class="c2p-analysis-card"><h3>古典/现代调色盘解剖</h3><p>${ana.palette || ''}</p></div>
+          <div class="c2p-analysis-card"><h3>原作核心笔法与物理肌理</h3><p>${ana.technique || ''}</p></div>
+          <div class="c2p-analysis-card"><h3>超精细代码临摹架构</h3><p>${ana.algorithm || ''}</p></div>
+        </div>
+      </section>` : '';
+
     document.body.innerHTML = `
       <header class="c2p-header">
         <div class="c2p-title-wrap">
@@ -55,6 +70,7 @@
           </div>
         </div>
       </div>
+      ${analysisHtml}
     `;
 
     const canvas = document.getElementById('painting');
@@ -253,13 +269,15 @@
         }, rand);
         const api = B.createBrushAPI(W, H, seedCounter, {
           mode,
-          maxOilStrokes: config.maxOilStrokes || 5000
+          maxOilStrokes: config.maxOilStrokes || 100000
         });
         config.buildStrokes(api);
         actions = api.strokes;
       }
 
-      checkpointStep = Math.max(20, Math.round(actions.length / 22));
+      checkpointStep = actions.length > 20000
+        ? Math.max(400, Math.round(actions.length / 16))
+        : Math.max(20, Math.round(actions.length / 22));
       ctx.clearRect(0, 0, W, H);
       ctx.drawImage(backdropCanvas, 0, 0);
 
