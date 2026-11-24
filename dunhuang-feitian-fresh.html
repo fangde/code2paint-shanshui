@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>敦煌飞天 · 百笔白描工笔盛彩版（Canvas 2D）</title>
+  <title>敦煌飞天 · 水墨写意临摹版（285窟盛彩百笔 · Canvas 2D）</title>
   <style>
     * {
       box-sizing: border-box;
@@ -38,7 +38,7 @@
       width: min(1160px, 93vw);
       height: auto;
       aspect-ratio: 16 / 10;
-      background: #f6eee0;
+      background: #f1e8d4;
       border: 1px solid rgba(72, 54, 38, 0.45);
     }
 
@@ -238,8 +238,8 @@
     </div>
     <div class="layer-steps" id="layerSteps">
       <button class="layer-chip" type="button" data-layer="1">一层·白描勾线</button>
-      <button class="layer-chip" type="button" data-layer="2">二层·平涂设色</button>
-      <button class="layer-chip" type="button" data-layer="3">三层·凹凸分染</button>
+      <button class="layer-chip" type="button" data-layer="2">二层·水墨设色</button>
+      <button class="layer-chip" type="button" data-layer="3">三层·凹凸晕染</button>
       <button class="layer-chip" type="button" data-layer="4">四层·开脸复勾</button>
       <button class="layer-chip" type="button" data-layer="5">五层·提白描金</button>
       <span class="hint-text">支持逐笔看：退一步 / 进一步 / ← → 单笔微调（Shift ±10 笔 · 空格暂停）</span>
@@ -248,7 +248,7 @@
 
   <div class="toolbar">
     <div class="status-group">
-      <span id="layerStatus" class="status-layer">铺设新白粉地仗…</span>
+      <span id="layerStatus" class="status-layer">铺设生宣暖泥底…</span>
       <span id="strokeStatus" class="status-count">0 / 0 笔</span>
     </div>
     <div class="btn-group">
@@ -263,44 +263,58 @@
 
   <script>
     // =========================================================================
-    // 顶部常量、新白粉地仗、十八描矿物颜料与播放参数配置区
+    // 顶部常量、生宣暖壁基底、水墨毛笔动力学与第 285 窟矿彩色板配置
     // =========================================================================
     const CONFIG = {
       CANVAS_WIDTH: 1280,
       CANVAS_HEIGHT: 800,
 
-      // 新刷白粉壁面（温润明净、无裂纹黑斑，还原初绘唐代盛彩质感）
-      WALL: {
-        BASE_COLOR: '#f6eee0',
-        EDGE_VIGNETTE: 'rgba(216, 200, 172, 0.24)',
-        NOISE_INTENSITY: 3,
-        FIBER_COUNT: 220
+      // 生宣/浅白粉壁底参数（取 285 窟明净暖底，含宣纸纤维肌理）
+      PAPER: {
+        BASE_COLOR: '#f1e8d4',
+        EDGE_VIGNETTE: 'rgba(186, 170, 138, 0.22)',
+        NOISE_INTENSITY: 6,
+        FIBER_COUNT: 420,
+        FIBER_ALPHA_MIN: 0.024,
+        FIBER_ALPHA_MAX: 0.064
       },
 
-      // 传统十八描线型与敦煌不退色矿彩色板
+      // 沿用《写意水墨山水》毛笔径向软边、生宣洇染与 5 毫枯笔飞白参数
+      BRUSH: {
+        SOFTNESS: 0.55,
+        BLEED_SCALE: 1.55,
+        BLEED_ALPHA_RATIO: 0.30,
+        DRY_BRISTLES: 5,
+        DRY_SKIP_BASE: 0.42,
+        PRESSURE_JITTER: 0.14
+      },
+
+      // 莫高窟第 285 窟盛彩还原色板（水墨淡赭底蕴 + 饱和而不俗艳的原画矿彩）
       PALETTE: {
-        INK_FACE:      '#6a4f3f', // 淡赭墨：开脸五官（游丝描，柔而不死）
-        INK_LINE:      '#423026', // 古松烟墨：发髻、衣纹、飘带勾线
-        INK_DARK:      '#231a15', // 焦墨：点睛与关键复勾
-        INK_CINNABAR:  '#c8462c', // 朱砂线：腰带、唇缝、流云蔓茎
-        SKIN_LIGHT:    '#f5e6d7', // 温润粉肉底色（明净肤色）
-        SKIN_BLUSH:    '#e5957b', // 桃花红颊晕染
-        SKIN_SHADE:    '#c99672', // 西域凹凸淡赭分染
-        HAIR_INK:      '#2b2421', // 乌墨发髻
-        CROWN_GREEN:   '#276d5b', // 冠结石绿
-        GOLD_OCHRE:    '#d4983a', // 泥金暖赭（箜篌、项圈、腕钏）
-        GOLD_BRIGHT:   '#f1c456', // 亮煌泥金提亮
-        VERMILION:     '#d93c28', // 饱满朱砂
-        VERMILION_DEEP:'#a82b1d', // 暗部重朱砂
-        MALACHITE:     '#24916a', // 饱满石绿（长裙）
-        MALACHITE_DEEP:'#166147', // 深石绿分染
-        LAPIS_BRIGHT:  '#158cb8', // 饱满孔雀石青（天衣飘带）
-        LAPIS_DEEP:    '#0f5f8c', // 深石青分染
-        ROSETTE_INK:   '#252c2b', // 宝相花三瓣黛墨珠
-        CLAM_WHITE:    '#fcf8ef'  // 蛤粉三白高光
+        INK_FACE:         '#6c503f', // 淡赭墨：开脸五官
+        INK_LINE:         '#3d2e25', // 松烟古墨：衣纹飘带与发髻骨架
+        INK_DARK:         '#1e1815', // 焦墨：点睛与关键顿挫复勾
+        INK_CINNABAR:     '#c4462b', // 朱砂墨：腰带、唇缝与“3”字流云线
+        SKIN_LIGHT:       '#efe4d6', // 温润粉白玉肌
+        SKIN_BLUSH:       '#dd8a6e', // 桃花颊暖晕
+        SKIN_SHADE:       '#c18d69', // 淡赭凹凸分染
+        HAIR_INK:         '#25201e', // 乌墨发髻
+        CROWN_GREEN:      '#286452', // 冠结石绿
+        CROWN_RUSSET:     '#ba5132', // 冠饰飞翅朱赭
+        GOLD_OCHRE:       '#cf9642', // 箜篌与项圈暖金赭
+        GOLD_BRIGHT:      '#ecc058', // 泥金高光
+        VERMILION:        '#c8462a', // 原画矿彩朱砂
+        VERMILION_DEEP:   '#992b1a', // 重朱砂
+        MALACHITE:        '#2f8264', // 原画矿绿石绿（雅致饱和）
+        MALACHITE_DEEP:   '#1b5842', // 深石绿重染
+        OCHRE_TERRACOTTA: '#c47e4c', // 原画裙腰/膝摆暖赭红彩
+        LAPIS_BRIGHT:     '#0f8db2', // 285 窟招牌孔雀石青
+        LAPIS_PALE:       '#70bad0', // 云蒂渐淡天青
+        LAPIS_DEEP:       '#0c5b80', // 深石青凹凸
+        ROSETTE_INK:      '#212926', // 宝相花三瓣黛墨核
+        CLAM_WHITE:       '#fbf6ea'  // 蛤粉三白高光
       },
 
-      // 动画速度档位（约 200 笔完整手绘笔顺，每笔均可见起收运笔过程）
       SPEED_LEVELS: [
         { label: '加速',    rate: 1 },
         { label: '加速 ×2', rate: 2 },
@@ -308,20 +322,19 @@
         { label: '加速 ×8', rate: 8 }
       ],
 
-      // 每按一次“进一步/退一步”精确步进 1 笔
+      CHECKPOINT_INTERVAL: 20,
       STEP_DELTA: 1,
 
       LAYER_NAMES: [
         '',
         '一层·白描勾线',
-        '二层·平涂设色',
-        '三层·凹凸分染',
+        '二层·水墨设色',
+        '三层·凹凸晕染',
         '四层·开脸复勾',
         '五层·提白描金'
       ]
     };
 
-    // DOM 引用
     const canvas = document.getElementById('muralCanvas');
     const ctx = canvas.getContext('2d');
     const layerStatusEl = document.getElementById('layerStatus');
@@ -339,8 +352,7 @@
     let wallCanvas = null;
     let baseCanvas = null;
     let baseCtx = null;
-    const brushTipCache = new Map();
-    let mineralGrainCanvas = null;
+    const checkpoints = new Map();
 
     let strokeQueue = [];
     let layerEndIndices = [0, 0, 0, 0, 0, 0];
@@ -351,9 +363,14 @@
     let isPaused = false;
     let pendingSeek = null;
     let seekRafId = null;
+    let rng = Math.random;
 
     function clamp(v, min, max) {
       return v < min ? min : (v > max ? max : v);
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
     }
 
     function createPRNG(seed) {
@@ -366,77 +383,8 @@
       };
     }
 
-    // =========================================================================
-    // 1. 新刷白粉壁面地仗生成
-    // =========================================================================
-    function buildFreshChalkWall() {
-      const off = document.createElement('canvas');
-      off.width = CONFIG.CANVAS_WIDTH;
-      off.height = CONFIG.CANVAS_HEIGHT;
-      const wctx = off.getContext('2d');
-
-      wctx.fillStyle = CONFIG.WALL.BASE_COLOR;
-      wctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-
-      const rand = createPRNG(28505);
-
-      // 刷白粉泥底水平暗扫笔意
-      for (let i = 0; i < 42; i++) {
-        const y = rand() * CONFIG.CANVAS_HEIGHT;
-        const h = 28 + rand() * 75;
-        wctx.fillStyle = i % 2 === 0
-          ? 'rgba(255, 252, 244, 0.10)'
-          : 'rgba(222, 206, 178, 0.08)';
-        wctx.fillRect(0, y, CONFIG.CANVAS_WIDTH, h);
-      }
-
-      // 细腻矿砂纸壁肌理（轻柔微粒，不留脏污黑点）
-      const imgData = wctx.getImageData(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      const data = imgData.data;
-      const amp = CONFIG.WALL.NOISE_INTENSITY;
-      for (let i = 0; i < data.length; i += 4) {
-        const n = (rand() + rand() - 1) * amp;
-        data[i] = clamp(data[i] + n, 0, 255);
-        data[i + 1] = clamp(data[i + 1] + n * 0.95, 0, 255);
-        data[i + 2] = clamp(data[i + 2] + n * 0.85, 0, 255);
-      }
-      wctx.putImageData(imgData, 0, 0);
-
-      // 细麻筋隐纹
-      wctx.lineCap = 'round';
-      for (let i = 0; i < CONFIG.WALL.FIBER_COUNT; i++) {
-        const x = rand() * CONFIG.CANVAS_WIDTH;
-        const y = rand() * CONFIG.CANVAS_HEIGHT;
-        const len = 6 + rand() * 14;
-        const ang = (rand() - 0.5) * 0.9;
-        wctx.strokeStyle = rand() > 0.5
-          ? 'rgba(255, 252, 246, 0.24)'
-          : 'rgba(196, 178, 148, 0.14)';
-        wctx.lineWidth = 0.65;
-        wctx.beginPath();
-        wctx.moveTo(x, y);
-        wctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
-        wctx.stroke();
-      }
-
-      // 四周柔和聚光晕边
-      const vignette = wctx.createRadialGradient(
-        CONFIG.CANVAS_WIDTH * 0.56, CONFIG.CANVAS_HEIGHT * 0.45, CONFIG.CANVAS_WIDTH * 0.28,
-        CONFIG.CANVAS_WIDTH * 0.52, CONFIG.CANVAS_HEIGHT * 0.50, CONFIG.CANVAS_WIDTH * 0.78
-      );
-      vignette.addColorStop(0, 'rgba(255, 252, 245, 0)');
-      vignette.addColorStop(1, CONFIG.WALL.EDGE_VIGNETTE);
-      wctx.fillStyle = vignette;
-      wctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-
-      return off;
-    }
-
-    // =========================================================================
-    // 2. 传统十八描几何细分与水墨毛笔/羊毫渲染引擎
-    // =========================================================================
     function hexToRgb(hex) {
-      const clean = (hex || '#423026').replace('#', '');
+      const clean = (hex || '#3d2e25').replace('#', '');
       const full = clean.length === 3
         ? clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
         : clean;
@@ -444,96 +392,179 @@
       return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
     }
 
-    function rgbaStr(rgb, a) {
-      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clamp(a, 0, 1).toFixed(3)})`;
+    function lerpRgb(rgbA, rgbB, t) {
+      const k = clamp(t, 0, 1);
+      return [
+        Math.round(rgbA[0] + (rgbB[0] - rgbA[0]) * k),
+        Math.round(rgbA[1] + (rgbB[1] - rgbA[1]) * k),
+        Math.round(rgbA[2] + (rgbB[2] - rgbA[2]) * k)
+      ];
     }
 
-    // 缓存毛笔笔锋多毫印章贴图（中心饱满、四周含细微笔毫参差与水墨柔边）
-    function getBrushTipSprite(color) {
-      if (brushTipCache.has(color)) return brushTipCache.get(color);
-      const size = 32;
-      const tipCanvas = document.createElement('canvas');
-      tipCanvas.width = size;
-      tipCanvas.height = size;
-      const tctx = tipCanvas.getContext('2d');
-      const rgb = hexToRgb(color);
-      const rand = createPRNG(rgb[0] * 65537 + rgb[1] * 257 + rgb[2] + 911);
+    // =========================================================================
+    // 1. 生宣暖壁基底生成（移植自《写意水墨山水》buildXuanPaper）
+    // =========================================================================
+    function buildFreshChalkWall() {
+      const off = document.createElement('canvas');
+      off.width = CONFIG.CANVAS_WIDTH;
+      off.height = CONFIG.CANVAS_HEIGHT;
+      const octx = off.getContext('2d');
+      const w = off.width;
+      const h = off.height;
+      const paperRand = createPRNG(28511);
 
-      // 外围极轻水墨晕染底
-      const halo = tctx.createRadialGradient(16, 16, 1, 16, 16, 15);
-      halo.addColorStop(0, rgbaStr(rgb, 0.34));
-      halo.addColorStop(0.55, rgbaStr(rgb, 0.16));
-      halo.addColorStop(1, rgbaStr(rgb, 0));
-      tctx.fillStyle = halo;
-      tctx.beginPath();
-      tctx.arc(16, 16, 15, 0, Math.PI * 2);
-      tctx.fill();
+      octx.fillStyle = CONFIG.PAPER.BASE_COLOR;
+      octx.fillRect(0, 0, w, h);
 
-      // 8 束狼毫聚锋微斑，构成非正圆自然毛笔截面
-      for (let i = 0; i < 8; i++) {
-        const ang = (i / 8) * Math.PI * 2 + (rand() - 0.5) * 0.45;
-        const dist = (i === 0) ? 0.5 : (2.2 + rand() * 4.2);
-        const cx = 16 + Math.cos(ang) * dist * 0.9;
-        const cy = 16 + Math.sin(ang) * dist * 1.1;
-        const r = i === 0 ? 9.5 : (5.0 + rand() * 4.2);
-        const g = tctx.createRadialGradient(cx, cy, 0.4, cx, cy, r);
-        g.addColorStop(0, rgbaStr(rgb, i === 0 ? 0.65 : 0.48));
-        g.addColorStop(0.6, rgbaStr(rgb, 0.20));
-        g.addColorStop(1, rgbaStr(rgb, 0));
-        tctx.fillStyle = g;
-        tctx.beginPath();
-        tctx.arc(cx, cy, r, 0, Math.PI * 2);
-        tctx.fill();
+      const vignette = octx.createRadialGradient(
+        w * 0.54, h * 0.45, w * 0.22,
+        w * 0.52, h * 0.50, w * 0.78
+      );
+      vignette.addColorStop(0, 'rgba(255, 251, 242, 0.22)');
+      vignette.addColorStop(1, CONFIG.PAPER.EDGE_VIGNETTE);
+      octx.fillStyle = vignette;
+      octx.fillRect(0, 0, w, h);
+
+      // 生宣颗粒肌理（温润明净，无裂纹黑斑）
+      const imgData = octx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+      const amp = CONFIG.PAPER.NOISE_INTENSITY;
+      for (let i = 0; i < data.length; i += 4) {
+        const delta = (paperRand() - 0.5) * 2 * amp;
+        data[i]     = clamp(data[i] + delta, 0, 255);
+        data[i + 1] = clamp(data[i + 1] + delta * 0.96, 0, 255);
+        data[i + 2] = clamp(data[i + 2] + delta * 0.88, 0, 255);
       }
+      octx.putImageData(imgData, 0, 0);
 
-      brushTipCache.set(color, tipCanvas);
-      return tipCanvas;
+      // 弯曲生宣纤维丝（420 根）
+      octx.save();
+      octx.lineCap = 'round';
+      for (let i = 0; i < CONFIG.PAPER.FIBER_COUNT; i++) {
+        const fx = paperRand() * w;
+        const fy = paperRand() * h;
+        const len = 8 + paperRand() * 26;
+        const ang = (paperRand() - 0.5) * Math.PI * 2;
+        const bend = (paperRand() - 0.5) * 11;
+        const alpha = lerp(CONFIG.PAPER.FIBER_ALPHA_MIN, CONFIG.PAPER.FIBER_ALPHA_MAX, paperRand());
+        const tone = paperRand() > 0.45 ? '156, 142, 118' : '255, 252, 245';
+
+        octx.strokeStyle = `rgba(${tone}, ${alpha.toFixed(4)})`;
+        octx.lineWidth = 0.4 + paperRand() * 0.7;
+        octx.beginPath();
+        octx.moveTo(fx, fy);
+        octx.quadraticCurveTo(
+          fx + Math.cos(ang) * len * 0.5 + bend,
+          fy + Math.sin(ang) * len * 0.5 - bend,
+          fx + Math.cos(ang) * len,
+          fy + Math.sin(ang) * len
+        );
+        octx.stroke();
+      }
+      octx.restore();
+
+      return off;
     }
 
-    // 矿彩颗粒与生宣丝理叠加质感图元
-    function getMineralGrainCanvas() {
-      if (mineralGrainCanvas) return mineralGrainCanvas;
-      const size = 128;
-      const gCanvas = document.createElement('canvas');
-      gCanvas.width = size;
-      gCanvas.height = size;
-      const gctx = gCanvas.getContext('2d');
-      const rand = createPRNG(51829);
+    // =========================================================================
+    // 2. 水墨毛笔渲染引擎（直接移植自 shuimo-shanshui.html 的软边渐变 + 洇染 + 5毫飞白）
+    // =========================================================================
+    function drawSoftRadialDab(targetCtx, x, y, radius, rgb, alpha, angle, aspect, softness) {
+      if (radius <= 0.3 || alpha <= 0.002) return;
+      targetCtx.save();
+      targetCtx.translate(x, y);
+      if (angle) targetCtx.rotate(angle);
+      if (aspect && aspect !== 1) targetCtx.scale(aspect, 1);
 
-      gctx.clearRect(0, 0, size, size);
-      // 细微矿物沉淀斑与纸纹
-      for (let i = 0; i < 420; i++) {
-        const x = rand() * size;
-        const y = rand() * size;
-        const r = 0.6 + rand() * 1.9;
-        const warm = rand() > 0.42;
-        gctx.fillStyle = warm
-          ? `rgba(110, 88, 62, ${(0.06 + rand() * 0.12).toFixed(3)})`
-          : `rgba(255, 250, 240, ${(0.10 + rand() * 0.18).toFixed(3)})`;
-        gctx.beginPath();
-        gctx.arc(x, y, r, 0, Math.PI * 2);
-        gctx.fill();
-      }
+      const grad = targetCtx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      const [r, g, b] = rgb;
+      const midStop = clamp(softness, 0.15, 0.82);
 
-      gctx.lineCap = 'round';
-      for (let i = 0; i < 48; i++) {
-        const x = rand() * size;
-        const y = rand() * size;
-        const ang = (rand() - 0.5) * 1.1;
-        const len = 8 + rand() * 20;
-        gctx.strokeStyle = `rgba(90, 72, 52, ${(0.05 + rand() * 0.08).toFixed(3)})`;
-        gctx.lineWidth = 0.7;
-        gctx.beginPath();
-        gctx.moveTo(x, y);
-        gctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
-        gctx.stroke();
-      }
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(4)})`);
+      grad.addColorStop(midStop, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.62).toFixed(4)})`);
+      grad.addColorStop(lerp(midStop, 1, 0.55), `rgba(${r}, ${g}, ${b}, ${(alpha * 0.18).toFixed(4)})`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
-      mineralGrainCanvas = gCanvas;
-      return mineralGrainCanvas;
+      targetCtx.fillStyle = grad;
+      targetCtx.beginPath();
+      targetCtx.arc(0, 0, radius, 0, Math.PI * 2);
+      targetCtx.fill();
+      targetCtx.restore();
     }
 
-    function catmullRomSpline(points, samplesPerSeg = 14, closed = false) {
+    function executeInkDab(targetCtx, dab) {
+      const rgb = dab.rgb;
+      const alpha = clamp(dab.alpha, 0.004, 0.96);
+      const radius = Math.max(0.55, dab.r);
+      const angle = dab.angle || 0;
+      const aspect = dab.aspect || 1;
+      const bleed = dab.bleed || 0;
+      const dryness = dab.dryness || 0;
+      const softness = dab.softness ?? CONFIG.BRUSH.SOFTNESS;
+      const blend = dab.blend || 'source-over';
+
+      targetCtx.save();
+      targetCtx.globalCompositeOperation = blend;
+
+      // 生宣洇染外晕：先铺一层更宽、更虚的水墨晕边
+      if (bleed > 0.02) {
+        const bleedR = radius * (1 + (CONFIG.BRUSH.BLEED_SCALE - 1) * bleed);
+        const bleedAlpha = alpha * CONFIG.BRUSH.BLEED_ALPHA_RATIO * bleed;
+        drawSoftRadialDab(
+          targetCtx,
+          dab.x + (dab.bx || 0),
+          dab.y + (dab.by || 0),
+          bleedR,
+          rgb,
+          bleedAlpha,
+          angle,
+          aspect * 1.06,
+          0.32
+        );
+      }
+
+      // 枯笔飞白效果：5 股笔毫分叉并按确定性哈希留白，露出宣纸底色
+      if (dryness > 0.15) {
+        const bristles = CONFIG.BRUSH.DRY_BRISTLES;
+        const perpX = -Math.sin(angle);
+        const perpY = Math.cos(angle);
+        const seedHash = Math.abs(Math.sin(dab.x * 12.9898 + dab.y * 78.233) * 43758.5453);
+
+        for (let i = 0; i < bristles; i++) {
+          const h = (seedHash * (i + 1.37)) % 1;
+          if (h < dryness * (CONFIG.BRUSH.DRY_SKIP_BASE + 0.35)) continue;
+
+          const offsetRatio = (i / (bristles - 1) - 0.5) * 1.45;
+          const ox = perpX * radius * offsetRatio;
+          const oy = perpY * radius * offsetRatio;
+          const subR = Math.max(0.65, radius * (0.30 + 0.16 * (1 - Math.abs(offsetRatio))));
+          const subAlpha = alpha * (0.55 + 0.45 * (1 - dryness * 0.45));
+
+          drawSoftRadialDab(
+            targetCtx,
+            dab.x + ox,
+            dab.y + oy,
+            subR,
+            rgb,
+            subAlpha,
+            angle,
+            Math.max(1.25, aspect * 1.35),
+            0.48
+          );
+        }
+        targetCtx.restore();
+        return;
+      }
+
+      // 常规湿润软边水墨笔触
+      drawSoftRadialDab(targetCtx, dab.x, dab.y, radius, rgb, alpha, angle, aspect, softness);
+      targetCtx.restore();
+    }
+
+    // -------------------------------------------------------------------------
+    // 曲线插值、十八描粗细调制及几何点在多边形内判定工具
+    // -------------------------------------------------------------------------
+    function catmullRomSpline(points, samplesPerSeg = 12, closed = false) {
       if (!points || points.length < 2) return points ? points.slice() : [];
       const n = points.length;
       const out = [];
@@ -541,18 +572,8 @@
 
       const getPt = (idx) => {
         if (closed) return points[(idx + n) % n];
-        if (idx < 0) {
-          return [
-            points[0][0] * 2 - points[1][0],
-            points[0][1] * 2 - points[1][1]
-          ];
-        }
-        if (idx >= n) {
-          return [
-            points[n - 1][0] * 2 - points[n - 2][0],
-            points[n - 1][1] * 2 - points[n - 2][1]
-          ];
-        }
+        if (idx < 0) return [points[0][0] * 2 - points[1][0], points[0][1] * 2 - points[1][1]];
+        if (idx >= n) return [points[n - 1][0] * 2 - points[n - 2][0], points[n - 1][1] * 2 - points[n - 2][1]];
         return points[idx];
       };
 
@@ -561,8 +582,7 @@
         const p1 = getPt(i);
         const p2 = getPt(i + 1);
         const p3 = getPt(i + 2);
-        const steps = i === segCount - 1 && !closed ? samplesPerSeg : samplesPerSeg;
-        for (let k = 0; k < steps; k++) {
+        for (let k = 0; k < samplesPerSeg; k++) {
           const t = k / samplesPerSeg;
           const t2 = t * t;
           const t3 = t2 * t;
@@ -591,497 +611,311 @@
       const cum = [0];
       let total = 0;
       for (let i = 1; i < pts.length; i++) {
-        const dx = pts[i][0] - pts[i - 1][0];
-        const dy = pts[i][1] - pts[i - 1][1];
-        total += Math.hypot(dx, dy);
+        total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
         cum.push(total);
       }
       return { cum, total };
     }
 
-    function sliceCurveByFraction(pts, cum, total, frac) {
-      if (frac >= 0.9999) return { pts, cum, segLen: total };
-      if (pts.length < 2 || frac <= 0) return { pts: [], cum: [], segLen: 0 };
-      const targetLen = total * clamp(frac, 0, 1);
-      if (targetLen < 0.5) return { pts: [], cum: [], segLen: 0 };
-
-      const outPts = [pts[0]];
-      const outCum = [0];
-      for (let i = 1; i < pts.length; i++) {
-        if (cum[i] <= targetLen) {
-          outPts.push(pts[i]);
-          outCum.push(cum[i]);
-        } else {
-          const prevLen = cum[i - 1];
-          const seg = cum[i] - prevLen;
-          const r = seg > 1e-5 ? (targetLen - prevLen) / seg : 0;
-          const x = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * r;
-          const y = pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * r;
-          outPts.push([x, y]);
-          outCum.push(targetLen);
-          break;
-        }
-      }
-      return { pts: outPts, cum: outCum, segLen: targetLen };
-    }
-
-    // 十八描笔锋粗细调制函数（强化提按、入笔藏锋与出锋锐尖节奏）
-    function brushProfileWidth(u, baseW, style, seed, bendFactor = 0) {
-      const wave = 1 + 0.10 * Math.sin(seed * 3.1 + u * 23.0) + 0.06 * Math.cos(seed * 7.7 + u * 47.0);
-      const turnPress = 1 + bendFactor * 0.38;
-
+    function brushProfileWidth(u, baseW, style, seed, bendFactor) {
+      const wave = 1 + 0.08 * Math.sin(seed * 3.1 + u * 21.0);
+      const turnPress = 1 + bendFactor * 0.34;
       if (style === 'yousi') {
-        // 高古游丝描：细劲含蓄，起笔微顿，收笔轻提
-        const entry = u < 0.07 ? (1.18 - 0.18 * (u / 0.07)) : 1.0;
-        const tail = u > 0.88 ? Math.max(0.28, (1 - u) / 0.12) : 1.0;
-        const cap = Math.min(1, u / 0.025);
-        return baseW * (0.42 + 0.62 * cap) * entry * tail * (1 + 0.05 * Math.sin(seed + u * 26)) * (1 + bendFactor * 0.18);
+        const entry = u < 0.07 ? (1.14 - 0.14 * (u / 0.07)) : 1.0;
+        const tail = u > 0.88 ? Math.max(0.32, (1 - u) / 0.12) : 1.0;
+        const cap = Math.min(1, u / 0.03);
+        return baseW * (0.48 + 0.54 * cap) * entry * tail * (1 + bendFactor * 0.16);
       }
       if (style === 'tiexian') {
-        // 铁线描：藏锋起笔、中段骨力沉稳、转折顿挫、收笔回锋
-        const press = (u < 0.07 || u > 0.93) ? 1.24 : 1.02;
-        const cap = Math.min(1, u / 0.02, (1 - u) / 0.02);
-        return baseW * 1.15 * press * (0.38 + 0.62 * cap) * turnPress * wave;
+        const press = (u < 0.07 || u > 0.93) ? 1.20 : 1.02;
+        const cap = Math.min(1, u / 0.025, (1 - u) / 0.025);
+        return baseW * 1.08 * press * (0.42 + 0.58 * cap) * turnPress * wave;
       }
       if (style === 'lanye') {
-        // 兰叶描：尖毫入纸，行中按笔饱满丰润，收尾如兰叶出锋
         const belly = Math.pow(Math.sin(Math.PI * clamp(u, 0, 1)), 0.68);
-        return baseW * 1.32 * (0.18 + 1.48 * belly) * turnPress * wave;
+        return baseW * 1.18 * (0.24 + 1.28 * belly) * turnPress * wave;
       }
       if (style === 'xingyun') {
-        // 行云流水描：开合顿挫分明，顺风纤细、转折沉厚
-        const env = Math.pow(Math.sin(Math.PI * clamp(u, 0, 1)), 0.40);
-        const pulse = 0.72 + 0.44 * Math.sin(seed + u * Math.PI * 3.8);
-        return baseW * 1.28 * (0.16 + 1.18 * env * pulse) * turnPress * wave;
+        const env = Math.pow(Math.sin(Math.PI * clamp(u, 0, 1)), 0.42);
+        const pulse = 0.74 + 0.38 * Math.sin(seed + u * Math.PI * 3.6);
+        return baseW * 1.16 * (0.22 + 1.08 * env * pulse) * turnPress * wave;
       }
       if (style === 'dingtou') {
-        // 钉头鼠尾描：入笔重按作“钉头”，行笔渐提作锐细“鼠尾”
-        if (u < 0.08) {
-          return baseW * 1.30 * (0.65 + 1.10 * Math.sin((u / 0.08) * Math.PI * 0.5));
-        }
-        const tail = Math.pow(clamp((1 - u) / 0.92, 0, 1), 0.85);
-        return baseW * 1.30 * (0.14 + 1.56 * tail) * turnPress * wave;
+        if (u < 0.08) return baseW * 1.20 * (0.65 + 0.95 * Math.sin((u / 0.08) * Math.PI * 0.5));
+        const tail = Math.pow(clamp((1 - u) / 0.92, 0, 1), 0.84);
+        return baseW * 1.20 * (0.18 + 1.38 * tail) * turnPress * wave;
       }
-      // 柔和晕染宽度
       const env = Math.pow(Math.sin(Math.PI * clamp(u, 0, 1)), 0.55);
-      return baseW * (0.3 + 0.85 * env);
+      return baseW * (0.35 + 0.85 * env);
     }
 
-    function drawCalligraphicPath(targetCtx, pts, cum, totalLen, opts, tFrac) {
-      if (pts.length < 2 || totalLen < 0.5) return;
-      const baseW = opts.width || 2.2;
+    function buildLineDabs(curve, cum, totalLen, opts) {
+      const dabs = [];
+      if (curve.length < 2 || totalLen < 0.5) return dabs;
+
+      const rgb = hexToRgb(opts.color);
+      const baseW = opts.width || 2.1;
       const style = opts.style || 'yousi';
       const seed = opts.seed || 1;
-      const alpha = opts.alpha !== undefined ? opts.alpha : 0.92;
-      const isDrawingTip = tFrac < 0.999;
+      const strokeAlpha = opts.alpha !== undefined ? opts.alpha : 0.90;
+      const blend = opts.blend || 'source-over';
 
-      // 层 3 渐变水墨退晕保持柔和光滑笔痕
-      if (style === 'soft') {
-        const leftPts = [];
-        const rightPts = [];
-        for (let i = 0; i < pts.length; i++) {
-          const prev = i === 0 ? pts[0] : pts[i - 1];
-          const next = i === pts.length - 1 ? pts[pts.length - 1] : pts[i + 1];
-          let tx = next[0] - prev[0];
-          let ty = next[1] - prev[1];
-          const mag = Math.hypot(tx, ty) || 1;
-          tx /= mag;
-          ty /= mag;
-          const uFull = totalLen > 0 ? cum[i] / totalLen : 0;
-          const w = brushProfileWidth(uFull, baseW, 'soft', seed, 0);
-          const hw = w * 0.5;
-          leftPts.push([pts[i][0] - ty * hw, pts[i][1] + tx * hw]);
-          rightPts.push([pts[i][0] + ty * hw, pts[i][1] - tx * hw]);
-        }
-        targetCtx.save();
-        targetCtx.globalCompositeOperation = opts.blend || 'multiply';
-        targetCtx.globalAlpha = alpha;
-        targetCtx.fillStyle = opts.color;
-        targetCtx.beginPath();
-        targetCtx.moveTo(leftPts[0][0], leftPts[0][1]);
-        for (let i = 1; i < leftPts.length; i++) targetCtx.lineTo(leftPts[i][0], leftPts[i][1]);
-        for (let i = rightPts.length - 1; i >= 0; i--) targetCtx.lineTo(rightPts[i][0], rightPts[i][1]);
-        targetCtx.closePath();
-        targetCtx.fill();
-        targetCtx.restore();
-        return;
-      }
+      const stylePreset = {
+        yousi:   { spacing: 0.36, dabAlpha: 0.48, bleed: 0.24, dryness: 0.00, softness: 0.56, aspect: 1.18, jitter: 0.16 },
+        tiexian: { spacing: 0.38, dabAlpha: 0.52, bleed: 0.35, dryness: 0.05, softness: 0.54, aspect: 1.24, jitter: 0.24 },
+        lanye:   { spacing: 0.40, dabAlpha: 0.54, bleed: 0.48, dryness: 0.10, softness: 0.48, aspect: 1.32, jitter: 0.36 },
+        xingyun: { spacing: 0.42, dabAlpha: 0.54, bleed: 0.52, dryness: 0.08, softness: 0.46, aspect: 1.36, jitter: 0.40 },
+        dingtou: { spacing: 0.40, dabAlpha: 0.56, bleed: 0.55, dryness: 0.06, softness: 0.48, aspect: 1.34, jitter: 0.35 },
+        soft:    { spacing: 0.42, dabAlpha: 0.38, bleed: 0.42, dryness: 0.00, softness: 0.36, aspect: 1.30, jitter: 0.65 }
+      }[style] || { spacing: 0.40, dabAlpha: 0.50, bleed: 0.40, dryness: 0.08, softness: 0.50, aspect: 1.25, jitter: 0.30 };
 
-      // 预计算切线、法线、转折曲率（转折按笔聚墨）及沿线采样毛笔状态
-      const samples = [];
-      for (let i = 0; i < pts.length; i++) {
-        const prev2 = pts[Math.max(0, i - 2)];
-        const prev = pts[Math.max(0, i - 1)];
-        const cur = pts[i];
-        const next = pts[Math.min(pts.length - 1, i + 1)];
-        const next2 = pts[Math.min(pts.length - 1, i + 2)];
+      // 预计算各顶点切线与曲率转折顿挫
+      const nodes = [];
+      for (let i = 0; i < curve.length; i++) {
+        const prev2 = curve[Math.max(0, i - 2)];
+        const prev = curve[Math.max(0, i - 1)];
+        const cur = curve[i];
+        const next = curve[Math.min(curve.length - 1, i + 1)];
+        const next2 = curve[Math.min(curve.length - 1, i + 2)];
 
-        let tx = next[0] - prev[0];
-        let ty = next[1] - prev[1];
+        let tx = next[0] - prev[0], ty = next[1] - prev[1];
         const mag = Math.hypot(tx, ty) || 1;
-        tx /= mag;
-        ty /= mag;
+        tx /= mag; ty /= mag;
 
-        // 局部转向角估计转折顿挫
-        let vx1 = cur[0] - prev2[0], vy1 = cur[1] - prev2[1];
-        let vx2 = next2[0] - cur[0], vy2 = next2[1] - cur[1];
-        const m1 = Math.hypot(vx1, vy1) || 1;
-        const m2 = Math.hypot(vx2, vy2) || 1;
+        const vx1 = cur[0] - prev2[0], vy1 = cur[1] - prev2[1];
+        const vx2 = next2[0] - cur[0], vy2 = next2[1] - cur[1];
+        const m1 = Math.hypot(vx1, vy1) || 1, m2 = Math.hypot(vx2, vy2) || 1;
         const dot = clamp((vx1 * vx2 + vy1 * vy2) / (m1 * m2), -1, 1);
-        const bendFactor = clamp((1 - dot) * 0.9, 0, 1);
+        const bend = clamp((1 - dot) * 0.9, 0, 1);
 
-        const uFull = totalLen > 0 ? cum[i] / totalLen : 0;
-        let w = brushProfileWidth(uFull, baseW, style, seed, bendFactor);
-        if (isDrawingTip && i >= pts.length - 4) {
-          const tipFade = clamp((pts.length - 1 - i) / 3, 0.16, 1);
-          w *= tipFade;
-        }
-
-        // 沿长笔墨色自然浓淡变化（饱满入笔 → 转折蓄墨 → 尾锋稍淡）
-        const longStrokeDry = totalLen > 120
-          ? clamp(1.04 - 0.24 * Math.pow(uFull, 1.35) + 0.14 * bendFactor, 0.68, 1.08)
-          : 1.0;
-
-        samples.push({
-          x: cur[0],
-          y: cur[1],
-          nx: -ty,
-          ny: tx,
-          ang: Math.atan2(ty, tx),
-          w,
-          u: uFull,
-          s: cum[i],
-          bend: bendFactor,
-          inkRichness: longStrokeDry
-        });
+        const u = totalLen > 0 ? cum[i] / totalLen : 0;
+        const w = brushProfileWidth(u, baseW, style, seed, bend);
+        nodes.push({ x: cur[0], y: cur[1], s: cum[i], u, w, bend, ang: Math.atan2(ty, tx) });
       }
 
-      const rgb = hexToRgb(opts.color);
-      const tipSprite = getBrushTipSprite(opts.color);
-
-      targetCtx.save();
-      targetCtx.globalCompositeOperation = opts.blend || 'source-over';
-
-      // 第一遍：宣纸/白粉壁水墨渗化晕边（较宽且柔淡，消除矢量生硬感）
-      targetCtx.beginPath();
-      for (let i = 0; i < samples.length; i++) {
-        const sp = samples[i];
-        const hw = sp.w * 0.92;
-        const px = sp.x + sp.nx * hw;
-        const py = sp.y + sp.ny * hw;
-        if (i === 0) targetCtx.moveTo(px, py);
-        else targetCtx.lineTo(px, py);
-      }
-      for (let i = samples.length - 1; i >= 0; i--) {
-        const sp = samples[i];
-        const hw = sp.w * 0.92;
-        targetCtx.lineTo(sp.x - sp.nx * hw, sp.y - sp.ny * hw);
-      }
-      targetCtx.closePath();
-      targetCtx.globalAlpha = alpha * 0.13;
-      targetCtx.fillStyle = opts.color;
-      targetCtx.fill();
-
-      // 第二遍：沿弧长连续点印旋转毛笔笔毫贴图 + 微颤，形成真实毛笔肚腹与浓淡墨韵
-      let nextStampS = 0;
-      for (let i = 0; i < samples.length - 1; i++) {
-        const a = samples[i];
-        const b = samples[i + 1];
+      let sCur = 0;
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const a = nodes[i];
+        const b = nodes[i + 1];
         const segLen = b.s - a.s;
-        if (segLen <= 0.05) continue;
+        if (segLen <= 0.04) continue;
 
-        while (nextStampS <= b.s) {
-          const r = clamp((nextStampS - a.s) / segLen, 0, 1);
-          const x = a.x + (b.x - a.x) * r;
-          const y = a.y + (b.y - a.y) * r;
-          const nx = a.nx + (b.nx - a.nx) * r;
-          const ny = a.ny + (b.ny - a.ny) * r;
-          const w = a.w + (b.w - a.w) * r;
-          const u = a.u + (b.u - a.u) * r;
-          const ink = a.inkRichness + (b.inkRichness - a.inkRichness) * r;
+        while (sCur <= b.s + 1e-4) {
+          const frac = clamp((sCur - a.s) / segLen, 0, 1);
+          const x = lerp(a.x, b.x, frac);
+          const y = lerp(a.y, b.y, frac);
+          const u = lerp(a.u, b.u, frac);
+          const w = lerp(a.w, b.w, frac);
+          const bend = lerp(a.bend, b.bend, frac);
 
-          // 运笔微颤与纸纹跳过（长线条尾部出现自然轻微飞白）
-          const dryWave = Math.sin(seed * 7.3 + nextStampS * 0.43) + 0.5 * Math.cos(seed * 2.9 + nextStampS * 0.97);
-          const allowFlyingWhite = (style !== 'yousi') && totalLen > 125 && u > 0.62;
-          const dryCut = allowFlyingWhite && dryWave > 0.98 - (u - 0.62) * 0.6;
+          const r = Math.max(0.75, w * 0.72);
+          const pressure = clamp(1 + (rng() - 0.5) * 2 * CONFIG.BRUSH.PRESSURE_JITTER + bend * 0.18, 0.72, 1.32);
+          const inkDepletion = totalLen > 105 ? (1 - u * 0.24) : 1.0;
 
-          if (!dryCut) {
-            const wobble = 0.22 * Math.sin(seed * 5.1 + nextStampS * 0.33);
-            const dabW = Math.max(1.1, w * 1.48);
-            const dabH = Math.max(1.1, w * 1.24);
-            targetCtx.save();
-            targetCtx.translate(x + nx * wobble, y + ny * wobble);
-            targetCtx.rotate(a.ang);
-            targetCtx.globalAlpha = clamp(alpha * 0.44 * ink, 0.08, 0.72);
-            targetCtx.drawImage(tipSprite, -dabW * 0.5, -dabH * 0.5, dabW, dabH);
-            targetCtx.restore();
+          // 长线条尾端增加枯笔飞白，发丝开脸保持润泽不断裂
+          let localDry = stylePreset.dryness;
+          if ((style === 'lanye' || style === 'xingyun' || style === 'dingtou') && totalLen > 100 && u > 0.56) {
+            localDry = clamp(stylePreset.dryness + ((u - 0.56) / 0.44) * 0.48, 0, 0.62);
           }
-          nextStampS += Math.max(0.85, w * 0.34);
+
+          dabs.push({
+            x: x + (rng() - 0.5) * stylePreset.jitter,
+            y: y + (rng() - 0.5) * stylePreset.jitter,
+            r: r * (0.85 + 0.15 * pressure),
+            rgb,
+            alpha: clamp(strokeAlpha * stylePreset.dabAlpha * inkDepletion * (0.9 + 0.1 * pressure), 0.04, 0.92),
+            angle: a.ang,
+            aspect: stylePreset.aspect,
+            bleed: stylePreset.bleed,
+            dryness: localDry,
+            softness: stylePreset.softness,
+            bx: (rng() - 0.5) * r * 0.42,
+            by: (rng() - 0.5) * r * 0.42,
+            blend
+          });
+
+          const step = Math.max(1.15, r * stylePreset.spacing);
+          sCur += step;
         }
       }
-
-      // 第三遍：狼毫分丝与飞白笔筋（主锋 + 侧锋 3~4 股丝缕，内段用 butt 消除接缝圆斑）
-      const bristleOffsets = (baseW >= 1.7 && style !== 'yousi')
-        ? [
-            { off: -0.34, wRatio: 0.28, aRatio: 0.46, breakBias: 0.55 },
-            { off: -0.06, wRatio: 0.44, aRatio: 0.78, breakBias: 1.05 },
-            { off: 0.14,  wRatio: 0.34, aRatio: 0.62, breakBias: 0.85 },
-            { off: 0.36,  wRatio: 0.24, aRatio: 0.42, breakBias: 0.45 }
-          ]
-        : [
-            { off: 0.0,   wRatio: 0.52, aRatio: 0.80, breakBias: 99 },
-            { off: 0.24,  wRatio: 0.24, aRatio: 0.36, breakBias: 99 }
-          ];
-
-      targetCtx.lineCap = 'butt';
-      targetCtx.lineJoin = 'round';
-      targetCtx.strokeStyle = rgbaStr(rgb, 1);
-
-      for (let bIdx = 0; bIdx < bristleOffsets.length; bIdx++) {
-        const br = bristleOffsets[bIdx];
-        for (let i = 0; i < samples.length - 1; i++) {
-          const p1 = samples[i];
-          const p2 = samples[i + 1];
-          // 长笔末尾侧毫自然断开形成毛笔飞白丝理
-          if (style !== 'yousi' && totalLen > 110 && p1.u > 0.54) {
-            const gapSignal = Math.sin(seed * (bIdx + 3.1) + p1.s * 0.48) + 0.5 * Math.cos(seed * 11.7 + p1.s * 0.83);
-            if (gapSignal > br.breakBias - (p1.u - 0.54) * 0.75) continue;
-          }
-          const shift1 = p1.w * br.off;
-          const shift2 = p2.w * br.off;
-          const segW = Math.max(0.45, ((p1.w + p2.w) * 0.5) * br.wRatio);
-          targetCtx.globalAlpha = clamp(alpha * br.aRatio * p1.inkRichness, 0.08, 0.92);
-          targetCtx.lineWidth = segW;
-          targetCtx.beginPath();
-          targetCtx.moveTo(p1.x + p1.nx * shift1, p1.y + p1.ny * shift1);
-          targetCtx.lineTo(p2.x + p2.nx * shift2, p2.y + p2.ny * shift2);
-          targetCtx.stroke();
-        }
-      }
-
-      targetCtx.restore();
+      return dabs;
     }
 
-    // 计算闭合多边形包围盒与主轴方向（供羊毫渐层刷染与扫刷动画使用）
-    function getPolygonGeometry(pts) {
+    function pointInPolygon(x, y, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i][0], yi = poly[i][1];
+        const xj = poly[j][0], yj = poly[j][1];
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function distToPolygonEdge(x, y, poly) {
+      let minD2 = Infinity;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const ax = poly[j][0], ay = poly[j][1];
+        const bx = poly[i][0], by = poly[i][1];
+        const dx = bx - ax, dy = by - ay;
+        const len2 = dx * dx + dy * dy;
+        const t = len2 > 1e-6 ? clamp(((x - ax) * dx + (y - ay) * dy) / len2, 0, 1) : 0;
+        const px = ax + t * dx, py = ay + t * dy;
+        const d2 = (x - px) * (x - px) + (y - py) * (y - py);
+        if (d2 < minD2) minD2 = d2;
+      }
+      return Math.sqrt(minD2);
+    }
+
+    function buildWashDabsForPolygon(curve, opts) {
+      const dabs = [];
+      if (!curve || curve.length < 3) return dabs;
+
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      let cx = 0, cy = 0;
-      for (let i = 0; i < pts.length; i++) {
-        const x = pts[i][0], y = pts[i][1];
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        cx += x;
-        cy += y;
+      let cx = 0, cy = 0, signedArea = 0;
+      for (let i = 0; i < curve.length; i++) {
+        const p0 = curve[i];
+        const p1 = curve[(i + 1) % curve.length];
+        if (p0[0] < minX) minX = p0[0];
+        if (p0[0] > maxX) maxX = p0[0];
+        if (p0[1] < minY) minY = p0[1];
+        if (p0[1] > maxY) maxY = p0[1];
+        cx += p0[0]; cy += p0[1];
+        signedArea += p0[0] * p1[1] - p1[0] * p0[1];
       }
-      cx /= Math.max(1, pts.length);
-      cy /= Math.max(1, pts.length);
+      cx /= curve.length;
+      cy /= curve.length;
+      const area = Math.max(100, Math.abs(signedArea) * 0.5);
 
-      // 主轴估计（找离中心最远点确立刷笔主导走向）
-      let farPt = pts[0] || [cx, cy];
-      let maxD2 = -1;
-      for (let i = 0; i < pts.length; i++) {
-        const d2 = (pts[i][0] - cx) ** 2 + (pts[i][1] - cy) ** 2;
-        if (d2 > maxD2) {
-          maxD2 = d2;
-          farPt = pts[i];
+      let farPt = curve[0], maxD2 = -1;
+      for (let i = 0; i < curve.length; i++) {
+        const d2 = (curve[i][0] - cx) ** 2 + (curve[i][1] - cy) ** 2;
+        if (d2 > maxD2) { maxD2 = d2; farPt = curve[i]; }
+      }
+      const axisAng = opts.axisAngle !== undefined ? opts.axisAngle : Math.atan2(farPt[1] - cy, farPt[0] - cx);
+      const cosA = Math.cos(axisAng), sinA = Math.sin(axisAng);
+      const radBound = Math.max(16, Math.sqrt(maxD2) + 8);
+
+      const isOpaque = (opts.blend === 'source-over');
+      const maxR = opts.dabRadius || clamp(Math.sqrt(area) * 0.115, 7.5, 22);
+      const step = clamp(isOpaque ? maxR * 0.42 : maxR * 0.48, 3.6, 10.5);
+
+      const rgbA = hexToRgb(opts.color);
+      const rgbB = opts.color2 ? hexToRgb(opts.color2) : rgbA;
+      const baseDabAlpha = isOpaque
+        ? clamp(opts.alpha * 0.58, 0.30, 0.64)
+        : clamp(opts.alpha * 0.38, 0.16, 0.46);
+
+      // 投影范围用于渐变双色插值（如云蒂由浓石青向浅天青退晕）
+      let minProj = Infinity, maxProj = -Infinity;
+      for (let i = 0; i < curve.length; i++) {
+        const p = (curve[i][0] - cx) * cosA + (curve[i][1] - cy) * sinA;
+        if (p < minProj) minProj = p;
+        if (p > maxProj) maxProj = p;
+      }
+      const projSpan = Math.max(1, maxProj - minProj);
+
+      // 1) 主轴旋转均匀水墨网格采样
+      for (let u = -radBound; u <= radBound; u += step) {
+        for (let v = -radBound; v <= radBound; v += step) {
+          const ju = u + (rng() - 0.5) * step * 0.40;
+          const jv = v + (rng() - 0.5) * step * 0.40;
+          const x = cx + cosA * ju - sinA * jv;
+          const y = cy + sinA * ju + cosA * jv;
+          if (x < minX - 2 || x > maxX + 2 || y < minY - 2 || y > maxY + 2) continue;
+          if (!pointInPolygon(x, y, curve)) continue;
+
+          const dEdge = distToPolygonEdge(x, y, curve);
+          const r = clamp(Math.min(maxR, dEdge * 1.18), 2.8, maxR);
+          const projT = clamp(((x - cx) * cosA + (y - cy) * sinA - minProj) / projSpan, 0, 1);
+          const col = opts.color2 ? lerpRgb(rgbA, rgbB, projT) : rgbA;
+          const dryBias = (!isOpaque && dEdge < maxR * 0.5) ? 0.08 : 0;
+
+          dabs.push({
+            x, y, r,
+            proj: ju,
+            rgb: col,
+            alpha: baseDabAlpha * (0.86 + 0.24 * rng()) * (opts.fadeTail ? (1 - 0.38 * projT) : 1),
+            angle: axisAng + (rng() - 0.5) * 0.25,
+            aspect: 1.32,
+            bleed: isOpaque ? 0.22 : 0.38,
+            dryness: dryBias,
+            softness: isOpaque ? 0.48 : 0.42,
+            bx: (rng() - 0.5) * r * 0.32,
+            by: (rng() - 0.5) * r * 0.32,
+            blend: opts.blend || 'multiply'
+          });
         }
       }
-      const dx = farPt[0] - cx;
-      const dy = farPt[1] - cy;
-      const axisAng = Math.atan2(dy, dx);
-      return {
-        minX, minY, maxX, maxY,
-        w: Math.max(1, maxX - minX),
-        h: Math.max(1, maxY - minY),
-        cx, cy,
-        axisAng,
-        radius: Math.max(8, Math.sqrt(maxD2))
-      };
-    }
 
-    function drawMineralFillPolygon(targetCtx, smoothedPts, opts, tFrac) {
-      if (smoothedPts.length < 3 || tFrac <= 0.01) return;
-      const geom = getPolygonGeometry(smoothedPts);
-      const seed = opts.seed || 7;
-      const easeAlpha = opts.alpha * clamp(Math.pow(tFrac, 0.72), 0, 1);
-      const rgb = hexToRgb(opts.color);
-
-      targetCtx.save();
-      targetCtx.globalCompositeOperation = opts.blend || 'multiply';
-
-      // 手绘微颤闭合边缘路径
-      const tracePolygon = () => {
-        targetCtx.beginPath();
-        for (let i = 0; i < smoothedPts.length; i++) {
-          const p = smoothedPts[i];
-          const jx = 0.45 * Math.sin(seed * 3.1 + i * 0.75);
-          const jy = 0.45 * Math.cos(seed * 2.3 + i * 0.85);
-          if (i === 0) targetCtx.moveTo(p[0] + jx, p[1] + jy);
-          else targetCtx.lineTo(p[0] + jx, p[1] + jy);
+      // 2) 窄细尖角补充采样（沿着多边形边缘略向内移，确保窄飘带与指尖绝不漏色）
+      const perimStep = Math.max(3.5, step * 0.9);
+      const areaSign = signedArea >= 0 ? 1 : -1;
+      for (let i = 0; i < curve.length; i++) {
+        const p0 = curve[i];
+        const p1 = curve[(i + 1) % curve.length];
+        const dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+        const len = Math.hypot(dx, dy);
+        if (len < 1) continue;
+        // 指向多边形内部的法向（CW/CCW 自适应）
+        const nx = (dy / len) * areaSign;
+        const ny = (-dx / len) * areaSign;
+        const steps = Math.max(1, Math.ceil(len / perimStep));
+        for (let k = 0; k < steps; k++) {
+          const frac = (k + 0.5) / steps;
+          const bx = lerp(p0[0], p1[0], frac);
+          const by = lerp(p0[1], p1[1], frac);
+          for (const distIn of [1.8, 3.8, 6.2]) {
+            const tx = bx + nx * distIn;
+            const ty = by + ny * distIn;
+            if (!pointInPolygon(tx, ty, curve)) continue;
+            const dEdge = distToPolygonEdge(tx, ty, curve);
+            if (dEdge < 1.8) continue;
+            const r = clamp(Math.min(maxR * 0.72, dEdge * 1.15), 2.5, maxR * 0.72);
+            const ju = (tx - cx) * cosA + (ty - cy) * sinA;
+            const projT = clamp((ju - minProj) / projSpan, 0, 1);
+            const col = opts.color2 ? lerpRgb(rgbA, rgbB, projT) : rgbA;
+            dabs.push({
+              x: tx, y: ty, r,
+              proj: ju,
+              rgb: col,
+              alpha: baseDabAlpha * 0.78 * (opts.fadeTail ? (1 - 0.38 * projT) : 1),
+              angle: Math.atan2(dy, dx),
+              aspect: 1.28,
+              bleed: isOpaque ? 0.16 : 0.30,
+              dryness: 0,
+              softness: 0.45,
+              bx: 0, by: 0,
+              blend: opts.blend || 'multiply'
+            });
+            break;
+          }
         }
-        targetCtx.closePath();
-      };
-
-      // 裁切入色块轮廓内，施以羊毫刷染与矿粉沉淀质感
-      tracePolygon();
-      targetCtx.clip();
-
-      // 动画扫刷渐进蒙版（tFrac < 1 时模拟扁头羊毫从一端扫涂上色）
-      if (tFrac < 0.999) {
-        const cosA = Math.cos(geom.axisAng);
-        const sinA = Math.sin(geom.axisAng);
-        const sweepSpan = geom.radius * 2.25;
-        const progX = -geom.radius * 1.15 + sweepSpan * clamp(tFrac, 0, 1);
-        targetCtx.save();
-        targetCtx.translate(geom.cx, geom.cy);
-        targetCtx.rotate(geom.axisAng);
-        targetCtx.beginPath();
-        targetCtx.rect(-geom.radius * 1.3, -geom.radius * 1.3, (progX + geom.radius * 1.3), geom.radius * 2.6);
-        targetCtx.restore();
-        targetCtx.clip();
-        void cosA; void sinA;
       }
 
-      // 1) 方向性水墨矿彩渐变铺底（入笔略浓，行笔透亮匀净）
-      const gx0 = geom.cx - Math.cos(geom.axisAng) * geom.radius * 0.88;
-      const gy0 = geom.cy - Math.sin(geom.axisAng) * geom.radius * 0.88;
-      const gx1 = geom.cx + Math.cos(geom.axisAng) * geom.radius * 0.88;
-      const gy1 = geom.cy + Math.sin(geom.axisAng) * geom.radius * 0.88;
-      const washGrad = targetCtx.createLinearGradient(gx0, gy0, gx1, gy1);
-      washGrad.addColorStop(0, rgbaStr(rgb, easeAlpha * 0.92));
-      washGrad.addColorStop(0.55, rgbaStr(rgb, easeAlpha * 0.82));
-      washGrad.addColorStop(1, rgbaStr(rgb, easeAlpha * 0.72));
-      targetCtx.fillStyle = washGrad;
-      targetCtx.fillRect(geom.minX - 6, geom.minY - 6, geom.w + 12, geom.h + 12);
-
-      // 2) 叠扫 6 道半透明羊毫宽刷痕（呈现手工设色排刷笔意）
-      const sweepCount = 6;
-      targetCtx.save();
-      targetCtx.translate(geom.cx, geom.cy);
-      targetCtx.rotate(geom.axisAng);
-      for (let s = 0; s < sweepCount; s++) {
-        const frac = (s / (sweepCount - 1)) - 0.5;
-        const offsetPerp = frac * Math.min(geom.w, geom.h) * 0.72;
-        const swWidth = Math.max(8, Math.min(geom.w, geom.h) * (0.28 + 0.14 * Math.sin(seed + s * 2.1)));
-        targetCtx.globalAlpha = easeAlpha * (0.09 + 0.06 * ((s + 1) % 2));
-        targetCtx.strokeStyle = opts.color;
-        targetCtx.lineWidth = swWidth;
-        targetCtx.lineCap = 'round';
-        targetCtx.beginPath();
-        targetCtx.moveTo(-geom.radius * 1.15, offsetPerp + 3 * Math.sin(seed + s));
-        targetCtx.quadraticCurveTo(0, offsetPerp - 5 * Math.cos(seed + s), geom.radius * 1.15, offsetPerp + 4 * Math.sin(seed + s * 1.7));
-        targetCtx.stroke();
-      }
-      targetCtx.restore();
-
-      // 3) 矿物颜料纸纹粒子沉淀叠加
-      const grainCanvas = getMineralGrainCanvas();
-      const pat = targetCtx.createPattern(grainCanvas, 'repeat');
-      if (pat) {
-        targetCtx.save();
-        targetCtx.globalCompositeOperation = 'multiply';
-        targetCtx.globalAlpha = clamp(easeAlpha * 0.24, 0, 0.35);
-        targetCtx.fillStyle = pat;
-        targetCtx.fillRect(geom.minX - 4, geom.minY - 4, geom.w + 8, geom.h + 8);
-        targetCtx.restore();
-      }
-
-      // 4) 湿画水渍聚边（边缘微微浓聚，真实还原水墨矿彩干后水线）
-      tracePolygon();
-      targetCtx.globalAlpha = easeAlpha * 0.24;
-      targetCtx.strokeStyle = opts.color;
-      targetCtx.lineWidth = (opts.feather || 1.8) + 1.1;
-      targetCtx.lineJoin = 'round';
-      targetCtx.stroke();
-
-      targetCtx.restore();
-    }
-
-    function drawRadialWash(targetCtx, cx, cy, rx, ry, rot, color, alpha, blend, tFrac) {
-      if (tFrac <= 0.01) return;
-      const scaleT = 0.65 + 0.35 * clamp(tFrac, 0, 1);
-      targetCtx.save();
-      targetCtx.globalCompositeOperation = blend || 'multiply';
-      targetCtx.globalAlpha = alpha * clamp(tFrac, 0, 1);
-      targetCtx.translate(cx, cy);
-      if (rot) targetCtx.rotate(rot);
-      targetCtx.scale(rx * scaleT, ry * scaleT);
-      const grad = targetCtx.createRadialGradient(0, 0, 0.08, 0, 0, 1.0);
-      grad.addColorStop(0, color);
-      grad.addColorStop(0.55, color);
-      grad.addColorStop(1, 'rgba(246, 238, 224, 0)');
-      targetCtx.fillStyle = grad;
-      targetCtx.beginPath();
-      targetCtx.arc(0, 0, 1.0, 0, Math.PI * 2);
-      targetCtx.fill();
-      targetCtx.restore();
-    }
-
-    function drawFeatherRibbonWash(targetCtx, pts, cum, totalLen, opts, tFrac) {
-      if (pts.length < 2 || tFrac <= 0.01) return;
-      const { pts: sliced, cum: sCum } = sliceCurveByFraction(pts, cum, totalLen, tFrac);
-      if (sliced.length < 2) return;
-      const maxW = opts.width || 24;
-      const baseAlpha = opts.alpha || 0.32;
-      const steps = 3;
-      // 三层同心柔边叠染，模拟水笔退晕“凹凸法”
-      for (let k = steps; k >= 1; k--) {
-        const wFactor = (k / steps);
-        const subAlpha = (baseAlpha / steps) * 1.35 * (1.25 - 0.2 * wFactor);
-        drawCalligraphicPath(targetCtx, sliced, sCum, totalLen, {
-          color: opts.color,
-          width: maxW * wFactor,
-          style: 'soft',
-          alpha: subAlpha,
-          blend: opts.blend || 'multiply',
-          seed: opts.seed || 1
-        }, tFrac);
-      }
-    }
-
-    function drawCalligraphicDot(targetCtx, x, y, rx, ry, rot, opts, tFrac) {
-      if (tFrac <= 0.01) return;
-      const s = 0.5 + 0.5 * clamp(tFrac, 0, 1);
-      targetCtx.save();
-      targetCtx.globalCompositeOperation = opts.blend || 'source-over';
-      targetCtx.globalAlpha = (opts.alpha !== undefined ? opts.alpha : 0.92) * clamp(tFrac, 0, 1);
-      targetCtx.fillStyle = opts.color;
-      targetCtx.beginPath();
-      targetCtx.ellipse(x, y, rx * s, (ry || rx) * s, rot || 0, 0, Math.PI * 2);
-      targetCtx.fill();
-      targetCtx.restore();
+      // 按羊毫从一端扫刷至另一端的顺次排序，播放时呈现出平扫晕染过程
+      dabs.sort((a, b) => a.proj - b.proj);
+      return dabs;
     }
 
     function executeStrokeAction(targetCtx, stroke, tFrac = 1) {
-      if (stroke.type === 'line') {
-        const sliced = sliceCurveByFraction(stroke.curve, stroke.cum, stroke.totalLen, tFrac);
-        drawCalligraphicPath(targetCtx, sliced.pts, sliced.cum, stroke.totalLen, stroke, tFrac);
-      } else if (stroke.type === 'fill') {
-        drawMineralFillPolygon(targetCtx, stroke.curve, stroke, tFrac);
-      } else if (stroke.type === 'wash') {
-        drawRadialWash(
-          targetCtx, stroke.x, stroke.y, stroke.rx, stroke.ry,
-          stroke.rot || 0, stroke.color, stroke.alpha, stroke.blend, tFrac
-        );
-      } else if (stroke.type === 'shade') {
-        drawFeatherRibbonWash(targetCtx, stroke.curve, stroke.cum, stroke.totalLen, stroke, tFrac);
-      } else if (stroke.type === 'dot') {
-        drawCalligraphicDot(
-          targetCtx, stroke.x, stroke.y, stroke.rx, stroke.ry, stroke.rot, stroke, tFrac
-        );
+      if (tFrac <= 0.001 || !stroke.dabs || stroke.dabs.length === 0) return;
+      const totalDabs = stroke.dabs.length;
+      const limit = tFrac >= 0.9999 ? totalDabs : Math.max(1, Math.ceil(totalDabs * clamp(tFrac, 0, 1)));
+      for (let i = 0; i < limit; i++) {
+        executeInkDab(targetCtx, stroke.dabs[i]);
       }
     }
 
     // =========================================================================
-    // 3. 莫高窟第 285 窟箜篌飞天 · 传统百笔法度队列构建
+    // 3. 莫高窟第 285 窟箜篌飞天 · 接近原画的水墨白描工笔队列
     // =========================================================================
     function buildTraditionalFeitianQueue() {
       strokeQueue = [];
+      rng = createPRNG(2852026);
       let autoSeed = 1;
       const P = CONFIG.PALETTE;
-      const speedMul = CONFIG.SPEED_LEVELS[speedIndex].rate;
 
       function addLine(layer, label, pts, {
         color = P.INK_LINE,
@@ -1089,69 +923,51 @@
         style = 'yousi',
         alpha = 0.90,
         blend = 'source-over',
-        samples = 14,
+        samples = 12,
         closed = false
       } = {}) {
         const curve = catmullRomSpline(pts, samples, closed);
         if (closed && curve.length > 0) curve.push(curve[0]);
         const { cum, total } = computeCurveLengths(curve);
-        const durFrames = clamp(Math.round(total / 22), 5, 24);
-        strokeQueue.push({
-          layer,
-          type: 'line',
-          label,
-          curve,
-          cum,
-          totalLen: total,
-          color,
-          width,
-          style,
-          alpha,
-          blend,
-          seed: (autoSeed++) * 1.37,
-          durFrames
-        });
+        const seed = (autoSeed++) * 1.37;
+        const dabs = buildLineDabs(curve, cum, total, { color, width, style, alpha, blend, seed });
+        const durFrames = clamp(Math.round(total / 24), 5, 22);
+        strokeQueue.push({ layer, type: 'line', label, dabs, durFrames });
       }
 
       function addFill(layer, label, pts, {
         color,
+        color2 = null,
+        fadeTail = false,
         alpha = 0.88,
         blend = 'multiply',
-        feather = 1.8,
-        samples = 12,
+        dabRadius = null,
+        axisAngle = undefined,
+        samples = 6,
         closed = true
       }) {
         const curve = catmullRomSpline(pts, samples, closed);
-        strokeQueue.push({
-          layer,
-          type: 'fill',
-          label,
-          curve,
-          color,
-          alpha,
-          blend,
-          feather,
-          seed: (autoSeed++) * 1.91,
-          durFrames: 10
+        const dabs = buildWashDabsForPolygon(curve, {
+          color, color2, fadeTail, alpha, blend, dabRadius, axisAngle
         });
+        const durFrames = clamp(Math.round(dabs.length / 10), 7, 16);
+        strokeQueue.push({ layer, type: 'fill', label, dabs, durFrames });
       }
 
       function addWash(layer, label, x, y, rx, ry, {
         color,
-        alpha = 0.45,
+        alpha = 0.42,
         blend = 'multiply',
         rot = 0
       }) {
-        strokeQueue.push({
-          layer,
-          type: 'wash',
-          label,
-          x, y, rx, ry, rot,
-          color,
-          alpha,
-          blend,
-          durFrames: 9
-        });
+        const rgb = hexToRgb(color);
+        const aspect = clamp(rx / Math.max(1, ry), 0.4, 2.8);
+        const r = Math.max(rx, ry);
+        const dabs = [
+          { x, y, r: r * 1.05, rgb, alpha: alpha * 0.72, angle: rot, aspect, bleed: 0.45, dryness: 0, softness: 0.34, bx: 0, by: 0, blend },
+          { x: x + (rng() - 0.5) * 3, y: y + (rng() - 0.5) * 3, r: r * 0.72, rgb, alpha: alpha * 0.55, angle: rot, aspect, bleed: 0.25, dryness: 0, softness: 0.48, bx: 0, by: 0, blend }
+        ];
+        strokeQueue.push({ layer, type: 'wash', label, dabs, durFrames: 8 });
       }
 
       function addShade(layer, label, pts, {
@@ -1159,23 +975,17 @@
         width = 24,
         alpha = 0.36,
         blend = 'multiply',
-        samples = 12
+        samples = 10
       }) {
         const curve = catmullRomSpline(pts, samples, false);
         const { cum, total } = computeCurveLengths(curve);
+        const seed = (autoSeed++) * 1.13;
+        const dabs = buildLineDabs(curve, cum, total, {
+          color, width, style: 'soft', alpha, blend, seed
+        });
         strokeQueue.push({
-          layer,
-          type: 'shade',
-          label,
-          curve,
-          cum,
-          totalLen: total,
-          color,
-          width,
-          alpha,
-          blend,
-          seed: (autoSeed++) * 1.13,
-          durFrames: clamp(Math.round(total / 34), 6, 16)
+          layer, type: 'shade', label, dabs,
+          durFrames: clamp(Math.round(total / 34), 6, 15)
         });
       }
 
@@ -1186,42 +996,82 @@
         alpha = 0.92,
         blend = 'source-over'
       }) {
-        strokeQueue.push({
-          layer,
-          type: 'dot',
-          label,
-          x, y, rx, ry, rot,
-          color,
-          alpha,
-          blend,
-          durFrames: 6
+        const rgb = hexToRgb(color);
+        const aspect = clamp(rx / Math.max(0.5, ry || rx), 0.5, 2.5);
+        const dabs = [{
+          x, y, r: Math.max(rx, ry || rx),
+          rgb, alpha, angle: rot, aspect,
+          bleed: 0.20, dryness: 0, softness: 0.58, bx: 0, by: 0, blend
+        }];
+        strokeQueue.push({ layer, type: 'dot', label, dabs, durFrames: 5 });
+      }
+
+      // 原画宝相花湿润水墨黛珠（外晕石绿水彩 + 多笔湿墨中心，取代呆板几何黑圆）
+      function addInkBoss(layer, label, cx, cy, rad) {
+        const dabs = [];
+        const inkRgb = hexToRgb(P.ROSETTE_INK);
+        const haloRgb = hexToRgb(P.MALACHITE);
+        // Outer soft mineral halo
+        for (let k = 0; k < 6; k++) {
+          const ang = (k / 6) * Math.PI * 2 + rng() * 0.5;
+          dabs.push({
+            x: cx + Math.cos(ang) * rad * 0.36,
+            y: cy + Math.sin(ang) * rad * 0.36,
+            r: rad * 0.72,
+            rgb: haloRgb, alpha: 0.16, angle: ang, aspect: 1.15,
+            bleed: 0.5, dryness: 0, softness: 0.32, bx: 0, by: 0, blend: 'multiply'
+          });
+        }
+        // Organic irregular ink-wash body
+        for (let i = 0; i < 18; i++) {
+          const ang = (i / 18) * Math.PI * 2 + (rng() - 0.5) * 0.4;
+          const dist = Math.sqrt(rng()) * rad * 0.62;
+          const r = rad * (0.40 + 0.22 * rng());
+          dabs.push({
+            x: cx + Math.cos(ang) * dist,
+            y: cy + Math.sin(ang) * dist,
+            r,
+            rgb: inkRgb,
+            alpha: 0.34 + 0.16 * (1 - dist / Math.max(1, rad)),
+            angle: ang, aspect: 1.14,
+            bleed: 0.48, dryness: 0.08, softness: 0.44,
+            bx: (rng() - 0.5) * 3, by: (rng() - 0.5) * 3,
+            blend: 'multiply'
+          });
+        }
+        // Inner dark ink pupil
+        dabs.push({
+          x: cx, y: cy, r: rad * 0.66,
+          rgb: inkRgb, alpha: 0.42, angle: 0, aspect: 1.06,
+          bleed: 0.35, dryness: 0, softness: 0.46, bx: 0, by: 0, blend: 'multiply'
         });
+        strokeQueue.push({ layer, type: 'wash', label, dabs, durFrames: 9 });
       }
 
       // -----------------------------------------------------------------------
-      // 第一层：白描勾线（约 110 笔 · 严格遵照“开脸约18笔 + 衣服飘带少而长”）
+      // 第一层：白描勾线（114 笔 · 严格遵照传统“开脸18笔 + 衣服飘带少而长”）
       // -----------------------------------------------------------------------
 
-      // 【1. 开脸（18 笔）：淡赭墨游丝描，一气呵成】
+      // 【1. 开脸（18 笔）：淡赭墨水墨游丝描】
       addLine(1, '开脸·左颊至圆润下巴', [
         [934, 106], [935, 134], [938, 152], [944, 180], [954, 212], [968, 227], [990, 224]
-      ], { color: P.INK_FACE, width: 1.9, style: 'yousi', alpha: 0.88 });
+      ], { color: P.INK_FACE, width: 2.0, style: 'yousi', alpha: 0.90 });
 
       addLine(1, '开脸·右颊至下颌合拢', [
         [1029, 128], [1032, 162], [1029, 194], [1014, 216], [990, 224]
-      ], { color: P.INK_FACE, width: 1.8, style: 'yousi', alpha: 0.86 });
+      ], { color: P.INK_FACE, width: 1.9, style: 'yousi', alpha: 0.88 });
 
       addLine(1, '开脸·额前发际线', [
         [932, 105], [966, 98], [1004, 102], [1022, 114], [1030, 130]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi', alpha: 0.84 });
+      ], { color: P.INK_FACE, width: 1.8, style: 'yousi', alpha: 0.86 });
 
       addLine(1, '开脸·右耳外廓', [
         [1031, 136], [1045, 132], [1049, 154], [1044, 178], [1032, 188]
-      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.85, style: 'yousi' });
 
       addLine(1, '开脸·右耳内轮', [
         [1035, 148], [1041, 158], [1036, 172]
-      ], { color: P.INK_FACE, width: 1.35, style: 'yousi', alpha: 0.80 });
+      ], { color: P.INK_FACE, width: 1.4, style: 'yousi', alpha: 0.82 });
 
       addLine(1, '开脸·右眉（观者左侧）', [
         [937, 136], [947, 131], [957, 132]
@@ -1237,9 +1087,9 @@
 
       addLine(1, '开脸·右眼下眼睑（虚笔）', [
         [938, 159], [946, 161], [953, 158]
-      ], { color: P.INK_FACE, width: 1.15, style: 'yousi', alpha: 0.72 });
+      ], { color: P.INK_FACE, width: 1.2, style: 'yousi', alpha: 0.74 });
 
-      addDot(1, '开脸·右眼珠定位', 944, 157, 2.5, { color: P.INK_LINE, alpha: 0.88 });
+      addDot(1, '开脸·右眼珠定位', 944, 157, 2.6, { color: P.INK_LINE, alpha: 0.88 });
 
       addLine(1, '开脸·左眼上眼睑（实笔垂眸）', [
         [974, 157], [989, 153], [1005, 152], [1012, 150]
@@ -1247,29 +1097,29 @@
 
       addLine(1, '开脸·左眼下眼睑（虚笔）', [
         [977, 159], [991, 160], [1004, 155]
-      ], { color: P.INK_FACE, width: 1.15, style: 'yousi', alpha: 0.72 });
+      ], { color: P.INK_FACE, width: 1.2, style: 'yousi', alpha: 0.74 });
 
-      addDot(1, '开脸·左眼珠定位', 986, 156, 2.7, { color: P.INK_LINE, alpha: 0.88 });
+      addDot(1, '开脸·左眼珠定位', 986, 156, 2.8, { color: P.INK_LINE, alpha: 0.88 });
 
       addLine(1, '开脸·鼻梁侧影（意到线不到）', [
         [963, 143], [959, 163], [957, 178]
-      ], { color: P.INK_FACE, width: 1.45, style: 'yousi', alpha: 0.78 });
+      ], { color: P.INK_FACE, width: 1.5, style: 'yousi', alpha: 0.80 });
 
       addLine(1, '开脸·鼻头与鼻翼弧', [
         [955, 181], [963, 187], [971, 183], [979, 178]
-      ], { color: P.INK_FACE, width: 1.55, style: 'yousi', alpha: 0.86 });
+      ], { color: P.INK_FACE, width: 1.6, style: 'yousi', alpha: 0.88 });
 
       addLine(1, '开脸·唇中缝（实笔含笑）', [
         [960, 198], [967, 201], [974, 199], [981, 198]
-      ], { color: P.INK_CINNABAR, width: 1.85, style: 'yousi', alpha: 0.88 });
+      ], { color: P.INK_CINNABAR, width: 1.9, style: 'yousi', alpha: 0.90 });
 
       addLine(1, '开脸·上唇弓（虚笔）', [
         [962, 197], [967, 194], [973, 195], [978, 197]
-      ], { color: P.INK_FACE, width: 1.1, style: 'yousi', alpha: 0.65 });
+      ], { color: P.INK_FACE, width: 1.15, style: 'yousi', alpha: 0.66 });
 
       addLine(1, '开脸·下唇弧（虚笔）', [
         [964, 204], [971, 207], [977, 203]
-      ], { color: P.INK_FACE, width: 1.15, style: 'yousi', alpha: 0.68 });
+      ], { color: P.INK_FACE, width: 1.2, style: 'yousi', alpha: 0.70 });
 
       // 【2. 发髻与双翅宝冠（10 笔）】
       addLine(1, '发髻·墨发外廓', [
@@ -1278,11 +1128,11 @@
 
       addLine(1, '发髻·鬓前碎发一笔', [
         [1021, 108], [1026, 122], [1030, 134]
-      ], { color: P.INK_LINE, width: 1.8, style: 'yousi' });
+      ], { color: P.INK_LINE, width: 1.85, style: 'yousi' });
 
       addLine(1, '宝冠·冠箍底带', [
         [922, 103], [968, 92], [1020, 82]
-      ], { color: P.INK_LINE, width: 2.5, style: 'tiexian' });
+      ], { color: P.INK_CINNABAR, width: 2.4, style: 'tiexian' });
 
       addLine(1, '宝冠·左顶朱钗柱', [
         [946, 94], [950, 62], [936, 36], [916, 22]
@@ -1302,20 +1152,20 @@
 
       addLine(1, '宝冠·左冠双翅上翼', [
         [942, 74], [914, 60], [886, 52], [910, 66], [938, 76]
-      ], { color: P.INK_LINE, width: 1.8, style: 'lanye' });
+      ], { color: P.INK_CINNABAR, width: 1.9, style: 'lanye' });
 
       addLine(1, '宝冠·左冠双翅下翼', [
         [938, 78], [914, 74], [892, 74], [916, 82], [938, 82]
-      ], { color: P.INK_LINE, width: 1.8, style: 'lanye' });
+      ], { color: P.INK_CINNABAR, width: 1.8, style: 'lanye' });
 
       addLine(1, '宝冠·右冠飞翅冠饰', [
         [994, 65], [974, 48], [958, 36], [986, 52], [1008, 56], [1024, 58], [1002, 70]
-      ], { color: P.INK_LINE, width: 1.8, style: 'lanye' });
+      ], { color: P.INK_CINNABAR, width: 1.9, style: 'lanye' });
 
       // 【3. 颈肩、项圈、躯干与双臂十指（22 笔）】
       addLine(1, '颈肩·前颈弧线', [
         [970, 226], [982, 244], [994, 250]
-      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.9, style: 'yousi' });
 
       addLine(1, '颈肩·后颈至右肩外廓', [
         [1031, 198], [1034, 224], [1048, 242], [1082, 248], [1100, 272]
@@ -1331,7 +1181,7 @@
 
       addLine(1, '项圈·中槽饰线', [
         [986, 241], [1015, 265], [1044, 246]
-      ], { color: P.INK_LINE, width: 1.4, style: 'yousi', alpha: 0.78 });
+      ], { color: P.INK_LINE, width: 1.5, style: 'yousi', alpha: 0.80 });
 
       addLine(1, '躯干·背部弧线至腰', [
         [1100, 272], [1102, 314], [1096, 356], [1086, 376]
@@ -1339,7 +1189,7 @@
 
       addLine(1, '躯干·胸肋收腰线', [
         [1004, 290], [1022, 326], [1034, 358]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
 
       addLine(1, '右臂·外臂过肘至腕（兰叶描）', [
         [1088, 258], [1088, 312], [1080, 360], [1044, 368], [986, 366]
@@ -1355,64 +1205,64 @@
 
       addLine(1, '右手·掌背与翘拇指', [
         [978, 358], [954, 344], [936, 328], [919, 314], [922, 332], [934, 346]
-      ], { color: P.INK_FACE, width: 1.85, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.9, style: 'yousi' });
 
       addLine(1, '右手·食指纤指', [
         [934, 346], [902, 348], [862, 348], [898, 356], [928, 358]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.75, style: 'yousi' });
 
       addLine(1, '右手·中指伸向琴弦', [
         [928, 358], [892, 360], [848, 356], [886, 368], [926, 368]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.75, style: 'yousi' });
 
       addLine(1, '右手·无名指微蜷', [
         [926, 368], [898, 378], [872, 374], [896, 386], [924, 384]
-      ], { color: P.INK_FACE, width: 1.6, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.65, style: 'yousi' });
 
       addLine(1, '右手·小指与下掌根', [
         [978, 378], [950, 396], [922, 398], [890, 394], [876, 388]
-      ], { color: P.INK_FACE, width: 1.75, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
 
       addLine(1, '左臂·前臂上缘', [
         [918, 362], [878, 334], [846, 310], [828, 308]
-      ], { color: P.INK_FACE, width: 1.9, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.95, style: 'yousi' });
 
       addLine(1, '左臂·前臂下缘', [
         [902, 376], [860, 352], [828, 336]
-      ], { color: P.INK_FACE, width: 1.85, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.9, style: 'yousi' });
 
       addLine(1, '左手·高翘拇指', [
         [828, 308], [818, 288], [804, 270], [814, 288], [820, 308]
-      ], { color: P.INK_FACE, width: 1.75, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
 
       addLine(1, '左手·食指拨弦手印', [
         [822, 312], [794, 324], [768, 324], [744, 326]
-      ], { color: P.INK_FACE, width: 1.75, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.8, style: 'yousi' });
 
       addLine(1, '左手·中指拈花指印', [
         [818, 322], [796, 334], [774, 344], [790, 348], [810, 334]
-      ], { color: P.INK_FACE, width: 1.65, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.7, style: 'yousi' });
 
       addLine(1, '左手·无名指勾线', [
         [822, 330], [802, 348], [782, 356], [796, 358]
-      ], { color: P.INK_FACE, width: 1.55, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.6, style: 'yousi' });
 
       addLine(1, '左手·小指与掌下廓', [
         [828, 336], [806, 358], [782, 366], [762, 362]
-      ], { color: P.INK_FACE, width: 1.65, style: 'yousi' });
+      ], { color: P.INK_FACE, width: 1.7, style: 'yousi' });
 
-      // 【4. 凤首弯弧箜篌（12 笔）】
+      // 【4. 凤首弯弧箜篌与琴轸七弦（14 笔）】
       addLine(1, '箜篌·弯弧共鸣箱外缘', [
         [758, 56], [816, 92], [886, 152], [952, 240], [1008, 324], [1052, 368]
-      ], { color: P.INK_LINE, width: 2.5, style: 'tiexian' });
+      ], { color: P.INK_LINE, width: 2.4, style: 'tiexian' });
 
       addLine(1, '箜篌·弯弧共鸣箱内缘', [
         [758, 56], [830, 66], [906, 114], [964, 198], [1014, 294], [1052, 368]
-      ], { color: P.INK_LINE, width: 2.5, style: 'tiexian' });
+      ], { color: P.INK_LINE, width: 2.4, style: 'tiexian' });
 
       addLine(1, '箜篌·琴背中脊棱线', [
         [776, 66], [848, 108], [924, 186], [986, 280], [1040, 358]
-      ], { color: P.INK_LINE, width: 1.6, style: 'tiexian', alpha: 0.78 });
+      ], { color: P.INK_LINE, width: 1.65, style: 'tiexian', alpha: 0.80 });
 
       addLine(1, '箜篌·下横杆上缘', [
         [1052, 366], [948, 408], [820, 460], [716, 502]
@@ -1422,15 +1272,19 @@
         [1056, 378], [954, 422], [826, 474], [722, 514], [716, 502]
       ], { color: P.INK_LINE, width: 2.2, style: 'tiexian' });
 
-      addLine(1, '箜篌·第一弦', [[776, 86], [754, 490]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第二弦', [[818, 96], [796, 474]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第三弦', [[854, 124], [834, 456]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第四弦', [[888, 160], [868, 442]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第五弦', [[922, 202], [904, 428]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第六弦', [[954, 248], [938, 414]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
-      addLine(1, '箜篌·第七弦', [[986, 296], [970, 400]], { color: P.INK_LINE, width: 1.35, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·杆端外琴轸一', [[728, 508], [722, 526]], { color: P.INK_LINE, width: 1.8, style: 'dingtou', samples: 4 });
+      addLine(1, '箜篌·杆端外琴轸二', [[746, 500], [740, 518]], { color: P.INK_LINE, width: 1.75, style: 'dingtou', samples: 4 });
+      addLine(1, '箜篌·杆端内琴轸三', [[786, 484], [780, 502]], { color: P.INK_LINE, width: 1.7, style: 'dingtou', samples: 4 });
 
-      // 【5. 石绿长裙与朱砂腰带（18 笔：外廓4 + 兰叶衣纹8 + 朱带6）】
+      addLine(1, '箜篌·第一弦', [[776, 86], [754, 490]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第二弦', [[818, 96], [796, 474]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第三弦', [[854, 124], [834, 456]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第四弦', [[888, 160], [868, 442]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第五弦', [[922, 202], [904, 428]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第六弦', [[954, 248], [938, 414]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+      addLine(1, '箜篌·第七弦', [[986, 296], [970, 400]], { color: P.INK_LINE, width: 1.45, style: 'tiexian', alpha: 0.85, samples: 6 });
+
+      // 【5. 石绿长裙与朱砂腰带裙裾（19 笔：外廓4 + 兰叶衣纹8 + 朱带垂绦7）】
       addLine(1, '长裙·束腰与后结', [
         [1074, 376], [1098, 358], [1124, 350], [1142, 368]
       ], { color: P.INK_LINE, width: 2.3, style: 'tiexian' });
@@ -1492,9 +1346,13 @@
         [1036, 408], [944, 482], [860, 548], [730, 590], [608, 608]
       ], { color: P.INK_CINNABAR, width: 2.3, style: 'xingyun' });
 
-      addLine(1, '朱砂飘裙·腹前盘旋副带', [
-        [996, 410], [928, 468], [866, 508], [818, 492], [810, 464]
+      addLine(1, '朱砂飘裙·腹前双回垂绦', [
+        [996, 410], [928, 468], [866, 508], [834, 488], [848, 448], [910, 422]
       ], { color: P.INK_CINNABAR, width: 2.0, style: 'yousi' });
+
+      addLine(1, '朱砂飘裙·琴杆下副回纹', [
+        [962, 412], [906, 452], [858, 476], [852, 446]
+      ], { color: P.INK_LINE, width: 1.65, style: 'yousi', alpha: 0.85 });
 
       addLine(1, '朱砂腰尾·右甩短带', [
         [1120, 376], [1160, 396], [1182, 446]
@@ -1504,7 +1362,7 @@
         [1256, 508], [1180, 546], [1110, 610], [1048, 688]
       ], { color: P.INK_LINE, width: 2.5, style: 'lanye' });
 
-      // 【6. 四组孔雀石青天衣飘带（13 笔：行云流水长线，两笔拉出一条飘带）】
+      // 【6. 四组孔雀石青天衣飘带（12 笔：行云流水长线）】
       addLine(1, '飘带一·高天舒卷上缘', [
         [526, 16], [666, 58], [826, 36], [926, 22], [976, 52], [1028, 108]
       ], { color: P.INK_LINE, width: 2.5, style: 'xingyun' });
@@ -1556,22 +1414,22 @@
         [1268, 672], [1182, 680], [1110, 702], [1186, 702], [1268, 700]
       ], { color: P.INK_LINE, width: 2.1, style: 'xingyun' });
 
-      // 【7. 左侧三瓣宝相莲华与流云蔓草（17 笔）】
+      // 【7. 左侧三瓣宝相莲华与第 285 窟标志性“3”字流云卷草（19 笔）】
       addLine(1, '宝相花·金蕊圆心', [
         [286, 446], [296, 428], [318, 428], [326, 446], [316, 464], [294, 464]
-      ], { color: P.INK_LINE, width: 2.0, style: 'tiexian', closed: true });
+      ], { color: P.INK_LINE, width: 2.1, style: 'tiexian', closed: true });
 
       addLine(1, '宝相花·左上石绿花瓣', [
         [288, 434], [254, 404], [244, 426], [268, 450]
-      ], { color: P.INK_LINE, width: 1.9, style: 'lanye' });
+      ], { color: P.INK_LINE, width: 2.0, style: 'lanye' });
 
       addLine(1, '宝相花·右上石绿花瓣', [
         [314, 428], [344, 396], [368, 418], [352, 448], [324, 452]
-      ], { color: P.INK_LINE, width: 1.9, style: 'lanye' });
+      ], { color: P.INK_LINE, width: 2.0, style: 'lanye' });
 
       addLine(1, '宝相花·下叶石绿花瓣', [
         [292, 462], [298, 496], [328, 488], [334, 462]
-      ], { color: P.INK_LINE, width: 1.9, style: 'lanye' });
+      ], { color: P.INK_LINE, width: 2.0, style: 'lanye' });
 
       addLine(1, '宝相花·左上黛珠外晕弧（朱砂）', [
         [274, 370], [220, 344], [168, 384], [174, 446], [224, 482]
@@ -1585,54 +1443,62 @@
         [224, 496], [224, 548], [268, 578], [336, 560]
       ], { color: P.INK_CINNABAR, width: 2.4, style: 'xingyun' });
 
-      // 流云蔓茎长线（10 笔流畅朱砂卷草与云气）
-      addLine(1, '流云·左上卷藤（行云流水）', [
-        [30, 178], [160, 166], [290, 134], [380, 92], [354, 40], [312, 36]
-      ], { color: P.INK_CINNABAR, width: 2.0, style: 'xingyun' });
-
-      addLine(1, '流云·上方折枝涡云', [
-        [436, 138], [526, 118], [560, 88], [516, 70]
-      ], { color: P.INK_CINNABAR, width: 1.9, style: 'xingyun' });
-
-      addLine(1, '流云·中左飞白涡纹一', [
-        [52, 304], [148, 302], [170, 274], [134, 260]
-      ], { color: P.INK_CINNABAR, width: 1.85, style: 'xingyun' });
-
-      addLine(1, '流云·中左连云藤二', [
-        [228, 316], [326, 294], [412, 262], [428, 228], [372, 224]
-      ], { color: P.INK_CINNABAR, width: 2.0, style: 'xingyun' });
-
-      addLine(1, '流云·宝相右翼扶摇云三', [
-        [454, 488], [546, 434], [612, 374], [642, 312], [608, 294]
-      ], { color: P.INK_CINNABAR, width: 2.0, style: 'xingyun' });
-
-      addLine(1, '流云·下左长舒蔓四', [
-        [50, 622], [186, 608], [320, 582], [462, 520], [490, 476], [442, 466]
+      // 285 窟典型“3”字型朱砂卷云蔓茎（12 笔）
+      addLine(1, '流云·左上长蔓双钩“3”字云', [
+        [32, 178], [160, 166], [290, 134], [346, 98], [324, 82], [358, 56], [324, 36]
       ], { color: P.INK_CINNABAR, width: 2.1, style: 'xingyun' });
 
-      addLine(1, '流云·裙前涡云五', [
-        [412, 610], [522, 578], [566, 540], [512, 524]
+      addLine(1, '流云·上中折枝卷云', [
+        [384, 152], [498, 128], [562, 92], [516, 66]
+      ], { color: P.INK_CINNABAR, width: 2.0, style: 'xingyun' });
+
+      addLine(1, '流云·中左飞白“3”字卷蔓', [
+        [52, 304], [136, 302], [170, 278], [130, 266], [162, 248], [120, 246]
       ], { color: P.INK_CINNABAR, width: 1.9, style: 'xingyun' });
 
-      addLine(1, '流云·裙尾左下长线六', [
+      addLine(1, '流云·中段双勾“3”字主茎', [
+        [228, 316], [326, 294], [412, 262], [384, 248], [428, 228], [372, 224]
+      ], { color: P.INK_CINNABAR, width: 2.1, style: 'xingyun' });
+
+      addLine(1, '流云·中央回风竖向“3”字云纹', [
+        [586, 248], [626, 258], [602, 282], [634, 302], [602, 326]
+      ], { color: P.INK_CINNABAR, width: 1.95, style: 'xingyun' });
+
+      addLine(1, '流云·宝相右翼扶摇长蔓', [
+        [454, 488], [546, 434], [612, 374], [642, 312], [608, 294]
+      ], { color: P.INK_CINNABAR, width: 2.1, style: 'xingyun' });
+
+      addLine(1, '流云·下左长舒蔓双卷', [
+        [50, 622], [186, 608], [320, 582], [442, 536], [422, 514], [472, 488], [434, 466]
+      ], { color: P.INK_CINNABAR, width: 2.1, style: 'xingyun' });
+
+      addLine(1, '流云·裙前涡云', [
+        [412, 610], [522, 578], [566, 540], [512, 524]
+      ], { color: P.INK_CINNABAR, width: 2.0, style: 'xingyun' });
+
+      addLine(1, '流云·裙尾左下长卷', [
         [140, 686], [286, 668], [362, 650], [336, 636]
+      ], { color: P.INK_CINNABAR, width: 1.9, style: 'xingyun' });
+
+      addLine(1, '流云·底左三叶云卷茎', [
+        [176, 774], [250, 744], [228, 728]
       ], { color: P.INK_CINNABAR, width: 1.85, style: 'xingyun' });
 
-      addLine(1, '流云·底边旋涡云七', [
-        [360, 770], [442, 746], [516, 758]
-      ], { color: P.INK_CINNABAR, width: 1.8, style: 'xingyun' });
+      addLine(1, '流云·底中旋涡云茎', [
+        [360, 770], [442, 746], [516, 758], [586, 738]
+      ], { color: P.INK_CINNABAR, width: 1.85, style: 'xingyun' });
 
-      addLine(1, '流云·右下随裙涡云八', [
+      addLine(1, '流云·右下随裙涡云', [
         [720, 774], [790, 750], [872, 756], [1006, 748]
-      ], { color: P.INK_CINNABAR, width: 1.85, style: 'xingyun' });
+      ], { color: P.INK_CINNABAR, width: 1.9, style: 'xingyun' });
 
       // -----------------------------------------------------------------------
-      // 第二层：平涂设色（约 30 笔 · 高饱和不退色矿彩，multiply 透显墨线）
+      // 第二层：水墨羊毫设色（38 笔 · 全数采用软边点染与渐退水色，无硬剪裁框）
       // -----------------------------------------------------------------------
-      addFill(2, '设色·天衣飘带一（饱和石青）', [
+      addFill(2, '设色·天衣飘带一（孔雀石青）', [
         [526, 16], [666, 58], [826, 36], [926, 22], [976, 52], [1028, 108],
         [928, 86], [868, 128], [792, 152], [686, 138], [588, 92]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.90, blend: 'multiply', feather: 1.4 });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', dabRadius: 16 });
 
       addFill(2, '设色·天衣飘带二（横空孔雀石青）', [
         [12, 232], [220, 190], [450, 174], [586, 176], [670, 206], [724, 272],
@@ -1640,214 +1506,222 @@
         [970, 376], [945, 384], [865, 416], [785, 444], [720, 462], [656, 458],
         [640, 414], [680, 354], [690, 286], [646, 222], [574, 214],
         [504, 296], [504, 236], [456, 294], [468, 232], [428, 218], [224, 226], [12, 260]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.90, blend: 'multiply', feather: 1.4, samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', dabRadius: 14, samples: 8 });
 
       addFill(2, '设色·天衣飘带三（胸前风旗石青）', [
         [640, 134], [760, 198], [898, 280], [992, 344], [966, 354],
         [834, 286], [712, 206]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.90, blend: 'multiply', feather: 1.4 });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', dabRadius: 13 });
 
       addFill(2, '设色·天衣风舌（石青）', [
         [698, 196], [790, 192], [876, 226], [954, 284], [852, 248], [768, 224]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', feather: 1.4 });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.86, blend: 'multiply', dabRadius: 12 });
 
-      addFill(2, '设色·发后与右旋大飘带（石青）', [
-        [1040, 128], [1072, 180], [1106, 128], [1132, 64], [1174, 20],
-        [1156, 18], [1114, 54], [1096, 130]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', feather: 1.4 });
+      addFill(2, '设色·发后与右旋上带（石青）', [
+        [1040, 128], [1072, 180], [1110, 128], [1142, 64], [1180, 20],
+        [1152, 18], [1108, 56], [1088, 128]
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', dabRadius: 8 });
 
       addFill(2, '设色·右旋 S 飘带（孔雀石青）', [
         [1154, 82], [1116, 128], [1142, 174], [1228, 160], [1268, 220],
         [1234, 294], [1156, 326], [1092, 314], [1092, 282], [1148, 288],
         [1222, 268], [1268, 202], [1246, 140], [1170, 152], [1146, 126], [1180, 94]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.90, blend: 'multiply', feather: 1.4 });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', dabRadius: 12 });
 
       addFill(2, '设色·右下角蓝带', [
         [1268, 672], [1182, 680], [1110, 702], [1186, 702], [1268, 700]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply' });
+      ], { color: P.LAPIS_BRIGHT, alpha: 0.84, blend: 'multiply', dabRadius: 10 });
 
-      // 肌肤设色（脸、颈胸躯干、右臂与双手用暖粉底色温和盖住背面琴弦交界）
+      // 肌肤设色：脸部用温和 multiply 以保留开脸游丝细线；臂与手用软边 source-over 遮住琴弦交界
       addFill(2, '设色·脸颊温润玉肌平涂', [
-        [932, 105], [966, 98], [1004, 102], [1030, 130], [1032, 162],
+        [934, 106], [966, 98], [1004, 102], [1030, 130], [1032, 162],
         [1029, 194], [1014, 216], [990, 224], [968, 227], [954, 212],
         [944, 180], [938, 152], [935, 134]
-      ], { color: P.SKIN_LIGHT, alpha: 0.86, blend: 'source-over' });
+      ], { color: P.SKIN_LIGHT, alpha: 0.68, blend: 'multiply', dabRadius: 12 });
 
       addFill(2, '设色·颈胸躯干与右臂润色', [
         [970, 226], [1031, 198], [1048, 242], [1094, 256], [1102, 314],
         [1096, 356], [1086, 376], [1044, 368], [986, 366], [986, 354],
         [1034, 352], [1058, 336], [1060, 286], [1034, 358], [1004, 290], [994, 250]
-      ], { color: P.SKIN_LIGHT, alpha: 0.88, blend: 'source-over' });
+      ], { color: P.SKIN_LIGHT, alpha: 0.88, blend: 'source-over', dabRadius: 12 });
 
       addFill(2, '设色·右手抚琴掌指肤色', [
         [978, 358], [954, 344], [919, 314], [922, 332], [862, 348],
         [848, 356], [872, 374], [876, 388], [922, 398], [950, 396], [978, 378]
-      ], { color: P.SKIN_LIGHT, alpha: 0.96, blend: 'source-over', samples: 8 });
+      ], { color: P.SKIN_LIGHT, alpha: 0.94, blend: 'source-over', dabRadius: 8, samples: 8 });
 
       addFill(2, '设色·左臂与左手玉腕肤色', [
         [918, 362], [846, 310], [804, 270], [818, 308], [744, 326],
         [774, 344], [762, 362], [828, 336], [902, 376]
-      ], { color: P.SKIN_LIGHT, alpha: 0.96, blend: 'source-over', samples: 8 });
+      ], { color: P.SKIN_LIGHT, alpha: 0.94, blend: 'source-over', dabRadius: 8, samples: 8 });
 
       // 发髻、冠饰、项圈与腕钏
       addFill(2, '设色·乌墨高髻', [
         [928, 102], [956, 86], [1002, 76], [1034, 92], [1045, 118],
         [1034, 140], [1029, 126], [1022, 112], [1004, 102], [966, 98]
-      ], { color: P.HAIR_INK, alpha: 0.92, blend: 'multiply' });
+      ], { color: P.HAIR_INK, alpha: 0.90, blend: 'multiply', dabRadius: 10 });
 
-      addFill(2, '设色·双翠结与飞翅冠饰', [
+      addFill(2, '设色·左冠翠结与朱翅', [
         [886, 52], [938, 74], [948, 68], [956, 78], [938, 84], [892, 74]
-      ], { color: P.CROWN_GREEN, alpha: 0.86, blend: 'multiply' });
+      ], { color: P.CROWN_RUSSET, color2: P.CROWN_GREEN, alpha: 0.88, blend: 'multiply', dabRadius: 4.5 });
 
-      addFill(2, '设色·右翠结与冠翅', [
+      addFill(2, '设色·右冠翠结与朱翅', [
         [958, 36], [988, 56], [1008, 56], [1024, 58], [1002, 72], [988, 68]
-      ], { color: P.CROWN_GREEN, alpha: 0.86, blend: 'multiply' });
+      ], { color: P.CROWN_RUSSET, color2: P.CROWN_GREEN, alpha: 0.88, blend: 'multiply', dabRadius: 4.5 });
 
-      addFill(2, '设色·宝项圈与金腕钏（暖金）', [
+      addFill(2, '设色·宝项圈暖金', [
         [982, 246], [1014, 272], [1050, 252], [1046, 212], [1037, 214],
         [1042, 240], [1016, 258], [988, 236]
-      ], { color: P.GOLD_OCHRE, alpha: 0.92, blend: 'multiply' });
+      ], { color: P.GOLD_OCHRE, alpha: 0.92, blend: 'source-over', dabRadius: 8 });
 
       addFill(2, '设色·腕钏点金', [
         [985, 353], [990, 368], [982, 380], [974, 366]
-      ], { color: P.GOLD_BRIGHT, alpha: 0.90, blend: 'multiply' });
+      ], { color: P.GOLD_BRIGHT, alpha: 0.92, blend: 'source-over', dabRadius: 6 });
 
-      // 箜篌暖金琴身（位于天衣飘带前方，使用 source-over 保持纯净金赭不泛绿）
+      // 箜篌暖金琴身（source-over 保持纯净金赭，处于蓝飘带前方）
       addFill(2, '设色·箜篌弯弧琴箱（暖金赭）', [
         [758, 56], [830, 66], [906, 114], [964, 198], [1014, 294], [1052, 368],
         [1008, 324], [952, 240], [886, 152], [816, 92]
-      ], { color: '#dca44a', alpha: 0.95, blend: 'source-over' });
+      ], { color: P.GOLD_OCHRE, alpha: 0.94, blend: 'source-over', dabRadius: 11 });
 
       addFill(2, '设色·箜篌下横杆', [
         [1052, 366], [948, 408], [820, 460], [716, 502],
         [722, 514], [826, 474], [954, 422], [1056, 378]
-      ], { color: '#dca44a', alpha: 0.94, blend: 'source-over' });
+      ], { color: P.GOLD_OCHRE, alpha: 0.94, blend: 'source-over', dabRadius: 8 });
 
-      // 石绿长裙与朱砂飘带
-      addFill(2, '设色·石绿飞舞长裙（饱和盛彩）', [
+      // 石绿长裙与腰臀暖赭过渡
+      addFill(2, '设色·石绿飞舞长裙（古雅矿绿）', [
         [1076, 384], [1136, 372], [1174, 418], [1186, 488], [1166, 560],
         [1108, 632], [1014, 704], [946, 742], [912, 720], [740, 724],
         [520, 720], [280, 714], [120, 708], [280, 704], [552, 688],
         [528, 670], [704, 634], [678, 616], [842, 578], [818, 562],
         [928, 536], [982, 490]
-      ], { color: P.MALACHITE, alpha: 0.86, blend: 'multiply', samples: 8 });
+      ], { color: P.MALACHITE, alpha: 0.86, blend: 'multiply', dabRadius: 18, samples: 8 });
 
       addFill(2, '设色·朱砂上飘裙带', [
         [1068, 388], [964, 444], [870, 502], [776, 540], [678, 556],
         [782, 550], [876, 514], [970, 456], [1068, 396]
-      ], { color: P.VERMILION, alpha: 0.88, blend: 'multiply' });
+      ], { color: P.VERMILION, alpha: 0.84, blend: 'multiply', dabRadius: 9 });
 
       addFill(2, '设色·朱砂冠带', [
         [922, 100], [968, 90], [1020, 80], [1020, 86], [968, 96], [922, 106]
-      ], { color: P.VERMILION, alpha: 0.90, blend: 'multiply' });
+      ], { color: P.VERMILION, alpha: 0.88, blend: 'multiply', dabRadius: 6 });
 
       addFill(2, '设色·右脚风带墨绿', [
         [1256, 508], [1180, 546], [1110, 610], [1048, 688],
         [1128, 628], [1196, 566], [1260, 530]
-      ], { color: P.MALACHITE_DEEP, alpha: 0.85, blend: 'multiply' });
+      ], { color: P.MALACHITE_DEEP, alpha: 0.84, blend: 'multiply', dabRadius: 10 });
 
-      // 左侧三瓣宝相花平涂（三绿瓣 + 亮金蕊 + 三黛墨珠）
+      // 左侧三瓣宝相花平涂（三绿瓣 + 亮金蕊 + 三团湿润水墨黛珠）
       addFill(2, '设色·宝相花石绿内瓣', [
         [288, 434], [254, 404], [244, 426], [268, 450], [292, 462],
         [298, 496], [328, 488], [334, 462], [352, 448], [368, 418],
         [344, 396], [314, 428]
-      ], { color: P.MALACHITE, alpha: 0.88, blend: 'multiply' });
+      ], { color: P.MALACHITE, alpha: 0.86, blend: 'multiply', dabRadius: 9 });
 
-      addDot(2, '设色·宝相花金蕊', 306, 446, 20, { ry: 18, color: P.GOLD_BRIGHT, alpha: 0.94, blend: 'source-over' });
+      addDot(2, '设色·宝相花金蕊', 306, 446, 20, { ry: 18, color: P.GOLD_BRIGHT, alpha: 0.92, blend: 'source-over' });
 
-      addDot(2, '设色·宝相左上黛墨宝珠', 226, 384, 34, { ry: 32, color: P.ROSETTE_INK, alpha: 0.86, blend: 'multiply' });
-      addDot(2, '设色·宝相右上黛墨宝珠', 390, 372, 34, { ry: 32, color: P.ROSETTE_INK, alpha: 0.86, blend: 'multiply' });
-      addDot(2, '设色·宝相底叶黛墨宝珠', 268, 524, 30, { ry: 28, color: P.ROSETTE_INK, alpha: 0.84, blend: 'multiply' });
+      addInkBoss(2, '设色·宝相左上湿墨黛珠', 226, 384, 34);
+      addInkBoss(2, '设色·宝相右上湿墨黛珠', 390, 372, 34);
+      addInkBoss(2, '设色·宝相底叶湿墨黛珠', 268, 524, 30);
 
-      // 周围散落流云石青三叶朵（含底缘三组，造型规整清晰）
-      addFill(2, '设色·左上三叶云瓣', [
+      // 散落流云三叶朵（蒂头石青、拖尾渐淡入纸，接近第 285 窟原画笔致）
+      addFill(2, '设色·左上三叶云瓣（蒂重尾淡）', [
         [168, 54], [202, 56], [206, 72], [176, 84], [204, 92], [202, 108],
         [174, 114], [194, 126], [178, 144], [108, 166], [140, 122], [148, 78]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.90, blend: 'multiply', dabRadius: 11, axisAngle: 2.35, samples: 8 });
 
       addFill(2, '设色·顶部三叶云瓣', [
         [394, 4], [434, 6], [430, 24], [404, 34], [420, 46], [404, 66],
         [374, 96], [332, 122], [356, 72], [364, 28]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.90, blend: 'multiply', dabRadius: 11, axisAngle: 2.30, samples: 8 });
 
       addFill(2, '设色·中左蓝云芽', [
         [222, 260], [268, 248], [284, 268], [250, 300], [186, 314], [220, 286]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply' });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.88, blend: 'multiply', dabRadius: 9, axisAngle: 2.55 });
 
       addFill(2, '设色·宝相右双叶石青云', [
         [530, 316], [568, 312], [584, 330], [562, 352], [582, 366], [570, 394],
         [516, 444], [534, 376]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.90, blend: 'multiply', dabRadius: 11, axisAngle: 2.25, samples: 8 });
 
       addFill(2, '设色·宝相右下三叶云瓣', [
         [550, 472], [588, 476], [596, 496], [572, 508], [590, 524], [574, 548],
         [504, 586], [536, 524]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.90, blend: 'multiply', dabRadius: 11, axisAngle: 2.30, samples: 8 });
 
       addFill(2, '设色·左下三叶流云瓣', [
         [44, 560], [88, 546], [96, 564], [72, 576], [94, 588], [84, 610],
         [24, 628], [46, 594]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.88, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.90, blend: 'multiply', dabRadius: 10, axisAngle: 2.45, samples: 8 });
+
+      addFill(2, '设色·左下伏云瓣', [
+        [278, 666], [336, 650], [352, 668], [322, 694], [238, 704], [286, 682]
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, fadeTail: true, alpha: 0.86, blend: 'multiply', dabRadius: 9, axisAngle: 2.60 });
 
       addFill(2, '设色·底缘石青三叶云一', [
         [232, 798], [272, 748], [298, 728], [326, 738], [308, 756], [332, 764], [322, 798]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.86, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, alpha: 0.88, blend: 'multiply', dabRadius: 10, samples: 8 });
 
       addFill(2, '设色·底缘石青三叶云二', [
         [606, 798], [648, 748], [674, 728], [704, 738], [684, 756], [710, 766], [696, 798]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.86, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, alpha: 0.88, blend: 'multiply', dabRadius: 10, samples: 8 });
 
       addFill(2, '设色·底缘石青三叶云三', [
         [988, 798], [1028, 738], [1054, 714], [1084, 726], [1062, 748], [1088, 758], [1072, 798]
-      ], { color: P.LAPIS_BRIGHT, alpha: 0.86, blend: 'multiply', samples: 8 });
+      ], { color: P.LAPIS_BRIGHT, color2: P.LAPIS_PALE, alpha: 0.88, blend: 'multiply', dabRadius: 10, samples: 8 });
 
       // -----------------------------------------------------------------------
-      // 第三层：凹凸分染（约 19 笔 · 西域晕染法与矿彩浓淡渐变）
+      // 第三层：西域凹凸法水墨退晕与暖赭石绿分染（17 笔）
       // -----------------------------------------------------------------------
-      addWash(3, '分染·飞天面颊桃花红晕', 956, 178, 15, 11, { color: P.SKIN_BLUSH, alpha: 0.22, rot: -0.2 });
-      addWash(3, '分染·眉眼鼻翼淡赭凹凸', 974, 148, 26, 20, { color: P.SKIN_SHADE, alpha: 0.24 });
+      addWash(3, '分染·飞天面颊桃花红晕', 956, 178, 15, 11, { color: P.SKIN_BLUSH, alpha: 0.24, rot: -0.2 });
+      addWash(3, '分染·眉眼鼻翼淡赭凹凸', 974, 148, 25, 19, { color: P.SKIN_SHADE, alpha: 0.24 });
       addWash(3, '分染·颈窝项圈阴影晕染', 1006, 242, 34, 18, { color: P.SKIN_SHADE, alpha: 0.28, rot: 0.2 });
-      addWash(3, '分染·右臂内外肌肉立体晕', 1076, 326, 26, 54, { color: P.SKIN_SHADE, alpha: 0.26, rot: 0.1 });
+      addWash(3, '分染·右臂内外肌肉立体晕', 1076, 326, 24, 52, { color: P.SKIN_SHADE, alpha: 0.26, rot: 0.1 });
 
       addShade(3, '分染·箜篌琴身暗面渐变', [
         [770, 62], [834, 102], [910, 176], [978, 272], [1038, 356]
-      ], { color: P.VERMILION_DEEP, width: 22, alpha: 0.28 });
+      ], { color: P.VERMILION_DEEP, width: 20, alpha: 0.28 });
 
-      addShade(3, '分染·石绿长裙臀腰深色压暗', [
-        [1132, 386], [1166, 466], [1124, 576], [1018, 678], [944, 728]
-      ], { color: P.MALACHITE_DEEP, width: 54, alpha: 0.42 });
+      addShade(3, '分染·长裙腰臀暖赭红彩（还原285窟配色）', [
+        [1146, 386], [1174, 466], [1140, 566], [1036, 668], [948, 732]
+      ], { color: P.OCHRE_TERRACOTTA, width: 42, alpha: 0.42 });
 
-      addShade(3, '分染·长裙衣纹褶皱暗部一', [
+      addShade(3, '分染·石绿长裙深绿压暗一', [
+        [1114, 396], [1082, 488], [1018, 578], [906, 650], [720, 686]
+      ], { color: P.MALACHITE_DEEP, width: 34, alpha: 0.36 });
+
+      addShade(3, '分染·长裙衣纹褶皱暗部二', [
         [1092, 396], [1048, 488], [978, 566], [852, 626], [640, 680]
-      ], { color: P.MALACHITE_DEEP, width: 26, alpha: 0.34 });
+      ], { color: P.MALACHITE_DEEP, width: 24, alpha: 0.34 });
 
       addShade(3, '分染·长裙摆尾部重石绿晕染', [
         [860, 646], [660, 690], [420, 708], [180, 710]
-      ], { color: P.MALACHITE_DEEP, width: 30, alpha: 0.36 });
+      ], { color: P.MALACHITE_DEEP, width: 28, alpha: 0.34 });
 
       addShade(3, '分染·飘带一兜风深青阴影', [
         [564, 52], [690, 96], [826, 86], [944, 62]
-      ], { color: P.LAPIS_DEEP, width: 32, alpha: 0.38 });
+      ], { color: P.LAPIS_DEEP, width: 30, alpha: 0.36 });
 
       addShade(3, '分染·飘带二长弧深石青晕', [
         [36, 246], [240, 206], [460, 194], [610, 198], [708, 286], [706, 348], [662, 414], [684, 444], [768, 434], [898, 392]
-      ], { color: P.LAPIS_DEEP, width: 22, alpha: 0.34 });
+      ], { color: P.LAPIS_DEEP, width: 20, alpha: 0.32 });
 
       addShade(3, '分染·飘带三胸前风旗深青', [
         [670, 166], [768, 224], [886, 294], [974, 346]
-      ], { color: P.LAPIS_DEEP, width: 24, alpha: 0.34 });
+      ], { color: P.LAPIS_DEEP, width: 22, alpha: 0.32 });
 
       addShade(3, '分染·右旋大 S 飘带明暗退晕', [
         [1146, 108], [1132, 152], [1234, 154], [1252, 232], [1192, 296], [1104, 298]
-      ], { color: P.LAPIS_DEEP, width: 24, alpha: 0.34 });
+      ], { color: P.LAPIS_DEEP, width: 22, alpha: 0.32 });
 
-      addWash(3, '分染·宝相花三瓣重彩凹凸晕', 310, 444, 46, 42, { color: P.MALACHITE_DEEP, alpha: 0.28 });
-      addWash(3, '分染·左上流云蒂头深青', 180, 92, 30, 26, { color: P.LAPIS_DEEP, alpha: 0.30 });
-      addWash(3, '分染·中右流云蒂头深青', 562, 356, 30, 34, { color: P.LAPIS_DEEP, alpha: 0.30 });
-      addWash(3, '分染·下右流云蒂头深青', 566, 514, 28, 32, { color: P.LAPIS_DEEP, alpha: 0.30 });
+      addWash(3, '分染·宝相花三瓣重彩凹凸晕', 310, 444, 44, 40, { color: P.MALACHITE_DEEP, alpha: 0.26 });
+      addWash(3, '分染·左上流云蒂头深青', 180, 92, 28, 24, { color: P.LAPIS_DEEP, alpha: 0.28 });
+      addWash(3, '分染·中右流云蒂头深青', 562, 356, 28, 32, { color: P.LAPIS_DEEP, alpha: 0.28 });
+      addWash(3, '分染·下右流云蒂头深青', 566, 514, 26, 30, { color: P.LAPIS_DEEP, alpha: 0.28 });
 
       // -----------------------------------------------------------------------
-      // 第四层：开脸点睛与关键复勾（约 20 笔 · source-over 提振精神）
+      // 第四层：开脸点睛与关键复勾（22 笔 · 焦墨淡墨水墨提神）
       // -----------------------------------------------------------------------
       addLine(4, '复勾·开脸右眉重提', [
         [937, 136], [947, 131], [957, 132]
@@ -1874,39 +1748,51 @@
 
       addLine(4, '复勾·下颌与耳轮定神', [
         [956, 214], [968, 227], [992, 224], [1016, 214]
-      ], { color: P.INK_FACE, width: 1.85, style: 'yousi', alpha: 0.88 });
+      ], { color: P.INK_FACE, width: 1.9, style: 'yousi', alpha: 0.88 });
 
       addLine(4, '复勾·项圈金弧重勒', [
         [982, 246], [1014, 272], [1050, 252]
       ], { color: P.INK_DARK, width: 2.3, style: 'tiexian', alpha: 0.88 });
 
-      addLine(4, '复勾·右手拇食中三指', [
-        [978, 358], [936, 328], [920, 315], [934, 346], [862, 348], [848, 356], [890, 366]
-      ], { color: P.INK_FACE, width: 1.75, style: 'yousi', alpha: 0.90, samples: 10 });
+      addLine(4, '复勾·右手拇指与食指', [
+        [978, 358], [954, 344], [936, 328], [919, 314], [922, 332], [934, 346], [902, 348], [862, 348]
+      ], { color: P.INK_LINE, width: 1.85, style: 'yousi', alpha: 0.94, samples: 10 });
+
+      addLine(4, '复勾·右手中指与无名指', [
+        [928, 358], [892, 360], [848, 356], [886, 368], [926, 368], [898, 378], [872, 374]
+      ], { color: P.INK_LINE, width: 1.80, style: 'yousi', alpha: 0.92, samples: 10 });
 
       addLine(4, '复勾·右手小指与掌根', [
         [978, 378], [950, 396], [922, 398], [890, 394], [876, 388]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi', alpha: 0.88 });
+      ], { color: P.INK_LINE, width: 1.80, style: 'yousi', alpha: 0.92 });
 
-      addLine(4, '复勾·左手兰花拨弦指', [
-        [828, 308], [804, 270], [820, 308], [744, 326]
-      ], { color: P.INK_FACE, width: 1.75, style: 'yousi', alpha: 0.90 });
+      addLine(4, '复勾·左手拇指与食指', [
+        [828, 308], [804, 270], [820, 308], [786, 324], [744, 326]
+      ], { color: P.INK_LINE, width: 1.85, style: 'yousi', alpha: 0.94 });
+
+      addLine(4, '复勾·左手中指拈花指印', [
+        [818, 322], [796, 334], [774, 344], [790, 348], [810, 334]
+      ], { color: P.INK_LINE, width: 1.75, style: 'yousi', alpha: 0.92 });
 
       addLine(4, '复勾·左手掌下缘', [
         [828, 336], [806, 358], [782, 366], [762, 362]
-      ], { color: P.INK_FACE, width: 1.7, style: 'yousi', alpha: 0.88 });
+      ], { color: P.INK_LINE, width: 1.80, style: 'yousi', alpha: 0.92 });
 
       addLine(4, '复勾·箜篌弯弧外缘', [
         [758, 56], [816, 92], [886, 152], [952, 240], [1008, 324], [1052, 368]
-      ], { color: P.INK_DARK, width: 2.5, style: 'tiexian', alpha: 0.88 });
+      ], { color: P.INK_DARK, width: 2.4, style: 'tiexian', alpha: 0.88 });
 
-      addLine(4, '复勾·箜篌弯弧内缘与中脊', [
+      addLine(4, '复勾·箜篌弯弧内缘', [
         [758, 56], [830, 66], [906, 114], [964, 198], [1014, 294], [1052, 368]
-      ], { color: P.INK_DARK, width: 2.5, style: 'tiexian', alpha: 0.88 });
+      ], { color: P.INK_DARK, width: 2.4, style: 'tiexian', alpha: 0.88 });
 
       addLine(4, '复勾·箜篌琴背中脊棱线', [
         [776, 66], [848, 108], [924, 186], [986, 280], [1040, 358]
-      ], { color: P.INK_LINE, width: 1.6, style: 'tiexian', alpha: 0.80 });
+      ], { color: P.INK_LINE, width: 1.65, style: 'tiexian', alpha: 0.82 });
+
+      addLine(4, '复勾·箜篌下横杆', [
+        [1052, 366], [948, 408], [820, 460], [716, 502]
+      ], { color: P.INK_DARK, width: 2.0, style: 'tiexian', alpha: 0.85 });
 
       addLine(4, '复勾·横空青带主轮廓顿挫', [
         [12, 232], [220, 190], [450, 174], [586, 176], [670, 206], [724, 272], [726, 344], [686, 414]
@@ -1929,7 +1815,7 @@
       ], { color: P.INK_DARK, width: 2.1, style: 'tiexian', closed: true, alpha: 0.88 });
 
       // -----------------------------------------------------------------------
-      // 第五层：敦煌三白提亮与泥金描点（约 16 笔 · 盛唐点睛焕彩）
+      // 第五层：敦煌三白提亮与泥金描点（16 笔）
       // -----------------------------------------------------------------------
       addWash(5, '提白·敦煌面部“三白”之额白', 964, 118, 22, 13, {
         color: P.CLAM_WHITE, alpha: 0.62, blend: 'source-over'
@@ -1937,16 +1823,16 @@
 
       addLine(5, '提白·敦煌面部“三白”之鼻梁高光', [
         [968, 142], [965, 162], [963, 178]
-      ], { color: P.CLAM_WHITE, width: 3.4, style: 'yousi', alpha: 0.72 });
+      ], { color: P.CLAM_WHITE, width: 3.2, style: 'yousi', alpha: 0.72 });
 
       addWash(5, '提白·敦煌面部“三白”之颐白（下巴）', 976, 215, 13, 8, {
         color: P.CLAM_WHITE, alpha: 0.58, blend: 'source-over'
       });
 
-      addDot(5, '点睛·左眼微小眼神光', 984, 154, 1.1, { color: P.CLAM_WHITE, alpha: 0.95 });
-      addDot(5, '点睛·右眼微小眼神光', 942, 155, 1.0, { color: P.CLAM_WHITE, alpha: 0.95 });
+      addDot(5, '点睛·左眼微小眼神光', 984, 154, 1.15, { color: P.CLAM_WHITE, alpha: 0.95 });
+      addDot(5, '点睛·右眼微小眼神光', 942, 155, 1.05, { color: P.CLAM_WHITE, alpha: 0.95 });
 
-      addDot(5, '点唇·樱桃下唇朱砂点润', 971, 202, 4.2, { ry: 2.1, color: P.VERMILION, alpha: 0.62 });
+      addDot(5, '点唇·樱桃下唇朱砂点润', 971, 202, 4.2, { ry: 2.1, color: P.VERMILION, alpha: 0.60 });
 
       addLine(5, '描金·宝冠金箍泥金高光', [
         [930, 100], [970, 91], [1014, 83]
@@ -1956,33 +1842,33 @@
         [992, 244], [1015, 263], [1040, 246]
       ], { color: P.GOLD_BRIGHT, width: 2.8, style: 'tiexian', alpha: 0.82 });
 
-      addDot(5, '描金·腕钏泥金亮斑', 982, 366, 6.2, { ry: 4.5, rot: -0.4, color: P.GOLD_BRIGHT, alpha: 0.72 });
+      addDot(5, '描金·腕钏泥金亮斑', 982, 366, 6.2, { ry: 4.5, rot: -0.4, color: P.GOLD_BRIGHT, alpha: 0.74 });
 
       addLine(5, '描金·箜篌琴脊煌金提光', [
         [784, 72], [852, 114], [924, 190], [984, 282]
-      ], { color: P.GOLD_BRIGHT, width: 3.0, style: 'lanye', alpha: 0.68 });
+      ], { color: P.GOLD_BRIGHT, width: 2.9, style: 'lanye', alpha: 0.68 });
 
       addLine(5, '提白·宝相花与珠弧高光', [
         [284, 422], [306, 412], [326, 426]
-      ], { color: P.CLAM_WHITE, width: 2.8, style: 'lanye', alpha: 0.70 });
+      ], { color: P.CLAM_WHITE, width: 2.8, style: 'lanye', alpha: 0.68 });
 
-      addDot(5, '提白·三瓣宝相花金蕊中心点', 306, 444, 5.5, { color: P.GOLD_BRIGHT, alpha: 0.88 });
+      addDot(5, '提白·三瓣宝相花金蕊中心点', 306, 444, 5.5, { color: P.GOLD_BRIGHT, alpha: 0.86 });
 
       addLine(5, '提白·青飘带迎风亮缘', [
         [120, 212], [320, 186], [520, 178], [636, 194]
-      ], { color: P.CLAM_WHITE, width: 2.2, style: 'xingyun', alpha: 0.56 });
+      ], { color: P.CLAM_WHITE, width: 2.2, style: 'xingyun', alpha: 0.54 });
 
       addLine(5, '提白·左上流云白粉提亮', [
         [152, 118], [176, 98], [186, 74]
-      ], { color: P.CLAM_WHITE, width: 3.0, style: 'lanye', alpha: 0.64 });
+      ], { color: P.CLAM_WHITE, width: 2.8, style: 'lanye', alpha: 0.60 });
 
       addLine(5, '提白·中右流云白粉提亮', [
         [528, 410], [552, 376], [568, 344]
-      ], { color: P.CLAM_WHITE, width: 3.0, style: 'lanye', alpha: 0.64 });
+      ], { color: P.CLAM_WHITE, width: 2.8, style: 'lanye', alpha: 0.60 });
 
       addLine(5, '提白·长裙迎风亮棱', [
         [980, 498], [898, 550], [776, 594]
-      ], { color: P.CLAM_WHITE, width: 2.0, style: 'xingyun', alpha: 0.52 });
+      ], { color: P.CLAM_WHITE, width: 2.0, style: 'xingyun', alpha: 0.50 });
 
       // 记录每层结束索引
       layerEndIndices = [0, 0, 0, 0, 0, 0];
@@ -1992,12 +1878,25 @@
       for (let l = 1; l <= 5; l++) {
         if (layerEndIndices[l] === 0) layerEndIndices[l] = layerEndIndices[l - 1];
       }
-      void speedMul;
     }
 
     // =========================================================================
-    // 4. 逐笔播放、拖拽定位与单笔步进控制
+    // 4. 快照缓存、逐笔播放、拖拽定位与单笔步进控制
     // =========================================================================
+    function shouldCacheAt(idx) {
+      return idx > 0 && idx % CONFIG.CHECKPOINT_INTERVAL === 0;
+    }
+
+    function saveCheckpoint(idx) {
+      if (checkpoints.has(idx)) return;
+      const snap = document.createElement('canvas');
+      snap.width = CONFIG.CANVAS_WIDTH;
+      snap.height = CONFIG.CANVAS_HEIGHT;
+      const sctx = snap.getContext('2d');
+      sctx.drawImage(baseCanvas, 0, 0);
+      checkpoints.set(idx, snap);
+    }
+
     function getActiveLayerAt(count) {
       if (count <= 0) return 1;
       const idx = clamp(count - 1, 0, Math.max(0, strokeQueue.length - 1));
@@ -2009,9 +1908,9 @@
       const isIdleBetweenStrokes = activeT <= 0.001 && completedCount > 0 && completedCount < total;
 
       if (completedCount === 0 && activeT <= 0.001) {
-        layerStatusEl.textContent = '新白粉壁面就绪（等待起笔开脸）';
+        layerStatusEl.textContent = '生宣暖壁就绪（等待起笔开脸）';
       } else if (done || (total > 0 && completedCount >= total)) {
-        layerStatusEl.textContent = `敦煌飞天百笔工笔版绘制完成（共 ${total} 笔）`;
+        layerStatusEl.textContent = `敦煌飞天 · 水墨白描工笔版完成（共 ${total} 笔）`;
       } else {
         const displayIdx = isIdleBetweenStrokes ? completedCount - 1 : clamp(completedCount, 0, total - 1);
         const curStroke = strokeQueue[displayIdx];
@@ -2047,13 +1946,32 @@
     function rebuildCanvasToCount(targetCount) {
       const total = strokeQueue.length;
       const clamped = clamp(Math.round(targetCount), 0, total);
-      completedCount = clamped;
       activeT = 0;
 
-      baseCtx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      baseCtx.drawImage(wallCanvas, 0, 0);
-      for (let i = 0; i < completedCount; i++) {
-        executeStrokeAction(baseCtx, strokeQueue[i], 1);
+      if (clamped >= completedCount && clamped - completedCount <= 8) {
+        // 向前小步进：直接在当前 baseCanvas 增量续画，零重绘开销
+        for (let i = completedCount; i < clamped; i++) {
+          executeStrokeAction(baseCtx, strokeQueue[i], 1);
+          if (shouldCacheAt(i + 1)) saveCheckpoint(i + 1);
+        }
+        completedCount = clamped;
+      } else {
+        // 查找 <= clamped 的最近离屏快照还原，加速倒带与滑块拖拽
+        let bestIdx = 0;
+        for (const key of checkpoints.keys()) {
+          if (key <= clamped && key > bestIdx) bestIdx = key;
+        }
+        baseCtx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        if (bestIdx === 0) {
+          baseCtx.drawImage(wallCanvas, 0, 0);
+        } else {
+          baseCtx.drawImage(checkpoints.get(bestIdx), 0, 0);
+        }
+        for (let i = bestIdx; i < clamped; i++) {
+          executeStrokeAction(baseCtx, strokeQueue[i], 1);
+          if (shouldCacheAt(i + 1)) saveCheckpoint(i + 1);
+        }
+        completedCount = clamped;
       }
 
       ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
@@ -2108,7 +2026,6 @@
       const rate = CONFIG.SPEED_LEVELS[speedIndex].rate;
       let budget = rate;
 
-      // 在高倍速下可能一帧跨越数笔；1x 速度时一笔分多帧顺滑运笔展开
       while (budget > 0 && completedCount < total) {
         const stroke = strokeQueue[completedCount];
         const stepT = 1 / Math.max(2, stroke.durFrames);
@@ -2119,6 +2036,7 @@
           executeStrokeAction(baseCtx, stroke, 1);
           completedCount++;
           activeT = 0;
+          if (shouldCacheAt(completedCount)) saveCheckpoint(completedCount);
         } else {
           activeT = nextT;
           budget = 0;
@@ -2147,7 +2065,7 @@
         const dataURL = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        link.download = `敦煌飞天百笔工笔版_${stamp}.png`;
+        link.download = `敦煌飞天水墨工笔版_${stamp}.png`;
         link.href = dataURL;
         document.body.appendChild(link);
         link.click();
@@ -2170,6 +2088,7 @@
       isPaused = false;
       completedCount = 0;
       activeT = 0;
+      checkpoints.clear();
       playPauseBtn.textContent = '暂停';
 
       wallCanvas = buildFreshChalkWall();
