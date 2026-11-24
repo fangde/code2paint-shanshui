@@ -3,146 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>写意水墨山水 · Canvas 2D</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #e6dfd1;
-      color: #2c2b28;
-      font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", Georgia, serif;
-      padding: 20px 16px;
-      user-select: none;
-    }
-
-    .scroll-frame {
-      background: #efe8d8;
-      padding: 14px;
-      border: 1px solid #cfc5b0;
-      box-shadow: 0 12px 36px rgba(30, 28, 24, 0.14), inset 0 0 0 1px rgba(255, 252, 245, 0.6);
-      max-width: 100%;
-    }
-
-    #inkCanvas {
-      display: block;
-      width: min(1120px, 92vw);
-      height: auto;
-      aspect-ratio: 3 / 2;
-      background: #f2ebd9;
-      border: 1px solid rgba(90, 82, 68, 0.22);
-    }
-
-    .toolbar {
-      margin-top: 14px;
-      width: min(1148px, 92vw);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 0 4px;
-    }
-
-    .status-group {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      font-size: 14px;
-      color: #4a4843;
-      letter-spacing: 0.08em;
-    }
-
-    .status-layer {
-      font-weight: 600;
-      color: #242422;
-    }
-
-    .status-count {
-      font-size: 12px;
-      color: #6e6b64;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .btn-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    button {
-      appearance: none;
-      background: #f5efe2;
-      color: #262522;
-      border: 1px solid #9f9684;
-      padding: 7px 18px;
-      font-size: 14px;
-      font-family: inherit;
-      letter-spacing: 0.12em;
-      cursor: pointer;
-      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-    }
-
-    button:hover {
-      background: #ebe2cf;
-      border-color: #575248;
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    button.active {
-      background: #2f2f2d;
-      color: #f4eee0;
-      border-color: #2f2f2d;
-    }
-
-    a.home-link {
-      display: inline-block;
-      background: #f5efe2;
-      color: #262522;
-      border: 1px solid #9f9684;
-      padding: 7px 14px;
-      font-size: 14px;
-      font-family: inherit;
-      letter-spacing: 0.1em;
-      text-decoration: none;
-      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-    }
-
-    a.home-link:hover {
-      background: #ebe2cf;
-      border-color: #575248;
-    }
-  </style>
+  <title>写意水墨山水</title>
+  <link rel="stylesheet" href="./core/theme.css" />
 </head>
-<body>
-  <div class="scroll-frame">
-    <canvas id="inkCanvas" width="1200" height="800"></canvas>
-  </div>
-
-  <div class="toolbar">
-    <div class="status-group">
-      <span id="layerStatus" class="status-layer">准备宣纸…</span>
-      <span id="strokeStatus" class="status-count">0 / 0 笔</span>
-    </div>
-    <div class="btn-group">
-      <button id="redrawBtn" type="button">重新绘制</button>
-      <button id="speedBtn" type="button">加速</button>
-      <a class="home-link" href="./index.html">← 回画廊首页</a>
-    </div>
-  </div>
-
+<body class="c2p-studio" data-theme="xuan">
+  <script src="./core/brushes.js"></script>
+  <script src="./core/studio-player.js"></script>
   <script>
+  (() => {
+    'use strict';
     // =========================================================================
     // 顶部常量与笔刷参数配置区（统一管理，便于调整画风、墨色与笔触密度）
     // =========================================================================
@@ -202,21 +71,11 @@
     };
 
     // =========================================================================
-    // 全局状态与 DOM 引用
+    // 全局状态与离屏画布
     // =========================================================================
-    const canvas = document.getElementById('inkCanvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: false });
-    const layerStatusEl = document.getElementById('layerStatus');
-    const strokeStatusEl = document.getElementById('strokeStatus');
-    const redrawBtn = document.getElementById('redrawBtn');
-    const speedBtn = document.getElementById('speedBtn');
-
+    let ctx = null;
     let paperCanvas = null;      // 预渲染的宣纸离屏画布
     let strokeQueue = [];        // 动作队列（严格按五层顺序压入）
-    let currentIndex = 0;        // 当前执行到的笔触索引
-    let speedIndex = 0;          // 当前加速档位索引
-    let animFrameId = null;      // requestAnimationFrame 句柄
-    let hasDownloaded = false;   // 当前画作是否已触发自动下载
     let rng = Math.random;       // 当前画作使用的可复现伪随机数生成器
 
     // =========================================================================
@@ -1191,97 +1050,41 @@
       );
     }
 
-    // =========================================================================
-    // 4. 逐笔动画渲染循环（requestAnimationFrame）与自动下载 PNG
-    // =========================================================================
-    function triggerAutoDownload() {
-      if (hasDownloaded) return;
-      hasDownloaded = true;
-      try {
-        const dataURL = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        link.download = `写意水墨山水_${stamp}.png`;
-        link.href = dataURL;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (err) {
-        console.warn('自动下载图片失败：', err);
+    window.Code2PaintStudio.mount({
+      title: '写意水墨山水',
+      subtitle: '五层纯正水墨山水法度：清墨染远山 → 淡墨勾坡岸 → 披麻皴山石 → 浓墨写枝干 → 焦墨点苔飞白',
+      category: '五层水墨山水',
+      mode: 'ink',
+      theme: 'xuan',
+      width: CONFIG.CANVAS_WIDTH,
+      height: CONFIG.CANVAS_HEIGHT,
+      seed: 20250501,
+      fileName: '写意水墨山水',
+      reseedOnRedraw: true,
+      layers: [
+        { id: 1, name: '一 · 清墨远山' },
+        { id: 2, name: '二 · 淡墨勾坡' },
+        { id: 3, name: '三 · 披麻皴理' },
+        { id: 4, name: '四 · 浓墨写石树' },
+        { id: 5, name: '五 · 焦墨点苔' }
+      ],
+      legacySetup({ seed }) {
+        rng = createPRNG(seed >>> 0);
+        strokeQueue = [];
+        paperCanvas = buildXuanPaper();
+        buildPaintingQueue();
+        const actions = strokeQueue.map((action) => ({
+          layer: action.layer,
+          label: CONFIG.LAYER_NAMES[action.layer] || '',
+          draw(targetCtx) {
+            ctx = targetCtx;
+            executeStrokeAction(action);
+          }
+        }));
+        return { backdropCanvas: paperCanvas, actions };
       }
-    }
-
-    function updateStatusUI(layerNum, done = false) {
-      if (done) {
-        layerStatusEl.textContent = '绘制完成（已自动保存 PNG）';
-      } else {
-        layerStatusEl.textContent = CONFIG.LAYER_NAMES[layerNum] || '运笔中…';
-      }
-      strokeStatusEl.textContent = `${currentIndex} / ${strokeQueue.length} 笔`;
-    }
-
-    function renderLoop() {
-      const batch = CONFIG.SPEED_LEVELS[speedIndex].dabsPerFrame;
-      let lastLayer = 1;
-
-      for (let i = 0; i < batch; i++) {
-        if (currentIndex >= strokeQueue.length) break;
-        const action = strokeQueue[currentIndex++];
-        lastLayer = action.layer;
-        executeStrokeAction(action);
-      }
-
-      if (currentIndex < strokeQueue.length) {
-        updateStatusUI(lastLayer, false);
-        animFrameId = requestAnimationFrame(renderLoop);
-      } else {
-        animFrameId = null;
-        updateStatusUI(5, true);
-        // 绘制完成后稍候一帧自动触发 PNG 下载，确保画布已完全呈现
-        requestAnimationFrame(() => triggerAutoDownload());
-      }
-    }
-
-    // =========================================================================
-    // 5. 初始化、重新绘制与加速按钮控制
-    // =========================================================================
-    function startPainting() {
-      if (animFrameId !== null) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
-
-      // 每次重新绘制采用新随机种子，构图骨架一致而山水气象各异
-      rng = createPRNG((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
-      hasDownloaded = false;
-      currentIndex = 0;
-
-      // 重新铺设宣纸基底
-      paperCanvas = buildXuanPaper();
-      ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      ctx.drawImage(paperCanvas, 0, 0);
-
-      // 按国画五层顺序构建完整笔触动作队列
-      buildPaintingQueue();
-      updateStatusUI(1, false);
-
-      // 启动逐笔作画动画
-      animFrameId = requestAnimationFrame(renderLoop);
-    }
-
-    redrawBtn.addEventListener('click', () => {
-      startPainting();
     });
-
-    speedBtn.addEventListener('click', () => {
-      speedIndex = (speedIndex + 1) % CONFIG.SPEED_LEVELS.length;
-      const level = CONFIG.SPEED_LEVELS[speedIndex];
-      speedBtn.textContent = level.label;
-      speedBtn.classList.toggle('active', speedIndex > 0);
-    });
-
-    // 页面加载后自动铺纸作画
-    startPainting();
+  })();
   </script>
 </body>
 </html>

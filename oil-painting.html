@@ -4,64 +4,98 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>古典油画静物（桃子与高脚杯）</title>
-<style>
-  html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    background: #080504;
-    overflow: hidden;
-  }
-  body {
-    display: grid;
-    place-items: center;
-  }
-  canvas {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: 100vw;
-    max-height: 100vh;
-  }
-  a.home-link {
-    position: fixed;
-    top: 16px;
-    left: 18px;
-    z-index: 20;
-    padding: 6px 13px;
-    border-radius: 6px;
-    background: rgba(24, 19, 15, 0.84);
-    border: 1px solid rgba(196, 164, 108, 0.42);
-    color: #efe4cf;
-    font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
-    font-size: 13px;
-    text-decoration: none;
-    letter-spacing: 0.04em;
-    backdrop-filter: blur(4px);
-    transition: background 0.16s ease, border-color 0.16s ease;
-  }
-  a.home-link:hover {
-    background: rgba(44, 34, 25, 0.94);
-    border-color: rgba(226, 193, 134, 0.72);
-  }
-</style>
+<link rel="stylesheet" href="./core/theme.css">
 </head>
-<body>
-<a class="home-link" href="./index.html">← 回画廊首页</a>
-<canvas id="painting" width="1000" height="1200"></canvas>
+<body class="c2p-studio" data-theme="gallery-dark">
+<script src="./core/brushes.js"></script>
+<script src="./core/studio-player.js"></script>
 <script>
 (() => {
   'use strict';
 
   // ---------------------------------------------------------------------------
-  // A small oil-brush engine.  Every mark is a sequence of feathered,
-  // low-impasto dabs; no gradients, filters, patterns or post-processing.
+  // A small oil-brush engine + non-invasive operation recorder for scrubbing.
   // ---------------------------------------------------------------------------
   const W = 1000, H = 1200, TAU = Math.PI * 2;
-  const canvas = document.getElementById('painting');
-  let ctx = canvas.getContext('2d', { alpha: false });
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  const OP_STROKE = 1, OP_FILL = 2;
+  let ctx = null;
+  let isRecording = false;
+  let recActions = [];
+  let recLayer = 2;
+  let recLabel = '二 · 单色明暗底稿（Grisaille）';
+  let curOps = null;
+  let recDepth = 0;
+  let clipStack = [];
+
+  function runPath(c, path) {
+    c.beginPath();
+    for (let i = 0; i < path.length; i++) {
+      const p = path[i], t = p[0];
+      if (t === 'M') c.moveTo(p[1], p[2]);
+      else if (t === 'L') c.lineTo(p[1], p[2]);
+      else if (t === 'Q') c.quadraticCurveTo(p[1], p[2], p[3], p[4]);
+      else if (t === 'E') c.ellipse(p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
+      else if (t === 'Z') c.closePath();
+    }
+  }
+
+  function replayOps(c, clips, ops) {
+    if (clips.length) {
+      c.save();
+      for (let i = 0; i < clips.length; i++) { runPath(c, clips[i]); c.clip(); }
+    }
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    for (let i = 0; i < ops.length; i++) {
+      const o = ops[i];
+      c.globalAlpha = o.alpha;
+      runPath(c, o.path);
+      if (o.op === OP_FILL) { c.fillStyle = o.style; c.fill(); }
+      else { c.strokeStyle = o.style; c.lineWidth = o.lw; c.stroke(); }
+    }
+    c.globalAlpha = 1;
+    if (clips.length) c.restore();
+  }
+
+  function createRecorderProxy() {
+    let curPath = [];
+    return {
+      fillStyle: '#000', strokeStyle: '#000', globalAlpha: 1, lineWidth: 1, lineCap: 'round', lineJoin: 'round',
+      save() { clipStack.push({ saved: true }); },
+      restore() {
+        while (clipStack.length) {
+          const top = clipStack.pop();
+          if (top.saved) break;
+        }
+      },
+      beginPath() { curPath = []; },
+      closePath() { curPath.push(['Z']); },
+      moveTo(x, y) { curPath.push(['M', x, y]); },
+      lineTo(x, y) { curPath.push(['L', x, y]); },
+      quadraticCurveTo(a, b, x, y) { curPath.push(['Q', a, b, x, y]); },
+      ellipse(x, y, rx, ry, rot, a0, a1) { curPath.push(['E', x, y, rx, ry, rot, a0, a1]); },
+      clip() { clipStack.push({ path: curPath.slice() }); },
+      fill() {
+        const op = { op: OP_FILL, style: this.fillStyle, alpha: this.globalAlpha, path: curPath.slice() };
+        if (curOps) curOps.push(op);
+        else {
+          const clips = clipStack.filter(c => c.path).map(c => c.path);
+          const layer = recLayer, label = recLabel;
+          recActions.push({ layer, label, draw: c => replayOps(c, clips, [op]) });
+        }
+      },
+      stroke() {
+        const op = { op: OP_STROKE, style: this.strokeStyle, alpha: this.globalAlpha, lw: this.lineWidth, path: curPath.slice() };
+        if (curOps) curOps.push(op);
+        else {
+          const clips = clipStack.filter(c => c.path).map(c => c.path);
+          const layer = recLayer, label = recLabel;
+          recActions.push({ layer, label, draw: c => replayOps(c, clips, [op]) });
+        }
+      }
+    };
+  }
+  const recorderProxy = createRecorderProxy();
 
   let seed = 0x51ed270b;
   function mulberry32(a) {
@@ -107,7 +141,7 @@
 
   // Three nested elliptical marks make a soft, feathered brush edge.
   const DAB_LAYERS = [[1, 0.58], [1.25, 0.26], [1.53, 0.095]];
-  function softDab(x, y, r, angle, stretch, c, a) {
+  function rawSoftDab(x, y, r, angle, stretch, c, a) {
     if (a <= 0.002 || r <= 0.25) return;
     if (!c || !isFinite(c[0]) || !isFinite(c[1]) || !isFinite(c[2]) || !isFinite(x) || !isFinite(y) || !isFinite(r) || !isFinite(a)) return;
     ctx.fillStyle = rgb(c);
@@ -120,9 +154,26 @@
     }
   }
 
+  function softDab(x, y, r, angle, stretch, c, a) {
+    if (!isRecording || recDepth > 0) return rawSoftDab(x, y, r, angle, stretch, c, a);
+    const prevOps = curOps;
+    curOps = [];
+    recDepth++;
+    try { rawSoftDab(x, y, r, angle, stretch, c, a); } finally {
+      const ops = curOps;
+      curOps = prevOps;
+      recDepth--;
+      if (ops.length) {
+        const clips = clipStack.filter(cl => cl.path).map(cl => cl.path);
+        const layer = recLayer, label = recLabel;
+        recActions.push({ layer, label, draw: c => replayOps(c, clips, ops) });
+      }
+    }
+  }
+
   // A stroke is sampled along an arbitrary parametric path.  The head and tail
   // taper in width and opacity so no stroke ends in a blunt hard edge.
-  function paintPath(sampler, o) {
+  function rawPaintPath(sampler, o) {
     const n = o.n || 24;
     const fade = o.fade == null ? 0.15 : o.fade;
     const alpha0 = o.a == null ? 0.2 : o.a;
@@ -148,14 +199,31 @@
       col = jitter(col, vary, o.temp || 0);
       const sj = o.sj == null ? 0.13 : o.sj;
       const r = Math.max(0.45, w * 0.5 * prof * (1 + rand(-sj, sj)));
-      softDab(x, y, r, angle, stretch, col, alpha0 * prof);
+      rawSoftDab(x, y, r, angle, stretch, col, alpha0 * prof);
       if (o.bristle && r > 4 && rng() < o.bristle) {
         const bo = rand(-r * 0.7, r * 0.7);
         const bc = jitter(mix(col, o.bristleCol || [222, 208, 180], 0.18), 5, 0);
-        softDab(x + nx * bo, y + ny * bo, r * 0.44, angle + rand(-0.09, 0.09), stretch * 0.8, bc, alpha0 * 0.30);
+        rawSoftDab(x + nx * bo, y + ny * bo, r * 0.44, angle + rand(-0.09, 0.09), stretch * 0.8, bc, alpha0 * 0.30);
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  function paintPath(sampler, o) {
+    if (!isRecording) return rawPaintPath(sampler, o);
+    const prevOps = curOps;
+    curOps = [];
+    recDepth++;
+    try { rawPaintPath(sampler, o); } finally {
+      const ops = curOps;
+      curOps = prevOps;
+      recDepth--;
+      if (ops.length) {
+        const clips = clipStack.filter(cl => cl.path).map(cl => cl.path);
+        const layer = recLayer, label = recLabel;
+        recActions.push({ layer, label, draw: c => replayOps(c, clips, ops) });
+      }
+    }
   }
 
   function lineS(x1, y1, x2, y2, wob = 0, phase = 0, freq = 2) {
@@ -1651,15 +1719,31 @@
     layer.width = W;
     layer.height = H;
     const layerCtx = layer.getContext('2d');
-    const mainCtx = ctx;
+    const prevCtx = ctx;
+    const prevRec = isRecording;
+    isRecording = false;
     ctx = layerCtx;
     painter();
-    ctx = mainCtx;
-    mainCtx.save();
-    mainCtx.globalAlpha = opacity;
-    mainCtx.drawImage(layer, 0, 0);
-    mainCtx.restore();
-    ctx.globalAlpha = 1;
+    isRecording = prevRec;
+    ctx = prevCtx;
+    if (prevRec) {
+      recActions.push({
+        layer: 4,
+        label: '古典透明多次罩染（Glazing）',
+        draw(targetCtx) {
+          targetCtx.save();
+          targetCtx.globalAlpha = opacity;
+          targetCtx.drawImage(layer, 0, 0);
+          targetCtx.restore();
+        }
+      });
+    } else {
+      prevCtx.save();
+      prevCtx.globalAlpha = opacity;
+      prevCtx.drawImage(layer, 0, 0);
+      prevCtx.restore();
+      ctx.globalAlpha = 1;
+    }
   }
 
   function glazeStrokes(count, x0, x1, y0, y1, color, alpha, angleLo, angleHi, widthLo, widthHi) {
@@ -1860,23 +1944,59 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Strict painting order: linen → grisaille → colour → glazes.
+  // Strict painting order mounted into unified Code2Paint studio player.
   // ---------------------------------------------------------------------------
-  function pause(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  window.Code2PaintStudio.mount({
+    title: '古典油画静物（桃子与高脚杯）',
+    subtitle: '纯毛刷点彩油画引擎：亚麻底布 → 单色明暗底稿（Grisaille）→ 厚涂设色 → 多次透明罩染（Glazing）',
+    category: '古典油画静物',
+    mode: 'oil',
+    theme: 'gallery-dark',
+    width: W,
+    height: H,
+    seed: 0x51ed270b,
+    fileName: '古典油画静物',
+    layers: [
+      { id: 1, name: '一 · 亚麻底布' },
+      { id: 2, name: '二 · 单色明暗底稿' },
+      { id: 3, name: '三 · 厚涂固有色' },
+      { id: 4, name: '四 · 多次透明罩染' }
+    ],
+    legacySetup({ seed: s }) {
+      seed = s >>> 0;
+      rng = mulberry32(seed);
+      recActions = [];
+      clipStack = [];
+      curOps = null;
+      recDepth = 0;
 
-  async function paint() {
-    layer1Linen();
-    await pause(24);
-    layer2Grisaille();
-    await pause(24);
-    layer3Color();
-    await pause(24);
-    layer4Glazing();
-  }
+      const backdrop = document.createElement('canvas');
+      backdrop.width = W;
+      backdrop.height = H;
+      ctx = backdrop.getContext('2d', { alpha: false });
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      isRecording = false;
+      layer1Linen();
 
-  paint();
+      isRecording = true;
+      ctx = recorderProxy;
+      recLayer = 2;
+      recLabel = '单色明暗底稿（Grisaille）';
+      layer2Grisaille();
+
+      recLayer = 3;
+      recLabel = '厚涂固有色与光影肌理';
+      layer3Color();
+
+      recLayer = 4;
+      recLabel = '古典透明多次罩染（Glazing）';
+      layer4Glazing();
+
+      isRecording = false;
+      return { backdropCanvas: backdrop, actions: recActions };
+    }
+  });
 })();
 </script>
 </body>

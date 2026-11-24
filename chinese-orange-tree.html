@@ -4,103 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>写意橘子树 · 重彩</title>
-<style>
-  :root {
-    --ink: #2b231b;
-    --paper: #f3e9d6;
-    --bar: rgba(246, 239, 226, 0.92);
-    --line: rgba(76, 60, 43, 0.28);
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    min-height: 100%;
-    background: #1d1813;
-    color: var(--ink);
-    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", serif;
-  }
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 14px;
-    min-height: 100vh;
-    overflow: hidden;
-  }
-  #painting {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: calc(100vw - 28px);
-    max-height: calc(100vh - 92px);
-    background: var(--paper);
-    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.52);
-  }
-  #bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--bar);
-    border: 1px solid var(--line);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(4px);
-  }
-  button {
-    appearance: none;
-    border: 1px solid rgba(61, 47, 33, 0.48);
-    background: rgba(255, 252, 243, 0.55);
-    color: #31271d;
-    font-family: inherit;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    padding: 7px 14px;
-    cursor: pointer;
-    transition: background 120ms ease, transform 120ms ease;
-  }
-  button:hover { background: rgba(255, 252, 243, 0.95); }
-  button:active { transform: translateY(1px); }
-  button:disabled { opacity: 0.45; cursor: default; }
-  a.home-link {
-    display: inline-block;
-    border: 1px solid rgba(61, 47, 33, 0.48);
-    background: rgba(255, 252, 243, 0.55);
-    color: #31271d;
-    font-family: inherit;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    padding: 7px 14px;
-    text-decoration: none;
-    transition: background 120ms ease, transform 120ms ease;
-  }
-  a.home-link:hover { background: rgba(255, 252, 243, 0.95); }
-  #status {
-    min-width: 150px;
-    text-align: center;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    color: #554838;
-    user-select: none;
-  }
-  @media (max-width: 560px) {
-    #status { width: 100%; }
-    button { font-size: 13px; padding: 6px 11px; }
-  }
-</style>
+<link rel="stylesheet" href="./core/theme.css">
 </head>
-<body>
-<canvas id="painting" width="1000" height="1300"></canvas>
-<div id="bar">
-  <button id="redraw" type="button">重新绘制</button>
-  <button id="speed" type="button">加速 ×1</button>
-  <button id="save" type="button">保存 PNG</button>
-  <a class="home-link" href="./index.html">← 回画廊首页</a>
-  <span id="status">准备作画</span>
-</div>
+<body class="c2p-studio" data-theme="xuan">
+<script src="./core/brushes.js"></script>
+<script src="./core/studio-player.js"></script>
 <script>
 (() => {
   'use strict';
@@ -475,6 +383,14 @@
   // ==========================================================================
   // 五、动作队列：所有笔触按顺序排队
   // ==========================================================================
+  const LAYER_NAMES = {
+    1: '一 · 树干枝根坡草',
+    2: '二 · 叠叶点染层次',
+    3: '三 · 橘果敷彩塑形',
+    4: '四 · 落款朱文小印'
+  };
+  let ctx = null;
+  let curLayer = 1;
   let queue = [];
   let strokeCount = 0;
   let drawCallCount = 0;
@@ -490,9 +406,12 @@
     if (samples.length < 2) return false;
     strokeCount++;
     const optsCopy = Object.assign({}, opts);
+    const layer = curLayer;
     queue.push({
-      type: 'stroke',
-      draw: () => {
+      layer,
+      label: LAYER_NAMES[layer],
+      draw: (targetCtx) => {
+        ctx = targetCtx;
         drawCallCount++;
         drawBrush(samples, optsCopy);
       }
@@ -503,9 +422,12 @@
   function addDab(x, y, r, color, alpha, dry = false, kind = 'wash') {
     if (strokeCount >= MAX_STROKES) return false;
     strokeCount++;
+    const layer = curLayer;
     queue.push({
-      type: 'stroke',
-      draw: () => {
+      layer,
+      label: LAYER_NAMES[layer],
+      draw: (targetCtx) => {
+        ctx = targetCtx;
         drawCallCount++;
         stampTip(x, y, r, color, alpha, dry, kind);
         ctx.globalAlpha = 1;
@@ -517,9 +439,12 @@
   function addAction(fn) {
     if (strokeCount >= MAX_STROKES) return false;
     strokeCount++;
+    const layer = curLayer;
     queue.push({
-      type: 'stroke',
-      draw: () => {
+      layer,
+      label: LAYER_NAMES[layer],
+      draw: (targetCtx) => {
+        ctx = targetCtx;
         drawCallCount++;
         fn();
       }
@@ -527,9 +452,7 @@
     return true;
   }
 
-  function addPause(frames) {
-    queue.push({ type: 'pause', frames });
-  }
+  function addPause() { /* handled natively by unified player */ }
 
   // ==========================================================================
   // 六、构图数据：树干、枝、叶簇、橘子
@@ -1136,132 +1059,38 @@
     drawCallCount = 0;
     R = mulberry32(0x5eed2026);
 
-    addPause(12);
+    curLayer = 1;
     buildTrunk();          // 第一段：树干、枝、根、坡草
-    addPause(22);
+    curLayer = 2;
     buildLeaves();         // 第二段：叶
-    addPause(22);
+    curLayer = 3;
     buildOranges();        // 第三段：橘
-    addPause(16);
+    curLayer = 4;
     buildSeal();
   }
 
-  // ==========================================================================
-  // 八、渲染与动画
-  // ==========================================================================
-  const canvas = document.getElementById('painting');
-  const ctx = canvas.getContext('2d', { alpha: false });
-  const statusEl = document.getElementById('status');
-  const speedBtn = document.getElementById('speed');
-  const redrawBtn = document.getElementById('redraw');
-  const saveBtn = document.getElementById('save');
-
-  let rafId = 0;
-  let queueIndex = 0;
-  let doneStrokes = 0;
-  let pauseLeft = 0;
-  let acc = 0;
-  let speedLevel = 0;
-  let painting = false;
-  let autoDownloaded = false;
-
-  function paperBackdrop() {
-    ctx.globalAlpha = 1;
-    ctx.drawImage(paperCanvas, 0, 0);
-  }
-
-  function updateStatus() {
-    if (!painting && doneStrokes >= strokeCount && strokeCount > 0) {
-      statusEl.textContent = `绘制完成 · 共 ${strokeCount} 笔`;
-    } else {
-      statusEl.textContent = `绘制中 · ${doneStrokes} / ${strokeCount} 笔`;
+  window.Code2PaintStudio.mount({
+    title: '写意橘子树 · 重彩',
+    subtitle: '生宣写意花果重彩：墨分五色写枝干 → 石绿花青点叶 → 朱磦藤黄绘橘 → 干笔收形',
+    category: '写意重彩',
+    mode: 'ink',
+    theme: 'xuan',
+    width: W,
+    height: H,
+    seed: 0x5eed2026,
+    fileName: '写意橘子树',
+    layers: [
+      { id: 1, name: '一 · 树干枝根坡草' },
+      { id: 2, name: '二 · 叠叶点染层次' },
+      { id: 3, name: '三 · 橘果敷彩塑形' },
+      { id: 4, name: '四 · 落款朱文小印' }
+    ],
+    legacySetup() {
+      buildPaper();
+      buildPainting();
+      return { backdropCanvas: paperCanvas, actions: queue };
     }
-  }
-
-  function startPainting() {
-    cancelAnimationFrame(rafId);
-    paperBackdrop();
-    queueIndex = 0;
-    doneStrokes = 0;
-    pauseLeft = 0;
-    acc = 0;
-    painting = true;
-    speedBtn.disabled = false;
-    updateStatus();
-    rafId = requestAnimationFrame(step);
-  }
-
-  function step() {
-    if (!painting) return;
-
-    if (pauseLeft > 0) {
-      pauseLeft--;
-    } else {
-      acc += BASE_SPEED * SPEED_STEPS[speedLevel];
-      while (acc >= 1 && queueIndex < queue.length) {
-        const action = queue[queueIndex++];
-        if (action.type === 'pause') {
-          pauseLeft = action.frames;
-          acc = 0;
-          break;
-        }
-        action.draw();
-        doneStrokes++;
-        acc -= 1;
-      }
-    }
-
-    if (doneStrokes % 5 === 0 || doneStrokes === strokeCount) updateStatus();
-
-    if (queueIndex >= queue.length && pauseLeft === 0) {
-      painting = false;
-      updateStatus();
-      if (!autoDownloaded) {
-        autoDownloaded = true;
-        setTimeout(() => savePNG(true), 700);
-      }
-      return;
-    }
-    rafId = requestAnimationFrame(step);
-  }
-
-  function savePNG(auto = false) {
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = '写意橘子树.png';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1200);
-    }, 'image/png');
-  }
-
-  // ==========================================================================
-  // 九、控件
-  // ==========================================================================
-  speedBtn.addEventListener('click', () => {
-    speedLevel = (speedLevel + 1) % SPEED_STEPS.length;
-    speedBtn.textContent = `加速 ×${SPEED_STEPS[speedLevel]}`;
   });
-
-  redrawBtn.addEventListener('click', () => {
-    if (painting) painting = false;
-    cancelAnimationFrame(rafId);
-    buildPainting();       // 重新生成同一构图的动作队列
-    startPainting();
-  });
-
-  saveBtn.addEventListener('click', () => savePNG(false));
-
-  // ==========================================================================
-  // 十、启动
-  // ==========================================================================
-  buildPaper();
-  buildPainting();
-  startPainting();
 })();
 </script>
 </body>

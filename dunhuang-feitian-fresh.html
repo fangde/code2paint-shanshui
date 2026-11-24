@@ -3,284 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>敦煌飞天 · 水墨写意临摹版（285窟盛彩百笔 · Canvas 2D）</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #26211c;
-      background-image: radial-gradient(circle at 50% 42%, #3a3128 0%, #1e1915 100%);
-      color: #f0e4ce;
-      font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", Georgia, serif;
-      padding: 20px 16px;
-      user-select: none;
-    }
-
-    .mural-frame {
-      background: #47392b;
-      padding: 14px;
-      border: 1px solid #765f47;
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(247, 241, 227, 0.18);
-      max-width: 100%;
-    }
-
-    #muralCanvas {
-      display: block;
-      width: min(1160px, 93vw);
-      height: auto;
-      aspect-ratio: 16 / 10;
-      background: #f1e8d4;
-      border: 1px solid rgba(72, 54, 38, 0.45);
-    }
-
-    .progress-panel {
-      margin-top: 12px;
-      width: min(1188px, 93vw);
-      padding: 10px 12px;
-      background: rgba(58, 46, 36, 0.78);
-      border: 1px solid #6b5642;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-    }
-
-    .progress-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    #progressSlider {
-      flex: 1;
-      -webkit-appearance: none;
-      appearance: none;
-      height: 6px;
-      background: linear-gradient(90deg, #c24b32 0%, #dfb05d var(--pct, 0%), #352a20 var(--pct, 0%));
-      border: 1px solid #755e47;
-      border-radius: 999px;
-      outline: none;
-      cursor: pointer;
-    }
-
-    #progressSlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #f0cf88;
-      border: 2px solid #4a3728;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
-      cursor: pointer;
-      transition: transform 0.12s ease;
-    }
-
-    #progressSlider::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
-    }
-
-    #progressSlider::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #f0cf88;
-      border: 2px solid #4a3728;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
-      cursor: pointer;
-    }
-
-    .progress-percent {
-      min-width: 54px;
-      text-align: right;
-      font-size: 13px;
-      color: #eedab2;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .layer-steps {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    button {
-      appearance: none;
-      background: #4a3a2c;
-      color: #f4e7cf;
-      border: 1px solid #8a7055;
-      padding: 7px 16px;
-      font-size: 14px;
-      font-family: inherit;
-      letter-spacing: 0.1em;
-      cursor: pointer;
-      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-    }
-
-    button:hover {
-      background: #5c4837;
-      border-color: #bfa07c;
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    button.active {
-      background: #b2452f;
-      color: #fcf4e6;
-      border-color: #db745b;
-    }
-
-    button.small-btn {
-      padding: 6px 12px;
-      font-size: 13px;
-      letter-spacing: 0.06em;
-    }
-
-    button.download-btn {
-      background: #1d6b80;
-      border-color: #469cb3;
-      color: #eef8fa;
-    }
-
-    button.download-btn:hover {
-      background: #25819a;
-      border-color: #6bc0d6;
-    }
-
-    a.home-link {
-      display: inline-block;
-      background: #4a3a2c;
-      color: #f4e7cf;
-      border: 1px solid #8a7055;
-      padding: 7px 14px;
-      font-size: 14px;
-      font-family: inherit;
-      letter-spacing: 0.08em;
-      text-decoration: none;
-      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-    }
-
-    a.home-link:hover {
-      background: #5c4837;
-      border-color: #bfa07c;
-    }
-
-    .layer-chip {
-      padding: 4px 10px;
-      font-size: 12px;
-      letter-spacing: 0.06em;
-      background: #3a2e23;
-      color: #bfa988;
-      border: 1px solid #64503d;
-    }
-
-    .layer-chip.done {
-      color: #f0dec0;
-      border-color: #8a7055;
-      background: #48392b;
-    }
-
-    .layer-chip.current {
-      background: #9f432e;
-      color: #fcf4e6;
-      border-color: #d6765d;
-    }
-
-    .hint-text {
-      margin-left: auto;
-      font-size: 11px;
-      color: #a89377;
-      letter-spacing: 0.04em;
-    }
-
-    .toolbar {
-      margin-top: 12px;
-      width: min(1188px, 93vw);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 0 4px;
-    }
-
-    .status-group {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 14px;
-      font-size: 14px;
-      color: #ded0b8;
-      letter-spacing: 0.06em;
-    }
-
-    .status-layer {
-      font-weight: 600;
-      color: #f7ead0;
-    }
-
-    .status-count {
-      font-size: 13px;
-      color: #c7b190;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .btn-group {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-  </style>
+  <title>敦煌飞天（285窟水墨盛彩版）</title>
+  <link rel="stylesheet" href="./core/theme.css" />
 </head>
-<body>
-  <div class="mural-frame">
-    <canvas id="muralCanvas" width="1280" height="800"></canvas>
-  </div>
-
-  <div class="progress-panel">
-    <div class="progress-row">
-      <input id="progressSlider" type="range" min="0" max="0" value="0" step="1" aria-label="作画进度条" />
-      <span id="progressPercent" class="progress-percent">0.0%</span>
-    </div>
-    <div class="layer-steps" id="layerSteps">
-      <button class="layer-chip" type="button" data-layer="1">一层·白描勾线</button>
-      <button class="layer-chip" type="button" data-layer="2">二层·水墨设色</button>
-      <button class="layer-chip" type="button" data-layer="3">三层·凹凸晕染</button>
-      <button class="layer-chip" type="button" data-layer="4">四层·开脸复勾</button>
-      <button class="layer-chip" type="button" data-layer="5">五层·提白描金</button>
-      <span class="hint-text">支持逐笔看：退一步 / 进一步 / ← → 单笔微调（Shift ±10 笔 · 空格暂停）</span>
-    </div>
-  </div>
-
-  <div class="toolbar">
-    <div class="status-group">
-      <span id="layerStatus" class="status-layer">铺设生宣暖泥底…</span>
-      <span id="strokeStatus" class="status-count">0 / 0 笔</span>
-    </div>
-    <div class="btn-group">
-      <button id="playPauseBtn" class="small-btn" type="button">暂停</button>
-      <button id="stepBackBtn" class="small-btn" type="button">退一步</button>
-      <button id="stepForwardBtn" class="small-btn" type="button">进一步</button>
-      <button id="redrawBtn" type="button">重新绘制</button>
-      <button id="speedBtn" type="button">加速</button>
-      <button id="downloadBtn" class="download-btn" type="button">下载 PNG</button>
-      <a class="home-link" href="./index.html">← 回画廊首页</a>
-    </div>
-  </div>
-
+<body class="c2p-studio" data-theme="gallery-dark">
+  <script src="./core/brushes.js"></script>
+  <script src="./core/studio-player.js"></script>
   <script>
+  (() => {
+    'use strict';
     // =========================================================================
     // 顶部常量、生宣暖壁基底、水墨毛笔动力学与第 285 窟矿彩色板配置
     // =========================================================================
@@ -354,34 +85,8 @@
       ]
     };
 
-    const canvas = document.getElementById('muralCanvas');
-    const ctx = canvas.getContext('2d');
-    const layerStatusEl = document.getElementById('layerStatus');
-    const strokeStatusEl = document.getElementById('strokeStatus');
-    const progressSlider = document.getElementById('progressSlider');
-    const progressPercentEl = document.getElementById('progressPercent');
-    const layerChips = Array.from(document.querySelectorAll('.layer-chip'));
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const stepBackBtn = document.getElementById('stepBackBtn');
-    const stepForwardBtn = document.getElementById('stepForwardBtn');
-    const redrawBtn = document.getElementById('redrawBtn');
-    const speedBtn = document.getElementById('speedBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-
     let wallCanvas = null;
-    let baseCanvas = null;
-    let baseCtx = null;
-    const checkpoints = new Map();
-
     let strokeQueue = [];
-    let layerEndIndices = [0, 0, 0, 0, 0, 0];
-    let completedCount = 0;
-    let activeT = 0;
-    let speedIndex = 0;
-    let animFrameId = null;
-    let isPaused = false;
-    let pendingSeek = null;
-    let seekRafId = null;
     let rng = Math.random;
 
     function clamp(v, min, max) {
@@ -1890,315 +1595,43 @@
       ], { color: P.CLAM_WHITE, width: 2.0, style: 'xingyun', alpha: 0.50 });
 
       // 记录每层结束索引
-      layerEndIndices = [0, 0, 0, 0, 0, 0];
-      for (let i = 0; i < strokeQueue.length; i++) {
-        layerEndIndices[strokeQueue[i].layer] = i + 1;
-      }
-      for (let l = 1; l <= 5; l++) {
-        if (layerEndIndices[l] === 0) layerEndIndices[l] = layerEndIndices[l - 1];
-      }
+      window.Code2PaintStudio._lastLayers = strokeQueue;
     }
 
-    // =========================================================================
-    // 4. 快照缓存、逐笔播放、拖拽定位与单笔步进控制
-    // =========================================================================
-    function shouldCacheAt(idx) {
-      return idx > 0 && idx % CONFIG.CHECKPOINT_INTERVAL === 0;
-    }
-
-    function saveCheckpoint(idx) {
-      if (checkpoints.has(idx)) return;
-      const snap = document.createElement('canvas');
-      snap.width = CONFIG.CANVAS_WIDTH;
-      snap.height = CONFIG.CANVAS_HEIGHT;
-      const sctx = snap.getContext('2d');
-      sctx.drawImage(baseCanvas, 0, 0);
-      checkpoints.set(idx, snap);
-    }
-
-    function getActiveLayerAt(count) {
-      if (count <= 0) return 1;
-      const idx = clamp(count - 1, 0, Math.max(0, strokeQueue.length - 1));
-      return strokeQueue[idx] ? strokeQueue[idx].layer : 1;
-    }
-
-    function updateStatusUI(done = false) {
-      const total = strokeQueue.length;
-      const isIdleBetweenStrokes = activeT <= 0.001 && completedCount > 0 && completedCount < total;
-
-      if (completedCount === 0 && activeT <= 0.001) {
-        layerStatusEl.textContent = '生宣暖壁就绪（等待起笔开脸）';
-      } else if (done || (total > 0 && completedCount >= total)) {
-        layerStatusEl.textContent = `敦煌飞天 · 水墨白描工笔版完成（共 ${total} 笔）`;
-      } else {
-        const displayIdx = isIdleBetweenStrokes ? completedCount - 1 : clamp(completedCount, 0, total - 1);
-        const curStroke = strokeQueue[displayIdx];
-        const lName = CONFIG.LAYER_NAMES[curStroke.layer] || '';
-        layerStatusEl.textContent = `${lName} ｜ ${curStroke.label}`;
-      }
-
-      const shownCount = clamp(completedCount, 0, total);
-      strokeStatusEl.textContent = `${shownCount} / ${total} 笔`;
-
-      progressSlider.max = String(total);
-      progressSlider.value = String(shownCount);
-      const pct = total > 0 ? (shownCount / total) * 100 : 0;
-      progressSlider.style.setProperty('--pct', `${pct.toFixed(2)}%`);
-      progressPercentEl.textContent = `${pct.toFixed(1)}%`;
-
-      const curLayer = shownCount >= total && total > 0
-        ? 5
-        : (isIdleBetweenStrokes
-          ? getActiveLayerAt(shownCount)
-          : getActiveLayerAt(Math.min(shownCount + 1, total)));
-      layerChips.forEach((chip) => {
-        const l = Number(chip.dataset.layer);
-        const prevEnd = layerEndIndices[l - 1] || 0;
-        const thisEnd = layerEndIndices[l] || 0;
-        const isDone = total > 0 && shownCount >= thisEnd && thisEnd > prevEnd;
-        const isCurrent = !done && shownCount > 0 && shownCount < total && l === curLayer;
-        chip.classList.toggle('done', isDone && !isCurrent);
-        chip.classList.toggle('current', isCurrent);
-      });
-    }
-
-    function rebuildCanvasToCount(targetCount) {
-      const total = strokeQueue.length;
-      const clamped = clamp(Math.round(targetCount), 0, total);
-      activeT = 0;
-
-      if (clamped >= completedCount && clamped - completedCount <= 8) {
-        // 向前小步进：直接在当前 baseCanvas 增量续画，零重绘开销
-        for (let i = completedCount; i < clamped; i++) {
-          executeStrokeAction(baseCtx, strokeQueue[i], 1);
-          if (shouldCacheAt(i + 1)) saveCheckpoint(i + 1);
-        }
-        completedCount = clamped;
-      } else {
-        // 查找 <= clamped 的最近离屏快照还原，加速倒带与滑块拖拽
-        let bestIdx = 0;
-        for (const key of checkpoints.keys()) {
-          if (key <= clamped && key > bestIdx) bestIdx = key;
-        }
-        baseCtx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-        if (bestIdx === 0) {
-          baseCtx.drawImage(wallCanvas, 0, 0);
-        } else {
-          baseCtx.drawImage(checkpoints.get(bestIdx), 0, 0);
-        }
-        for (let i = bestIdx; i < clamped; i++) {
-          executeStrokeAction(baseCtx, strokeQueue[i], 1);
-          if (shouldCacheAt(i + 1)) saveCheckpoint(i + 1);
-        }
-        completedCount = clamped;
-      }
-
-      ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      ctx.drawImage(baseCanvas, 0, 0);
-      updateStatusUI(completedCount >= total && total > 0);
-    }
-
-    function seekToStroke(targetCount) {
-      rebuildCanvasToCount(targetCount);
-      if (completedCount >= strokeQueue.length && strokeQueue.length > 0) {
-        playPauseBtn.textContent = '重播';
-      } else if (isPaused) {
-        playPauseBtn.textContent = '继续';
-      }
-    }
-
-    function pausePlayback() {
-      if (animFrameId !== null) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
-      isPaused = true;
-      playPauseBtn.textContent = completedCount >= strokeQueue.length ? '重播' : '继续';
-    }
-
-    function resumePlayback() {
-      if (completedCount >= strokeQueue.length) {
-        seekToStroke(0);
-      }
-      isPaused = false;
-      playPauseBtn.textContent = '暂停';
-      if (animFrameId === null) {
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
-    }
-
-    function renderLoop() {
-      if (isPaused) {
-        animFrameId = null;
-        return;
-      }
-
-      const total = strokeQueue.length;
-      if (completedCount >= total) {
-        animFrameId = null;
-        isPaused = true;
-        playPauseBtn.textContent = '重播';
-        updateStatusUI(true);
-        return;
-      }
-
-      const rate = CONFIG.SPEED_LEVELS[speedIndex].rate;
-      let budget = rate;
-
-      while (budget > 0 && completedCount < total) {
-        const stroke = strokeQueue[completedCount];
-        const stepT = 1 / Math.max(2, stroke.durFrames);
-        const nextT = activeT + stepT * budget;
-        if (nextT >= 1) {
-          const used = (1 - activeT) / stepT;
-          budget -= used;
-          executeStrokeAction(baseCtx, stroke, 1);
-          completedCount++;
-          activeT = 0;
-          if (shouldCacheAt(completedCount)) saveCheckpoint(completedCount);
-        } else {
-          activeT = nextT;
-          budget = 0;
-        }
-      }
-
-      ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      ctx.drawImage(baseCanvas, 0, 0);
-      if (completedCount < total && activeT > 0) {
-        executeStrokeAction(ctx, strokeQueue[completedCount], activeT);
-      }
-
-      if (completedCount >= total) {
-        animFrameId = null;
-        isPaused = true;
-        playPauseBtn.textContent = '重播';
-        updateStatusUI(true);
-      } else {
-        updateStatusUI(false);
-        animFrameId = requestAnimationFrame(renderLoop);
-      }
-    }
-
-    function downloadCanvasPNG() {
-      try {
-        const dataURL = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        link.download = `敦煌飞天水墨工笔版_${stamp}.png`;
-        link.href = dataURL;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (err) {
-        console.warn('下载 PNG 失败：', err);
-      }
-    }
-
-    function startPainting() {
-      if (animFrameId !== null) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
-      if (seekRafId !== null) {
-        cancelAnimationFrame(seekRafId);
-        seekRafId = null;
-      }
-
-      isPaused = false;
-      completedCount = 0;
-      activeT = 0;
-      checkpoints.clear();
-      playPauseBtn.textContent = '暂停';
-
-      wallCanvas = buildFreshChalkWall();
-      if (!baseCanvas) {
-        baseCanvas = document.createElement('canvas');
-        baseCanvas.width = CONFIG.CANVAS_WIDTH;
-        baseCanvas.height = CONFIG.CANVAS_HEIGHT;
-        baseCtx = baseCanvas.getContext('2d');
-      }
-      baseCtx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      baseCtx.drawImage(wallCanvas, 0, 0);
-
-      ctx.clearRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
-      ctx.drawImage(baseCanvas, 0, 0);
-
-      buildTraditionalFeitianQueue();
-      updateStatusUI(false);
-      animFrameId = requestAnimationFrame(renderLoop);
-    }
-
-    // 交互绑定
-    progressSlider.addEventListener('input', () => {
-      pausePlayback();
-      pendingSeek = Number(progressSlider.value);
-      if (seekRafId === null) {
-        seekRafId = requestAnimationFrame(() => {
-          seekRafId = null;
-          if (pendingSeek !== null) {
-            const v = pendingSeek;
-            pendingSeek = null;
-            seekToStroke(v);
+    window.Code2PaintStudio.mount({
+      title: '敦煌飞天（285窟水墨盛彩版）',
+      subtitle: '传统 209 笔盛唐壁画临摹法度：十八笔开脸 → 游丝飘带 → 矿彩点染 → 凹凸提白',
+      category: '水墨敦煌临摹',
+      mode: 'ink',
+      theme: 'gallery-dark',
+      width: CONFIG.CANVAS_WIDTH,
+      height: CONFIG.CANVAS_HEIGHT,
+      seed: 20250402,
+      fileName: '敦煌飞天水墨盛彩版',
+      baseSpeed: 1.4,
+      layers: [
+        { id: 1, name: '一 · 白描勾线' },
+        { id: 2, name: '二 · 水墨设色' },
+        { id: 3, name: '三 · 凹凸晕染' },
+        { id: 4, name: '四 · 开脸复勾' },
+        { id: 5, name: '五 · 提白描金' }
+      ],
+      legacySetup({ seed }) {
+        rng = createPRNG(seed >>> 0);
+        strokeQueue = [];
+        wallCanvas = buildFreshChalkWall();
+        buildTraditionalFeitianQueue();
+        const actions = strokeQueue.map((stroke) => ({
+          layer: stroke.layer,
+          label: stroke.label || CONFIG.LAYER_NAMES[stroke.layer] || '',
+          draw(targetCtx) {
+            executeStrokeAction(targetCtx, stroke, 1);
           }
-        });
+        }));
+        return { backdropCanvas: wallCanvas, actions };
       }
     });
-
-    layerChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const l = Number(chip.dataset.layer);
-        pausePlayback();
-        seekToStroke(layerEndIndices[l] || 0);
-      });
-    });
-
-    playPauseBtn.addEventListener('click', () => {
-      if (isPaused) resumePlayback();
-      else pausePlayback();
-    });
-
-    stepBackBtn.addEventListener('click', () => {
-      pausePlayback();
-      seekToStroke(completedCount - CONFIG.STEP_DELTA);
-    });
-
-    stepForwardBtn.addEventListener('click', () => {
-      pausePlayback();
-      seekToStroke(completedCount + CONFIG.STEP_DELTA);
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        pausePlayback();
-        seekToStroke(completedCount - (e.shiftKey ? 10 : 1));
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        pausePlayback();
-        seekToStroke(completedCount + (e.shiftKey ? 10 : 1));
-      } else if (e.code === 'Space' && document.activeElement?.tagName !== 'BUTTON') {
-        e.preventDefault();
-        if (isPaused) resumePlayback();
-        else pausePlayback();
-      }
-    });
-
-    redrawBtn.addEventListener('click', () => {
-      startPainting();
-    });
-
-    speedBtn.addEventListener('click', () => {
-      speedIndex = (speedIndex + 1) % CONFIG.SPEED_LEVELS.length;
-      const level = CONFIG.SPEED_LEVELS[speedIndex];
-      speedBtn.textContent = level.label;
-      speedBtn.classList.toggle('active', speedIndex > 0);
-    });
-
-    downloadBtn.addEventListener('click', () => {
-      downloadCanvasPNG();
-    });
-
-    startPainting();
+  })();
   </script>
 </body>
 </html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code2Paint 作品赏析</title>
+<link rel="stylesheet" href="./core/theme.css">
+</head>
+<body class="c2p-studio">
+<script src="./core/brushes.js"></script>
+<script src="./core/studio-player.js"></script>
+<script src="./artworks/registry.js"></script>
+<script src="./artworks/gongbi-10.js"></script>
+<script src="./artworks/xieyi-flowers-25.js"></script>
+<script src="./artworks/xieyi-aquatic-10.js"></script>
+<script src="./artworks/xieyi-landscape-20.js"></script>
+<script src="./artworks/xieyi-figures-10.js"></script>
+<script src="./artworks/oil-figures-10.js"></script>
+<script src="./artworks/oil-still-landscape-15.js"></script>
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const catalog = window.Code2PaintCatalog;
+  if (!catalog) {
+    document.body.innerHTML = '<p style="padding:40px">作品库加载失败。</p>';
+    return;
+  }
+  const allWorks = catalog.getAll();
+  const idx = allWorks.findIndex(w => w.id === id);
+  const item = idx >= 0 ? allWorks[idx] : catalog.getDynamicList()[0];
+  if (!item || !item.buildStrokes) {
+    document.body.innerHTML = '<p style="padding:40px">未找到对应作品：<a href="./index.html">返回画廊</a></p>';
+    return;
+  }
+  const prev = idx > 0 ? allWorks[idx - 1] : null;
+  const next = idx >= 0 && idx < allWorks.length - 1 ? allWorks[idx + 1] : null;
+  window.Code2PaintStudio.mount({
+    ...item,
+    prevUrl: prev ? catalog.urlFor(prev) : '',
+    nextUrl: next ? catalog.urlFor(next) : ''
+  });
+})();
+</script>
+</body>
+</html>

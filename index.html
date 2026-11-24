@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Code2Paint · 中国传统国画与敦煌飞天画集</title>
+  <title>Code2Paint · 中国传统国画、敦煌壁画与古典油画百幅画集</title>
   <style>
     * {
       box-sizing: border-box;
@@ -16,32 +16,31 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       background-color: #e6dfd0;
       background-image: radial-gradient(circle at 50% 45%, rgba(255, 252, 244, 0.35), rgba(182, 168, 140, 0.2));
       color: #2c2b28;
       font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", Georgia, serif;
-      padding: 36px 20px;
+      padding: 32px 18px;
     }
 
     .container {
-      width: min(1080px, 94vw);
+      width: min(1260px, 95vw);
       background: #efe8d7;
       border: 1px solid #cdc3ad;
       box-shadow: 0 14px 40px rgba(32, 29, 24, 0.12), inset 0 0 0 1px rgba(255, 252, 245, 0.65);
-      padding: 36px 32px;
+      padding: 34px 30px;
     }
 
     header {
       text-align: center;
-      padding-bottom: 24px;
+      padding-bottom: 22px;
       border-bottom: 1px solid rgba(92, 84, 70, 0.22);
     }
 
     h1 {
-      font-size: clamp(24px, 3.2vw, 32px);
+      font-size: clamp(24px, 3vw, 32px);
       font-weight: 600;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.16em;
       color: #23221f;
       margin-bottom: 10px;
     }
@@ -53,11 +52,90 @@
       line-height: 1.7;
     }
 
+    .controls-bar {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 18px;
+      border-bottom: 1px dashed rgba(92, 84, 70, 0.2);
+    }
+
+    .filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      appearance: none;
+      background: #f5efe2;
+      color: #3a362e;
+      border: 1px solid #bdb39d;
+      padding: 6px 13px;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .tab-btn:hover {
+      background: #ebe2cf;
+      border-color: #6b6354;
+    }
+
+    .tab-btn.active {
+      background: #7c382b;
+      color: #faf4e8;
+      border-color: #7c382b;
+    }
+
+    .tab-count {
+      opacity: 0.8;
+      font-size: 12px;
+      margin-left: 3px;
+    }
+
+    .search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    #searchInput {
+      width: min(260px, 70vw);
+      padding: 7px 12px;
+      background: #f8f3e8;
+      border: 1px solid #bdb39d;
+      color: #24221e;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      outline: none;
+    }
+
+    #searchInput:focus {
+      border-color: #7c382b;
+      background: #fffcf5;
+    }
+
+    .count-label {
+      font-size: 12px;
+      color: #6b665c;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
     .gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      margin-top: 28px;
+      grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+      gap: 20px;
+      margin-top: 24px;
     }
 
     .card {
@@ -68,8 +146,8 @@
       color: inherit;
       background: #f5efe2;
       border: 1px solid #bdb39d;
-      padding: 24px 22px;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+      padding: 20px 18px;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
     }
 
     .card:hover {
@@ -79,455 +157,219 @@
       box-shadow: 0 8px 22px rgba(34, 31, 25, 0.1);
     }
 
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
     .seal {
       display: inline-block;
       font-size: 12px;
-      letter-spacing: 0.15em;
+      letter-spacing: 0.12em;
       color: #7c382b;
       border: 1px solid rgba(124, 56, 43, 0.45);
       padding: 2px 8px;
-      margin-bottom: 14px;
-      align-self: flex-start;
+    }
+
+    .group-tag {
+      font-size: 11px;
+      color: #6f695e;
+      letter-spacing: 0.06em;
     }
 
     .card h2 {
-      font-size: 21px;
+      font-size: 19px;
       font-weight: 600;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.09em;
       color: #1f1e1c;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .card p {
-      font-size: 14px;
-      line-height: 1.75;
+      font-size: 13px;
+      line-height: 1.7;
       color: #4f4c45;
-      margin-bottom: 18px;
+      margin-bottom: 15px;
     }
 
     .swatch-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 18px;
+      gap: 7px;
+      margin-bottom: 14px;
     }
 
     .swatch {
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
       border: 1px solid rgba(60, 56, 48, 0.25);
     }
 
     .enter {
       font-size: 13px;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.12em;
       color: #2f2e2a;
       border-top: 1px solid rgba(92, 84, 70, 0.18);
-      padding-top: 12px;
+      padding-top: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 48px 20px;
+      color: #6b665c;
+      font-size: 15px;
+      letter-spacing: 0.08em;
+    }
+
     footer {
-      margin-top: 26px;
+      margin-top: 28px;
       text-align: center;
       font-size: 12px;
       color: #6d6960;
       letter-spacing: 0.08em;
+    }
+
+    @media (max-width: 680px) {
+      .container { padding: 22px 16px; }
+      .search-wrap { width: 100%; justify-content: space-between; }
+      #searchInput { flex: 1; }
     }
   </style>
 </head>
 <body>
   <main class="container">
     <header>
-      <h1>中国传统国画与敦煌飞天画集</h1>
-      <p class="subtitle">原生 HTML5 Canvas 2D 逐笔渲染 · 宣纸水墨、写意花果与敦煌矿物重彩 · 零外部依赖</p>
+      <h1>中国传统国画、敦煌壁画与古典油画画集</h1>
+      <p class="subtitle">统一代码毛刷引擎与逐笔播放工作台 · 118 幅写意、工笔、敦煌与古典油画精品 · 支持单步步进、分层跳转与高清导出</p>
     </header>
 
-    <section class="gallery">
-      <a class="card" href="./shuimo-shanshui.html">
-        <div>
-          <span class="seal">五层水墨</span>
-          <h2>写意水墨山水</h2>
-          <p>
-            严循国画五层作画法度：清墨晕染远山、淡墨勾勒坡岸、中墨披麻皴理、浓墨写石树干、焦墨点苔飞白，左下大片留白以显江水空濛。
-          </p>
-          <div class="swatch-row" aria-label="墨分五色">
-            <span class="swatch" style="background: rgb(18, 19, 20);" title="焦墨"></span>
-            <span class="swatch" style="background: rgb(34, 36, 38);" title="浓墨"></span>
-            <span class="swatch" style="background: rgb(58, 61, 64);" title="中墨"></span>
-            <span class="swatch" style="background: rgb(92, 96, 100);" title="淡墨"></span>
-            <span class="swatch" style="background: rgb(126, 130, 134);" title="清墨"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./qianjiang-shanshui.html">
-        <div>
-          <span class="seal">六层浅绛</span>
-          <h2>浅绛山水（花青·赭石）</h2>
-          <p>
-            以五层墨骨立其形神，第六层采用正片叠底薄罩淡彩：山石向阳面暖罩赭石，背阴、远峰与水际冷染花青，清润淡雅而不掩墨韵。
-          </p>
-          <div class="swatch-row" aria-label="墨骨与浅绛淡彩">
-            <span class="swatch" style="background: rgb(34, 36, 38);" title="浓墨"></span>
-            <span class="swatch" style="background: rgb(58, 61, 64);" title="中墨"></span>
-            <span class="swatch" style="background: rgb(176, 128, 92);" title="赭石"></span>
-            <span class="swatch" style="background: rgb(86, 112, 130);" title="花青"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./chinese-orange-tree.html">
-        <div>
-          <span class="seal">写意重彩</span>
-          <h2>写意橘子树 · 重彩</h2>
-          <p>
-            竖幅生宣写意花果重彩，墨分五色写苍劲枝干，石绿、花青、汁绿层叠点叶，朱磦、赭石与藤黄绘累累橘果，含软边洇染、枯笔飞白与手动保存 PNG。
-          </p>
-          <div class="swatch-row" aria-label="墨干叶绿与朱磦橘彩">
-            <span class="swatch" style="background: #3a2e24;" title="中墨"></span>
-            <span class="swatch" style="background: #5b412b;" title="赭褐枝干"></span>
-            <span class="swatch" style="background: #345441;" title="石绿花青"></span>
-            <span class="swatch" style="background: #7b854c;" title="汁绿"></span>
-            <span class="swatch" style="background: #d8782a;" title="朱磦橘色"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./chinese-grapes.html">
-        <div>
-          <span class="seal">没骨写意</span>
-          <h2>青葡萄 · 没骨写意</h2>
-          <p>
-            立轴生宣没骨写意花果，墨分五色写老藤卷须，汁绿花青层叠染叶，晶莹青葡萄珠圆玉润，支持进度条拖拽步进与手动保存 PNG。
-          </p>
-          <div class="swatch-row" aria-label="老藤墨叶与晶莹青葡">
-            <span class="swatch" style="background: #3a2d23;" title="中墨老藤"></span>
-            <span class="swatch" style="background: #4e6338;" title="墨绿叶"></span>
-            <span class="swatch" style="background: #667a3b;" title="汁绿"></span>
-            <span class="swatch" style="background: #9bb85b;" title="嫩青葡萄"></span>
-            <span class="swatch" style="background: #c8d67a;" title="透亮果光"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./dunhuang-feitian-sketch.html">
-        <div>
-          <span class="seal">纯代码写意</span>
-          <h2>敦煌散花飞天（写意初稿）</h2>
-          <p>
-            纯数学曲线与程序化笔触手绘散花飞天，七层传统壁画技法（泥底、铁线描、分染、沥粉贴金、风化做旧），含进度条与手动下载 PNG。
-          </p>
-          <div class="swatch-row" aria-label="七层敦煌矿物色彩">
-            <span class="swatch" style="background: rgb(208, 186, 150);" title="泥壁土底"></span>
-            <span class="swatch" style="background: rgb(198, 72, 46);" title="朱砂"></span>
-            <span class="swatch" style="background: rgb(72, 146, 114);" title="石绿"></span>
-            <span class="swatch" style="background: rgb(52, 92, 138);" title="石青"></span>
-            <span class="swatch" style="background: rgb(216, 174, 88);" title="泥金"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./dunhuang-feitian.html">
-        <div>
-          <span class="seal">古壁临摹</span>
-          <h2>敦煌莫高窟飞天（285窟古壁版）</h2>
-          <p>
-            参照莫高窟第 285 窟箜篌飞天原壁构图与残缺岁月质感，29,850 笔七层矿彩渲染，支持进度条步进与七层快捷跳转。
-          </p>
-          <div class="swatch-row" aria-label="285窟古壁矿彩">
-            <span class="swatch" style="background: rgb(174, 146, 108);" title="风化泥壁"></span>
-            <span class="swatch" style="background: rgb(62, 42, 30);" title="深褐焦线"></span>
-            <span class="swatch" style="background: rgb(164, 68, 48);" title="古壁朱砂"></span>
-            <span class="swatch" style="background: rgb(74, 126, 98);" title="石绿"></span>
-            <span class="swatch" style="background: rgb(184, 132, 74);" title="赭石"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./dunhuang-feitian-fresh.html">
-        <div>
-          <span class="seal">水墨写意</span>
-          <h2>敦煌飞天（285窟水墨盛彩版）</h2>
-          <p>
-            融合《写意水墨山水》生宣洇染与 5 毫枯笔飞白引擎，依传统 209 笔法度（18 笔开脸、长线飘带与羊毫点染设色）高度临摹第 285 窟箜篌飞天原画，支持单笔步进观摩。
-          </p>
-          <div class="swatch-row" aria-label="盛彩新画矿物颜料">
-            <span class="swatch" style="background: rgb(246, 238, 222);" title="新白粉壁面"></span>
-            <span class="swatch" style="background: rgb(216, 56, 38);" title="鲜朱砂"></span>
-            <span class="swatch" style="background: rgb(32, 154, 108);" title="艳石绿"></span>
-            <span class="swatch" style="background: rgb(32, 78, 162);" title="群青石青"></span>
-            <span class="swatch" style="background: rgb(232, 184, 62);" title="煌金"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./oil-painting.html">
-        <div>
-          <span class="seal">古典油画</span>
-          <h2>古典油画静物（桃子与高脚杯）</h2>
-          <p>
-            无渐变与滤镜的纯毛刷点彩油画引擎，严格遵循古典罩染四层工序：亚麻底布 &rarr; 单色明暗底稿（Grisaille）&rarr; 厚涂设色 &rarr; 透明罩染（Glazing），再现暗调静物光影质感。
-          </p>
-          <div class="swatch-row" aria-label="古典油画四层设色">
-            <span class="swatch" style="background: rgb(30, 21, 16);" title="生褐暗底"></span>
-            <span class="swatch" style="background: rgb(214, 174, 122);" title="亚麻暖调"></span>
-            <span class="swatch" style="background: rgb(188, 100, 55);" title="桃红暖肤"></span>
-            <span class="swatch" style="background: rgb(194, 128, 78);" title="金褐反光"></span>
-            <span class="swatch" style="background: rgb(165, 108, 62);" title="铜器罩染"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入逐笔赏析</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-ink-bamboo.html">
-        <div>
-          <span class="seal">水墨花鸟</span>
-          <h2>芥子园·风竹墨韵</h2>
-          <p>
-            《芥子园画谱》经典竹谱法度：淡墨定坡石远竿 &rarr; 自下而上立浓墨主竿 &rarr; 点“人”字节生鹿角枝 &rarr; “个”“介”字法写竹叶。
-          </p>
-          <div class="swatch-row" aria-label="墨竹五色">
-            <span class="swatch" style="background: rgb(242, 233, 214);" title="宣纸本底"></span>
-            <span class="swatch" style="background: rgb(110, 106, 99);" title="淡墨远竿"></span>
-            <span class="swatch" style="background: rgb(52, 48, 43);" title="中墨枝节"></span>
-            <span class="swatch" style="background: rgb(22, 20, 18);" title="浓焦竹叶"></span>
-            <span class="swatch" style="background: rgb(157, 45, 34);" title="朱文闲章"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-red-plum.html">
-        <div>
-          <span class="seal">写意花鸟</span>
-          <h2>疏影红梅</h2>
-          <p>
-            《芥子园》梅谱法度：渴笔飞白老干起势 &rarr; “女”字穿插细枝 &rarr; 胭脂曙红五瓣点厾花头 &rarr; 焦墨点蒂勾须点蕊。
-          </p>
-          <div class="swatch-row" aria-label="红梅色彩">
-            <span class="swatch" style="background: rgb(242, 233, 214);" title="宣纸本底"></span>
-            <span class="swatch" style="background: rgb(42, 36, 30);" title="渴笔老干"></span>
-            <span class="swatch" style="background: rgb(214, 69, 82);" title="曙红点瓣"></span>
-            <span class="swatch" style="background: rgb(158, 25, 42);" title="胭脂含苞"></span>
-            <span class="swatch" style="background: rgb(21, 18, 16);" title="焦墨勾蕊"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-lotus-kingfisher.html">
-        <div>
-          <span class="seal">泼墨花鸟</span>
-          <h2>荷风翠影</h2>
-          <p>
-            大写意花鸟范本：斗笔泼墨外虚内实写荷叶 &rarr; 没骨曙红点染荷花莲蓬 &rarr; 悬肘勾荷梗 &rarr; 石青朱磦写翠鸟栖枝。
-          </p>
-          <div class="swatch-row" aria-label="荷花翠鸟设色">
-            <span class="swatch" style="background: rgb(42, 42, 36);" title="泼墨荷叶"></span>
-            <span class="swatch" style="background: rgb(184, 37, 63);" title="没骨荷瓣"></span>
-            <span class="swatch" style="background: rgb(201, 166, 67);" title="嫩黄莲蓬"></span>
-            <span class="swatch" style="background: rgb(27, 100, 143);" title="翠鸟石青"></span>
-            <span class="swatch" style="background: rgb(207, 90, 44);" title="朱磦腹羽"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-qi-shrimp.html">
-        <div>
-          <span class="seal">水墨水族</span>
-          <h2>齐派墨虾</h2>
-          <p>
-            齐白石经典水族技法：侧锋重墨定头胸甲壳 &rarr; 五节虾身逐节减淡呈现晶莹质感 &rarr; 劲笔折钳钢丝须 &rarr; 焦墨点睛。
-          </p>
-          <div class="swatch-row" aria-label="墨虾五墨渐变">
-            <span class="swatch" style="background: rgb(242, 233, 214);" title="清水留白"></span>
-            <span class="swatch" style="background: rgb(138, 131, 122);" title="清淡虾尾"></span>
-            <span class="swatch" style="background: rgb(84, 79, 72);" title="中墨虾腰"></span>
-            <span class="swatch" style="background: rgb(24, 22, 20);" title="重墨头胸"></span>
-            <span class="swatch" style="background: rgb(13, 11, 10);" title="焦墨点睛"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-ink-koi.html">
-        <div>
-          <span class="seal">没骨水族</span>
-          <h2>年年有余·水墨游鱼</h2>
-          <p>
-            没骨写意游鱼教程：淡墨垂柳水波营造清境 &rarr; 朱磦重墨侧锋定鱼头背部 &rarr; 飞白写散尾双鳍 &rarr; 点睛浮萍。
-          </p>
-          <div class="swatch-row" aria-label="游鱼设色">
-            <span class="swatch" style="background: rgb(217, 87, 41);" title="朱磦锦鲤"></span>
-            <span class="swatch" style="background: rgb(229, 164, 77);" title="藤黄柔尾"></span>
-            <span class="swatch" style="background: rgb(46, 43, 39);" title="乌墨丹顶"></span>
-            <span class="swatch" style="background: rgb(88, 108, 67);" title="柳色浮萍"></span>
-            <span class="swatch" style="background: rgb(157, 45, 34);" title="赤印款识"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-blue-green-landscape.html">
-        <div>
-          <span class="seal">青绿山水</span>
-          <h2>千里青绿</h2>
-          <p>
-            传统青绿设色五步法度：中锋勾勒三叠山骨 &rarr; 淡墨分染阴阳 &rarr; 石绿石青赭石层层赋彩 &rarr; 红树孤帆与重墨点苔。
-          </p>
-          <div class="swatch-row" aria-label="青绿矿彩">
-            <span class="swatch" style="background: rgb(48, 43, 36);" title="墨骨勾皴"></span>
-            <span class="swatch" style="background: rgb(39, 122, 88);" title="艳石绿"></span>
-            <span class="swatch" style="background: rgb(27, 79, 130);" title="深石青"></span>
-            <span class="swatch" style="background: rgb(184, 118, 62);" title="赭石暖坡"></span>
-            <span class="swatch" style="background: rgb(201, 56, 34);" title="朱砂红树"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-snow-landscape.html">
-        <div>
-          <span class="seal">雪景山水</span>
-          <h2>寒江独钓·雪景寒林</h2>
-          <p>
-            传统“不画雪而画天”雪景法：山顶屋面严格留白 &rarr; 干墨重压山阴枯树 &rarr; 淡墨花青烘天染水衬雪 &rarr; 弹粉飞雪与扁舟。
-          </p>
-          <div class="swatch-row" aria-label="雪景冷暖色调">
-            <span class="swatch" style="background: rgb(250, 246, 238);" title="积雪留白"></span>
-            <span class="swatch" style="background: rgb(77, 89, 102);" title="烘天冷靛"></span>
-            <span class="swatch" style="background: rgb(59, 58, 54);" title="山阴浓墨"></span>
-            <span class="swatch" style="background: rgb(25, 23, 20);" title="寒林枯干"></span>
-            <span class="swatch" style="background: rgb(212, 138, 66);" title="雪屋微灯"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-ink-fisherman.html">
-        <div>
-          <span class="seal">写意人物</span>
-          <h2>江雪蓑笠翁</h2>
-          <p>
-            南宋梁楷减笔人物法：计白当黑留江面 &rarr; 一笔斗笠与三笔开脸传神 &rarr; 破笔拖墨写蓑衣 &rarr; 钉头鼠尾衣袍三笔扁舟。
-          </p>
-          <div class="swatch-row" aria-label="写意人物墨韵">
-            <span class="swatch" style="background: rgb(242, 233, 214);" title="空濛留白"></span>
-            <span class="swatch" style="background: rgb(207, 168, 130);" title="淡赭面色"></span>
-            <span class="swatch" style="background: rgb(168, 125, 76);" title="蓑衣暖底"></span>
-            <span class="swatch" style="background: rgb(33, 28, 23);" title="破笔浓墨"></span>
-            <span class="swatch" style="background: rgb(24, 21, 18);" title="钉头鼠尾"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-oil-apple.html">
-        <div>
-          <span class="seal">古典油画</span>
-          <h2>基础油画·光影红苹果</h2>
-          <p>
-            油画静物经典四步训练：熟褐单色起稿铺暗底 &rarr; 固有色与明暗交界线 &rarr; 深入塑造冷暖反光果蒂 &rarr; 钛白厚涂高光点睛。
-          </p>
-          <div class="swatch-row" aria-label="苹果静物四步色阶">
-            <span class="swatch" style="background: rgb(36, 25, 19);" title="熟褐暗底"></span>
-            <span class="swatch" style="background: rgb(62, 16, 18);" title="明暗交界"></span>
-            <span class="swatch" style="background: rgb(196, 48, 36);" title="固有正红"></span>
-            <span class="swatch" style="background: rgb(228, 118, 52);" title="受光暖橙"></span>
-            <span class="swatch" style="background: rgb(255, 248, 232);" title="厚涂高光"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
-
-      <a class="card" href="./tutorial-oil-sunset-sea.html">
-        <div>
-          <span class="seal">印象派油画</span>
-          <h2>基础油画·海景日落</h2>
-          <p>
-            风景油画标准四步法：暖调打底标水平线 &rarr; 天空暮紫至金橙渐变晕染 &rarr; 深海大色压沉 &rarr; 厚涂金色碎波光与归巢海鸥。
-          </p>
-          <div class="swatch-row" aria-label="海景日落色调">
-            <span class="swatch" style="background: rgb(68, 72, 112);" title="暮空紫青"></span>
-            <span class="swatch" style="background: rgb(216, 114, 68);" title="晚霞橙红"></span>
-            <span class="swatch" style="background: rgb(255, 232, 148);" title="落日金辉"></span>
-            <span class="swatch" style="background: rgb(24, 48, 74);" title="深海靛蓝"></span>
-            <span class="swatch" style="background: rgb(255, 246, 205);" title="波光高光"></span>
-          </div>
-        </div>
-        <div class="enter">
-          <span>进入分步跟练</span>
-          <span>&rarr;</span>
-        </div>
-      </a>
+    <section class="controls-bar" aria-label="画作分类筛选与搜索">
+      <div class="filter-tabs" id="filterTabs"></div>
+      <div class="search-wrap">
+        <input id="searchInput" type="search" placeholder="搜索画作名称、技法或印章…" aria-label="搜索画作">
+        <span class="count-label" id="countLabel">加载画集中…</span>
+      </div>
     </section>
 
+    <section class="gallery" id="gallery"></section>
+
     <footer>
-      打开任意画作即可观看逐笔绘制动画，所有经典教程支持单步步进（退一步 / 进一步）、进度条拖拽回看与分层跳转
+      打开任意画作即可观看逐笔绘制动画，全画集统一支持单步步进（退一步 / 进一步）、进度条拖拽回看、分层跳转与保存 PNG
     </footer>
   </main>
+
+  <script src="./artworks/registry.js"></script>
+  <script src="./artworks/gongbi-10.js"></script>
+  <script src="./artworks/xieyi-flowers-25.js"></script>
+  <script src="./artworks/xieyi-aquatic-10.js"></script>
+  <script src="./artworks/xieyi-landscape-20.js"></script>
+  <script src="./artworks/xieyi-figures-10.js"></script>
+  <script src="./artworks/oil-figures-10.js"></script>
+  <script src="./artworks/oil-still-landscape-15.js"></script>
+  <script>
+  (() => {
+    'use strict';
+
+    const catalog = window.Code2PaintCatalog;
+    const tabsEl = document.getElementById('filterTabs');
+    const searchEl = document.getElementById('searchInput');
+    const countEl = document.getElementById('countLabel');
+    const galleryEl = document.getElementById('gallery');
+
+    if (!catalog) {
+      galleryEl.innerHTML = '<div class="empty-state">画集数据加载失败，请刷新重试。</div>';
+      return;
+    }
+
+    const allWorks = catalog.getAll();
+    const GROUPS = ['全部', '国画·工笔', '国画·花鸟', '国画·水族', '国画·山水', '国画·人物敦煌', '油画·人物', '油画·静物风景'];
+    let activeGroup = '全部';
+    let query = '';
+
+    function escHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderTabs() {
+      const counts = { '全部': allWorks.length };
+      for (const w of allWorks) {
+        counts[w.group] = (counts[w.group] || 0) + 1;
+      }
+      tabsEl.innerHTML = GROUPS.map(g => {
+        const isActive = g === activeGroup;
+        const n = counts[g] || 0;
+        return `<button class="tab-btn${isActive ? ' active' : ''}" type="button" data-group="${escHtml(g)}">${escHtml(g)}<span class="tab-count">(${n})</span></button>`;
+      }).join('');
+
+      tabsEl.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeGroup = btn.dataset.group;
+          renderTabs();
+          renderGallery();
+        });
+      });
+    }
+
+    function renderGallery() {
+      const q = query.trim().toLowerCase();
+      const filtered = allWorks.filter(w => {
+        if (activeGroup !== '全部' && w.group !== activeGroup) return false;
+        if (!q) return true;
+        const hay = `${w.title} ${w.seal} ${w.group} ${w.category || ''} ${w.desc || ''} ${w.subtitle || ''}`.toLowerCase();
+        return hay.includes(q);
+      });
+
+      countEl.textContent = `显示 ${filtered.length} / ${allWorks.length} 幅作品`;
+
+      if (!filtered.length) {
+        galleryEl.innerHTML = '<div class="empty-state">没有找到匹配该关键词的作品，请尝试清空搜索或切换分类。</div>';
+        return;
+      }
+
+      galleryEl.innerHTML = filtered.map(w => {
+        const href = catalog.urlFor(w);
+        const swatches = (w.swatches || []).slice(0, 5).map(c => `<span class="swatch" style="background: ${escHtml(c)};"></span>`).join('');
+        const cta = w.url ? '进入逐笔赏析' : '进入分步临摹';
+        return `
+          <a class="card" href="${escHtml(href)}">
+            <div>
+              <div class="card-meta">
+                <span class="seal">${escHtml(w.seal || w.category || '精品赏析')}</span>
+                <span class="group-tag">${escHtml(w.group)}</span>
+              </div>
+              <h2>${escHtml(w.title)}</h2>
+              <p>${escHtml(w.desc || w.subtitle || '')}</p>
+              <div class="swatch-row">${swatches}</div>
+            </div>
+            <div class="enter">
+              <span>${cta}</span>
+              <span>&rarr;</span>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    searchEl.addEventListener('input', () => {
+      query = searchEl.value;
+      renderGallery();
+    });
+
+    renderTabs();
+    renderGallery();
+  })();
+  </script>
 </body>
 </html>
