@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>寒江独钓·雪景寒林</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '寒江独钓·雪景寒林',
+  subtitle: '传统雪景山水法：阴面斧劈积墨 → 烘天染水反衬雪 → 寒林雪屋留白 → 独钓小舟弹粉飞雪',
+  category: '雪景山水',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 1200,
+  height: 820,
+  seed: 202607,
+  fileName: '寒江独钓雪景寒林',
+  layers: [
+    { id: 1, name: '一 · 干墨勾山石轮廓' },
+    { id: 2, name: '二 · 烘天染江定雪境' },
+    { id: 3, name: '三 · 雪坡茅屋与寒林' },
+    { id: 4, name: '四 · 寒江孤舟与暖灯' },
+    { id: 5, name: '五 · 弹粉飞雪题款' }
+  ],
+  buildStrokes(api) {
+    const leftRidge = [[0, 505], [72, 438], [148, 378], [225, 342], [308, 362], [385, 415], [462, 472], [545, 505]];
+    const rightRidge = [[565, 425], [665, 345], [755, 285], [842, 232], [935, 268], [1045, 325], [1145, 375], [1200, 405]];
+
+    // 一 · 干墨勾出右远峰阴壁与左岸大体骨势
+    api.inkStroke(1, '右主雪峰暗壁轮廓', [[755, 312], [842, 255], [965, 312], [1120, 398]], {
+      width: 5.5, color: '#2f2d2a', alpha: 0.80, dry: 0.42
+    });
+    const rFissures = [
+      [[755, 355], [725, 435], [695, 495]],
+      [[865, 295], [835, 385], [805, 475]],
+      [[985, 345], [965, 425], [942, 495]]
+    ];
+    rFissures.forEach((pts, i) => {
+      api.inkStroke(1, `右峰背阴斧劈皴 ${i + 1}`, pts, {
+        width: 7.5, color: '#292622', alpha: 0.72, dry: 0.50, profile: 'taper'
+      });
+    });
+
+    // 二 · “不画雪而画天”：无缝冷靛暮雪天穹 + 广阔江水底染（由岸坡层遮盖接缝，零直边！）
+    api.inkWash(2, '阴天暮雪冷靛天穹烘染', [
+      [0, 0], [1200, 0], [1200, 405], ...rightRidge.slice().reverse(), ...leftRidge.slice().reverse()
+    ], { color: '#4c5866', colorEdge: '#7d8996', alpha: 0.74, passes: 36 });
+
+    // Wide seamless winter river across mid-lower plane (drawn BEFORE foreground snowbank overlaps its left edge!)
+    api.inkWash(2, '寒江冷灰江水无缝横染', [
+      [280, 495], [1200, 488], [1200, 820], [280, 820]
+    ], { color: '#616d7a', colorEdge: '#95a1ac', alpha: 0.48, passes: 28 });
+
+    // Right snow峰 shaded wall and glistening snow top
+    api.inkWash(2, '右雪峰阴坡暗岩压实', [
+      [660, 495], [765, 325], [842, 255], [965, 312], [1145, 410], [1195, 495], [645, 495]
+    ], { color: '#4d4c49', colorEdge: '#80807d', alpha: 0.54, passes: 22 });
+    api.inkWash(2, '右峰顶厚雪皑皑留白带', [
+      [565, 425], [665, 345], [755, 285], [842, 232], [935, 268], [1045, 325], [1145, 375],
+      [1130, 396], [965, 314], [842, 256], [765, 324], [610, 448]
+    ], { color: '#fcf8ef', alpha: 0.94, blend: 'source-over', passes: 10 });
+
+    // 三 · 前景左雪崖、雪岸、积雪茅屋与蟹爪寒林（自然压过江面边缘）
+    // Opaque left rocky snow cliff body over water wash edge
+    api.inkWash(3, '左雪崖实体背阴岩壁', [
+      [0, 505], [105, 445], [222, 375], [345, 430], [452, 535], [492, 665], [435, 760], [0, 780]
+    ], { color: '#78736a', colorEdge: '#4a463f', alpha: 0.94, blend: 'source-over', passes: 28 });
+
+    // Warm sunlit snow cap over left ridge + foreground snowy shore apron covering bottom seam seamlessly
+    api.inkWash(3, '左山顶厚雪留白', [
+      [0, 505], [72, 438], [148, 378], [225, 342], [308, 362], [385, 415], [462, 472],
+      [430, 488], [345, 432], [222, 376], [105, 446], [0, 528]
+    ], { color: '#fcf8ef', alpha: 0.94, blend: 'source-over', passes: 10 });
+
+    api.inkWash(3, '近岸雪滩平坡（遮挡水岸接缝）', [
+      [0, 745], [280, 738], [465, 755], [645, 785], [790, 715], [915, 652], [1065, 630], [1200, 662], [1200, 820], [0, 820]
+    ], { color: '#f3ede0', colorEdge: '#ece3d0', alpha: 0.96, blend: 'source-over', passes: 22 });
+
+    // Organic cliff cracks on left rock
+    api.inkStroke(3, '左雪崖雪下暗石轮廓', [[10, 525], [105, 445], [222, 375], [345, 430], [450, 530]], {
+      width: 6, color: '#272420', alpha: 0.85, dry: 0.46
+    });
+    [[95, 495], [138, 565], [165, 655]], [[195, 425], [242, 505], [268, 595]];
+    [[[95, 495], [138, 565], [165, 655]], [[195, 425], [242, 505], [268, 595]]].forEach((pts, i) => {
+      api.inkStroke(3, `左壁斧劈裂纹 ${i + 1}`, pts, { width: 7, color: '#282521', alpha: 0.72, dry: 0.48 });
+    });
+
+    api.inkStroke(3, '近右雪岸石缘线', [[735, 760], [885, 660], [1055, 632], [1195, 665]], {
+      width: 6.5, color: '#24211d', alpha: 0.88, dry: 0.42
+    });
+
+    // Snow cottage
+    api.inkStroke(3, '茅屋暗墙木柱', [[245, 568], [245, 628], [362, 628], [362, 568]], {
+      width: 5.5, color: '#1f1c18', alpha: 0.90
+    });
+    api.inkStroke(3, '屋檐重墨线', [[224, 570], [303, 548], [382, 572]], {
+      width: 7.5, color: '#141210', alpha: 0.94
+    });
+    api.inkWash(3, '雪屋厚积雪坡面', [[228, 566], [303, 508], [378, 568]], {
+      color: '#fbf7ee', alpha: 0.95, blend: 'source-over', passes: 8, edgeRing: true, edgeWidth: 1.5
+    });
+
+    // Cold winter trees
+    [
+      ['雪林主枯树干', [[172, 640], [158, 540], [176, 455], [152, 378]], 9.5],
+      ['蟹爪左叉枝', [[166, 472], [112, 412], [75, 355]], 4.8],
+      ['蟹爪右叉枝', [[170, 452], [218, 385], [242, 338]], 4.4],
+      ['山坡枯枝二', [[402, 650], [412, 558], [395, 475], [428, 405]], 7.5],
+      ['右岸寒林枯干', [[1020, 648], [998, 552], [972, 472]], 7.2],
+      ['右岸蟹爪梢', [[998, 552], [1055, 492], [1095, 452]], 3.8]
+    ].forEach(([label, pts, w]) => {
+      api.inkStroke(3, label, pts, { width: w, color: '#1b1815', alpha: 0.88, dry: 0.28, profile: 'taper' });
+    });
+
+    // 四 · 独钓小舟与雪屋微灯
+    const bx = 635, by = 628;
+    api.inkStroke(4, '寒江孤舟主底', [[bx - 64, by - 4], [bx, by + 6], [bx + 68, by - 2]], {
+      width: 9, color: '#141210', alpha: 0.94, profile: 'taper'
+    });
+    api.inkStroke(4, '渔翁蓑衣', [[bx - 10, by - 6], [bx + 12, by - 10]], {
+      width: 8, color: '#1b1815', alpha: 0.92
+    });
+    api.inkStroke(4, '斗笠顶笔', [[bx - 16, by - 16], [bx + 16, by - 16]], {
+      width: 5, color: '#141210', alpha: 0.94
+    });
+    api.inkStroke(4, '渔竿斜出', [[bx + 10, by - 8], [bx + 76, by - 42]], {
+      width: 2.2, color: '#1c1815', alpha: 0.88
+    });
+    api.inkStroke(4, '舟下细微波痕', [[bx - 82, by + 15], [bx, by + 18], [bx + 86, by + 15]], {
+      width: 2.2, color: '#39414a', alpha: 0.55
+    });
+
+    api.inkDot(4, '雪屋微光暖窗', 303, 598, 10, 12, { color: '#d68b42', alpha: 0.92, blend: 'source-over' });
+
+    // 五 · 弹粉飞雪点染与题款
+    for (let i = 0; i < 62; i++) {
+      const fx = 28 + api.rand() * 1144;
+      const fy = 18 + api.rand() * 570;
+      const fr = 1.5 + api.rand() * 2.4;
+      api.inkDot(5, '弹粉飞雪点缀', fx, fy, fr, fr, {
+        color: '#fdfaf3', alpha: 0.72 + api.rand() * 0.24, blend: 'source-over', dur: 0.1
+      });
+    }
+
+    api.inscription(5, '题画：江天雪霁', 80, 95, '江天雪霁', { size: 32, stepY: 42, color: '#f4eee2' });
+    api.seal(5, '朱文闲章：清寒', 80, 285, '清寒', { size: 40 });
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>芥子园·风竹墨韵</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '芥子园·风竹墨韵',
+  subtitle: '《芥子园画谱》竹谱法度：画竿自下而上 → 点节生枝 → 个字介字写竹叶',
+  category: '水墨花鸟',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 900,
+  height: 1200,
+  seed: 202601,
+  fileName: '芥子园风竹墨韵',
+  layers: [
+    { id: 1, name: '一 · 淡墨坡石远竿' },
+    { id: 2, name: '二 · 浓墨立竿（自下而上）' },
+    { id: 3, name: '三 · 横笔点节与鹿角枝' },
+    { id: 4, name: '四 · 个字介字写竹叶' },
+    { id: 5, name: '五 · 点苔题款钤印' }
+  ],
+  buildStrokes(api) {
+    // 一 · 淡墨坡石远竿
+    api.inkWash(1, '坡石淡墨底蕴', [
+      [430, 1185], [470, 1085], [560, 1045], [705, 1060], [835, 1110], [895, 1190]
+    ], { color: '#756f66', colorEdge: '#4a453e', alpha: 0.34, passes: 20 });
+
+    api.inkStroke(1, '近石披麻皴纲要', [
+      [445, 1170], [495, 1095], [585, 1060], [690, 1066], [790, 1105], [860, 1175]
+    ], { width: 10, color: '#585249', alpha: 0.56, dry: 0.42, bleed: 0.15 });
+
+    // 远景淡墨细竿（三株掩映，自下而上）
+    const backJoints = [
+      [[480, 1120], [474, 985]],
+      [[474, 980], [462, 835]],
+      [[462, 829], [446, 682]],
+      [[446, 676], [426, 525]],
+      [[426, 519], [402, 372]],
+      [[402, 366], [374, 225]]
+    ];
+    backJoints.forEach((seg, idx) => {
+      api.inkStroke(1, `远竿第 ${idx + 1} 节（淡墨）`, seg, {
+        width: 14 - idx * 1.1,
+        color: '#6e6a63',
+        tipColor: '#4c4943',
+        alpha: 0.48,
+        profile: 'flat',
+        bleed: 0.25
+      });
+    });
+
+    // 二 · 浓墨立竿（主竿 + 次竿，严格自下而上）
+    const mainJoints = [
+      [[645, 1150], [634, 995]],
+      [[634, 988], [616, 828]],
+      [[616, 821], [592, 658]],
+      [[592, 651], [562, 488]],
+      [[562, 481], [528, 322]],
+      [[528, 315], [492, 168]]
+    ];
+    mainJoints.forEach((seg, idx) => {
+      api.inkStroke(2, `主竿第 ${idx + 1} 节（中锋实笔）`, seg, {
+        width: 24 - idx * 1.9,
+        color: '#25221e',
+        tipColor: '#12100e',
+        alpha: 0.88,
+        profile: 'flat',
+        bleed: 0.18
+      });
+    });
+
+    const rightJoints = [
+      [[755, 1140], [744, 1005]],
+      [[744, 998], [728, 862]],
+      [[728, 856], [708, 720]],
+      [[708, 714], [685, 582]],
+      [[685, 576], [658, 448]]
+    ];
+    rightJoints.forEach((seg, idx) => {
+      api.inkStroke(2, `辅竿第 ${idx + 1} 节`, seg, {
+        width: 17 - idx * 1.4,
+        color: '#34302b',
+        tipColor: '#191714',
+        alpha: 0.78,
+        profile: 'flat',
+        bleed: 0.15
+      });
+    });
+
+    // 三 · 横笔点节与鹿角枝
+    backJoints.slice(0, -1).forEach((seg, idx) => {
+      const [x, y] = seg[1];
+      api.inkStroke(3, `远竿点节 ${idx + 1}`, [[x - 9, y - 3], [x, y - 1], [x + 9, y - 3]], {
+        width: 3.4, color: '#45413b', alpha: 0.55, profile: 'taper'
+      });
+    });
+
+    mainJoints.slice(0, -1).forEach((seg, idx) => {
+      const [x, y] = seg[1];
+      api.inkStroke(3, `主竿“人”字点节 ${idx + 1}`, [[x - 14, y - 4], [x, y - 1], [x + 14, y - 4]], {
+        width: 5.2, color: '#141210', alpha: 0.92, profile: 'taper'
+      });
+    });
+
+    rightJoints.slice(0, -1).forEach((seg, idx) => {
+      const [x, y] = seg[1];
+      api.inkStroke(3, `辅竿点节 ${idx + 1}`, [[x - 10, y - 3], [x, y - 1], [x + 10, y - 3]], {
+        width: 4.0, color: '#211e1a', alpha: 0.82, profile: 'taper'
+      });
+    });
+
+    const twigs = [
+      [3, '左出主梢枝', [[592, 651], [505, 575], [405, 520], [315, 488]], 5.5, '#25211d', 0.85],
+      [3, '左出次细枝', [[460, 545], [385, 455], [322, 392]], 3.6, '#2a2621', 0.82],
+      [3, '中上左摇枝', [[562, 481], [475, 412], [375, 365], [278, 338]], 4.8, '#1e1b18', 0.86],
+      [3, '中上仰细梢', [[422, 385], [362, 295], [308, 240]], 3.2, '#28241f', 0.80],
+      [3, '竿顶风摇枝', [[528, 315], [448, 248], [362, 205]], 4.0, '#1f1c18', 0.85],
+      [3, '主竿右平衡枝', [[562, 481], [638, 418], [724, 378]], 4.2, '#2d2823', 0.82],
+      [3, '远竿淡墨侧枝', [[446, 676], [378, 610], [295, 575]], 3.4, '#6a655e', 0.50],
+      [3, '辅竿斜伸梢', [[708, 714], [648, 632], [585, 585]], 3.8, '#36312c', 0.75],
+      [3, '辅竿右侧风梢', [[685, 576], [768, 502], [835, 468]], 3.5, '#3b3630', 0.74]
+    ];
+    twigs.forEach(([, label, pts, w, col, a]) => {
+      api.inkStroke(3, label, pts, { width: w, color: col, alpha: a, profile: 'taper', dry: 0.12 });
+    });
+
+    // 四 · 个字、介字、分字写竹叶（由淡及浓，藏锋起笔、中腹饱满、锋芒收尖）
+    function addLeaf(layer, label, sx, sy, ang, len, w, col, a) {
+      const mx = sx + Math.cos(ang) * len * 0.48 + Math.sin(ang) * len * 0.06;
+      const my = sy + Math.sin(ang) * len * 0.48 + Math.cos(ang) * len * 0.05;
+      const ex = sx + Math.cos(ang) * len;
+      const ey = sy + Math.sin(ang) * len + len * 0.12;
+      api.inkStroke(layer, label, [[sx, sy], [mx, my], [ex, ey]], {
+        width: w, color: col, alpha: a, profile: 'bambooLeaf', bleed: 0.14
+      });
+    }
+
+    function addGeGroup(sx, sy, baseAng, scale, col, a, tag) {
+      addLeaf(4, `${tag}·正笔`, sx, sy, baseAng, 98 * scale, 13 * scale, col, a);
+      addLeaf(4, `${tag}·左撇`, sx + 2, sy + 2, baseAng + 0.36, 86 * scale, 11.5 * scale, col, a * 0.94);
+      addLeaf(4, `${tag}·右掠`, sx - 2, sy + 1, baseAng - 0.32, 80 * scale, 10.5 * scale, col, a * 0.9);
+    }
+
+    function addJieGroup(sx, sy, baseAng, scale, col, a, tag) {
+      addGeGroup(sx, sy, baseAng, scale, col, a, tag);
+      addLeaf(4, `${tag}·介字穿插`, sx + Math.cos(baseAng) * 14, sy + 10, baseAng + 0.62, 68 * scale, 9.5 * scale, col, a * 0.85);
+    }
+
+    // Distant misty leaf clusters first
+    addGeGroup(335, 592, 2.38, 0.92, '#69645d', 0.48, '远叶');
+    addJieGroup(295, 575, 2.52, 0.88, '#716c64', 0.44, '远叶');
+    addGeGroup(422, 425, 2.25, 0.85, '#68635c', 0.46, '远叶');
+    addGeGroup(612, 608, 2.15, 0.82, '#5a554e', 0.56, '中景叶');
+    addGeGroup(785, 492, 0.72, 0.92, '#3d3933', 0.72, '右梢叶');
+    addJieGroup(708, 386, 0.62, 0.96, '#2b2723', 0.82, '右枝叶');
+
+    // Rich dark foreground wind-swept bamboo clusters
+    addJieGroup(440, 542, 2.35, 1.08, '#171513', 0.92, '中左主叶');
+    addJieGroup(365, 495, 2.50, 1.12, '#141210', 0.94, '左风叶');
+    addGeGroup(320, 405, 2.68, 0.96, '#1f1c18', 0.88, '上挑叶');
+    addJieGroup(395, 368, 2.42, 1.10, '#161412', 0.92, '主梢重墨叶');
+    addJieGroup(295, 342, 2.62, 1.04, '#1b1815', 0.89, '左展叶');
+    addGeGroup(315, 255, 2.55, 0.90, '#221e1a', 0.85, '顶梢叶');
+    addJieGroup(428, 232, 2.38, 0.98, '#191714', 0.90, '高风叶');
+    addGeGroup(580, 588, 2.22, 0.95, '#24201c', 0.84, '辅竿叶');
+
+    // 五 · 坡石点苔、新竹笋与题款钤印
+    api.inkStroke(5, '山石枯笔加皴', [
+      [485, 1135], [535, 1082], [608, 1070], [722, 1098]
+    ], { width: 12, color: '#27231e', alpha: 0.74, dry: 0.55 });
+
+    // 地面两簇幽兰小草护根
+    api.inkStroke(5, '石畔凤尾草一', [[510, 1110], [462, 1020], [420, 968]], {
+      width: 5, color: '#25211c', alpha: 0.78, profile: 'bambooLeaf'
+    });
+    api.inkStroke(5, '石畔凤尾草二', [[520, 1105], [500, 1018], [486, 955]], {
+      width: 4.5, color: '#2d2924', alpha: 0.75, profile: 'bambooLeaf'
+    });
+    api.inkStroke(5, '石畔凤尾草三', [[760, 1125], [818, 1052], [855, 1010]], {
+      width: 4.5, color: '#2b2722', alpha: 0.72, profile: 'bambooLeaf'
+    });
+
+    const moss = [
+      [530, 1072], [552, 1062], [575, 1058], [665, 1068], [692, 1076],
+      [718, 1085], [482, 1105], [465, 1124]
+    ];
+    moss.forEach(([mx, my], idx) => {
+      api.inkDot(5, `石坡焦墨点苔 ${idx + 1}`, mx, my, 5.2, 3.6, { color: '#141210', alpha: 0.90 });
+    });
+
+    api.inscription(5, '行楷题款：清风高节', 142, 165, '清风高节', { size: 34, stepY: 44, color: '#241e17' });
+    api.seal(5, '朱文闲章：写竹', 142, 365, '写竹', { size: 42 });
+  }
+});
+</script>
+</body>
+</html>

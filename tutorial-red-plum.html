@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>疏影红梅</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '疏影红梅',
+  subtitle: '《芥子园》梅谱精要：渴笔拖老干 → “女”字穿小枝 → 胭脂五瓣点梅 → 焦墨勾蒂点蕊',
+  category: '写意花鸟',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 960,
+  height: 1200,
+  seed: 202602,
+  fileName: '疏影红梅',
+  layers: [
+    { id: 1, name: '一 · 渴笔苍干' },
+    { id: 2, name: '二 · “女”字穿枝' },
+    { id: 3, name: '三 · 胭脂五瓣点梅' },
+    { id: 4, name: '四 · 焦墨点蒂点蕊' },
+    { id: 5, name: '五 · 点苔题款钤印' }
+  ],
+  buildStrokes(api) {
+    // 一 · 渴笔老干（S 型大势起承转合）
+    api.inkStroke(1, '淡墨润背干', [
+      [140, 1085], [305, 935], [510, 775], [685, 650], [740, 560]
+    ], { width: 42, color: '#5c554c', alpha: 0.34, bleed: 0.45 });
+
+    api.inkStroke(1, '焦渴飞白主老干', [
+      [125, 1110], [270, 965], [465, 800], [670, 670], [735, 575], [615, 455], [420, 340]
+    ], { width: 32, color: '#2a241e', tipColor: '#161310', alpha: 0.88, dry: 0.48, bleed: 0.14 });
+
+    api.inkStroke(1, '主干顿挫复笔', [
+      [148, 1075], [335, 908], [520, 760]
+    ], { width: 22, color: '#1b1713', alpha: 0.82, dry: 0.56 });
+
+    // 二 · “女”字穿枝法（交叉生势，小枝如铁刺）
+    const branches = [
+      ['主枝左仰伸展', [[515, 760], [360, 635], [220, 520], [155, 445]], 13, '#221d18', 0.88, 0.32],
+      ['右出横斜大枝', [[665, 668], [765, 632], [855, 622]], 11, '#27211c', 0.84, 0.25],
+      ['折返高冲主梢', [[615, 455], [500, 355], [345, 255], [215, 185]], 10, '#1f1a16', 0.88, 0.28],
+      ['中枝“女”字交叉枝', [[460, 575], [575, 415], [655, 285], [690, 195]], 9, '#2b251f', 0.84, 0.24],
+      ['左低垂反照枝', [[290, 935], [215, 815], [140, 720]], 9.5, '#29231d', 0.82, 0.30],
+      ['右侧迎风挺梢', [[705, 530], [790, 420], [835, 325]], 7.2, '#241f1a', 0.85, 0.18],
+      ['高位细挺花枝一', [[355, 265], [285, 165], [250, 105]], 4.5, '#191613', 0.90, 0.08],
+      ['高位细挺花枝二', [[485, 355], [470, 235], [440, 165]], 4.2, '#1d1915', 0.88, 0.08],
+      ['左梢剑刺小枝', [[245, 540], [210, 415], [195, 345]], 4.4, '#1b1814', 0.88, 0.10],
+      ['右低承接细枝', [[745, 638], [795, 545], [848, 490]], 4.6, '#231e19', 0.86, 0.10],
+      ['干下小芽刺枝', [[415, 835], [450, 715], [468, 650]], 4.2, '#26211b', 0.84, 0.10]
+    ];
+    branches.forEach(([label, pts, w, col, a, dry]) => {
+      api.inkStroke(2, label, pts, { width: w, color: col, alpha: a, dry, profile: 'taper' });
+    });
+
+    // 三 · 胭脂五瓣点梅（正、侧、仰、含苞花蕾错落分布）
+    const blossoms = [
+      // Main cluster around upper left & mid
+      { x: 350, y: 262, r: 22, type: 'front', dark: true },
+      { x: 315, y: 215, r: 19, type: 'front', dark: false },
+      { x: 258, y: 185, r: 17, type: 'side', dark: true },
+      { x: 270, y: 132, r: 14, type: 'bud', dark: true },
+      { x: 438, y: 315, r: 23, type: 'front', dark: true },
+      { x: 472, y: 252, r: 18, type: 'side', dark: false },
+      { x: 446, y: 182, r: 14, type: 'bud', dark: false },
+      // Crossing branch cluster
+      { x: 565, y: 422, r: 24, type: 'front', dark: true },
+      { x: 615, y: 365, r: 20, type: 'front', dark: false },
+      { x: 652, y: 295, r: 19, type: 'side', dark: true },
+      { x: 682, y: 222, r: 15, type: 'bud', dark: true },
+      // Left extension
+      { x: 330, y: 605, r: 22, type: 'front', dark: true },
+      { x: 252, y: 538, r: 21, type: 'front', dark: false },
+      { x: 195, y: 478, r: 18, type: 'side', dark: true },
+      { x: 210, y: 405, r: 16, type: 'side', dark: false },
+      { x: 168, y: 425, r: 13, type: 'bud', dark: true },
+      // Right wind-swept blossoms
+      { x: 745, y: 475, r: 21, type: 'front', dark: true },
+      { x: 792, y: 418, r: 18, type: 'side', dark: false },
+      { x: 830, y: 348, r: 14, type: 'bud', dark: true },
+      { x: 795, y: 612, r: 20, type: 'front', dark: false },
+      { x: 842, y: 565, r: 16, type: 'side', dark: true },
+      // Low twigs accent
+      { x: 455, y: 695, r: 18, type: 'front', dark: false },
+      { x: 192, y: 785, r: 19, type: 'side', dark: true },
+      { x: 148, y: 732, r: 13, type: 'bud', dark: false }
+    ];
+
+    blossoms.forEach((b, idx) => {
+      const col = b.dark ? '#b62839' : '#d64552';
+      const rim = b.dark ? '#7a1222' : '#9c2032';
+      if (b.type === 'bud') {
+        api.inkBlob(3, `红梅花苞 ${idx + 1}`, b.x, b.y, b.r * 0.65, b.r * 0.9, -0.4, {
+          color: '#9e192a', rimColor: '#6d0e1a', alpha: 0.90, count: 8, bleed: 0.25
+        });
+      } else {
+        const count = b.type === 'front' ? 5 : 3;
+        const baseRot = (idx * 1.17) % (Math.PI * 2);
+        for (let p = 0; p < count; p++) {
+          const ang = baseRot + (p / 5) * Math.PI * 2;
+          const dist = b.r * 0.52;
+          api.inkBlob(
+            3,
+            `胭脂点瓣（第 ${idx + 1} 朵）`,
+            b.x + Math.cos(ang) * dist,
+            b.y + Math.sin(ang) * dist,
+            b.r * 0.48,
+            b.r * 0.44,
+            ang,
+            { color: col, rimColor: rim, alpha: 0.78, count: 9, bleed: 0.28 }
+          );
+        }
+      }
+    });
+
+    // 四 · 焦墨点蒂、细笔勾须点蕊
+    blossoms.forEach((b, idx) => {
+      api.inkDot(4, `焦墨点花蒂 ${idx + 1}`, b.x, b.y + (b.type === 'bud' ? 7 : 1), 3.6, 3.2, {
+        color: '#171311', alpha: 0.94
+      });
+      if (b.type !== 'bud') {
+        const rays = b.type === 'front' ? 6 : 4;
+        for (let s = 0; s < rays; s++) {
+          const ang = -Math.PI * 0.8 + (s / Math.max(1, rays - 1)) * Math.PI * 1.4 + (idx % 3) * 0.2;
+          const len = b.r * 0.56;
+          const ex = b.x + Math.cos(ang) * len;
+          const ey = b.y + Math.sin(ang) * len;
+          api.inkStroke(4, `硬毫勾花须 ${idx + 1}`, [[b.x, b.y], [ex, ey]], {
+            width: 1.5, color: '#1b1614', alpha: 0.85, profile: 'uniform'
+          });
+          api.inkDot(4, `浓墨点花蕊 ${idx + 1}`, ex, ey, 2.0, 2.0, {
+            color: '#120f0d', alpha: 0.92
+          });
+        }
+      }
+    });
+
+    // 五 · 老干点苔、题款钤印
+    const mossPts = [
+      [182, 1020], [225, 985], [340, 882], [442, 798], [585, 705], [645, 652], [680, 505], [532, 385]
+    ];
+    mossPts.forEach(([mx, my], idx) => {
+      api.inkDot(5, `老干苍苔 ${idx + 1}`, mx, my, 5.5, 3.8, { color: '#151311', alpha: 0.86 });
+    });
+
+    api.inscription(5, '题画：疏影横斜水清浅', 835, 145, '疏影横斜', { size: 32, stepY: 42, color: '#261f18' });
+    api.seal(5, '朱文闲章：寒香', 835, 340, '寒香', { size: 40 });
+  }
+});
+</script>
+</body>
+</html>

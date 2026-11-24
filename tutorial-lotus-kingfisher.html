@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>荷风翠影</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '荷风翠影',
+  subtitle: '写意泼墨法度：大笔泼墨写荷叶 → 没骨点染荷花 → 悬肘勾梗 → 石青朱磦写翠鸟',
+  category: '泼墨花鸟',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 1000,
+  height: 1200,
+  seed: 202603,
+  fileName: '荷风翠影',
+  layers: [
+    { id: 1, name: '一 · 悬肘荷梗先立势' },
+    { id: 2, name: '二 · 泼墨写波浪荷叶' },
+    { id: 3, name: '三 · 没骨点染红荷' },
+    { id: 4, name: '四 · 设色点写翠鸟' },
+    { id: 5, name: '五 · 水草浮萍题印' }
+  ],
+  buildStrokes(api) {
+    const cx = 565, cy = 345;
+
+    // 一 · 悬肘中锋长梗先入纸（隐藏在前景翻卷大荷叶背面，穿插得体）
+    api.inkStroke(1, '主花荷梗（悬肘一气呵成）', [
+      [cx, cy + 18], [585, 580], [595, 860], [608, 1170]
+    ], { width: 11, color: '#292d22', tipColor: '#151711', alpha: 0.88, profile: 'flat', dry: 0.14 });
+
+    api.inkStroke(1, '花蕾细长梗', [
+      [418, 308], [428, 595], [438, 920], [446, 1170]
+    ], { width: 8, color: '#3b4032', alpha: 0.78, profile: 'flat', dry: 0.18 });
+
+    api.inkStroke(1, '右侧栖鸟弯枝梗', [
+      [818, 510], [775, 695], [755, 925], [742, 1170]
+    ], { width: 9, color: '#2e3126', alpha: 0.84, profile: 'flat', dry: 0.2 });
+
+    [[587, 480], [592, 910], [426, 460], [435, 860], [782, 660]].forEach(([tx, ty], i) => {
+      api.inkDot(1, `荷梗倒刺 ${i + 1}`, tx - 6, ty, 2.4, 1.5, { color: '#171612', alpha: 0.88 });
+    });
+
+    // 二 · 泼墨写意波浪边荷叶（斗笔外实内虚、深浅交错 + 叶脐留晕）
+    // Wavy scalloped edge polygon for natural billowing pad
+    api.inkWash(2, '左下主荷叶墨气泼写', [
+      [88, 765], [122, 650], [188, 585], [275, 530], [385, 515], [488, 540],
+      [568, 585], [625, 665], [585, 765], [470, 845], [315, 865], [168, 845]
+    ], { color: '#23251e', colorEdge: '#435538', alpha: 0.86, passes: 40, edgeRing: true, edgeWidth: 2.8 });
+
+    // Opaque deep ink overlay blobs creating overlapping ink splash clusters + clear center leaf dimple
+    api.inkBlob(2, '主叶左下泼墨大块', 245, 715, 130, 88, -0.22, {
+      color: '#1b1d18', rimColor: '#36442f', alpha: 0.78, count: 24, bleed: 0.45, blend: 'source-over'
+    });
+    api.inkBlob(2, '主叶右上墨绿润叶', 445, 645, 125, 78, 0.18, {
+      color: '#2e3827', rimColor: '#4c5e3f', alpha: 0.68, count: 20, bleed: 0.42
+    });
+    api.inkBlob(2, '叶脐留浅透气圆心', 345, 682, 18, 12, 0, {
+      color: '#6b705a', alpha: 0.72, count: 6, blend: 'source-over'
+    });
+
+    const veins = [
+      [345, 682, 135, 675], [345, 682, 225, 560], [345, 682, 385, 528],
+      [345, 682, 545, 600], [345, 682, 595, 710], [345, 682, 468, 822],
+      [345, 682, 255, 842], [345, 682, 125, 775]
+    ];
+    veins.forEach(([x1, y1, x2, y2], idx) => {
+      api.inkStroke(2, `主叶辐射脉纹 ${idx + 1}`, [[x1, y1], [(x1 + x2) * 0.5, (y1 + y2) * 0.5 - 8], [x2, y2]], {
+        width: 3.4, color: '#11120e', alpha: 0.70, profile: 'taper'
+      });
+    });
+
+    // Right curled lotus pad wrapping the right stem naturally
+    api.inkWash(2, '右侧翻卷淡墨荷叶', [
+      [605, 865], [685, 782], [795, 768], [898, 795], [935, 868], [840, 952], [662, 938]
+    ], { color: '#47523e', colorEdge: '#272f23', alpha: 0.62, passes: 24, edgeRing: true });
+    api.inkStroke(2, '侧荷叶反卷重边', [
+      [615, 868], [742, 818], [895, 838]
+    ], { width: 11, color: '#1b2017', alpha: 0.75, bleed: 0.25 });
+
+    // 三 · 没骨曙红点染荷花 + 莲蓬
+    function drawPetal(layer, label, pts, w, cTip, cBase, a) {
+      api.inkStroke(layer, label, pts, {
+        width: w, color: cTip, colorEnd: cBase, alpha: a, profile: 'bambooLeaf', bleed: 0.24
+      });
+    }
+
+    drawPetal(3, '荷花后衬淡瓣一', [[cx - 32, cy - 115], [cx - 48, cy - 55], [cx - 12, cy + 5]], 42, '#ce4157', '#f4c7cf', 0.68);
+    drawPetal(3, '荷花后衬淡瓣二', [[cx + 25, cy - 118], [cx + 42, cy - 55], [cx + 12, cy + 5]], 42, '#ce4157', '#f4c7cf', 0.68);
+    drawPetal(3, '荷花左展花瓣', [[cx - 108, cy - 58], [cx - 72, cy - 12], [cx - 16, cy + 12]], 46, '#b8253f', '#f0bec8', 0.80);
+    drawPetal(3, '荷花右展花瓣', [[cx + 106, cy - 52], [cx + 68, cy - 8], [cx + 16, cy + 12]], 46, '#b8253f', '#f0bec8', 0.80);
+
+    api.inkBlob(3, '嫩黄莲蓬头', cx, cy - 22, 26, 18, 0, {
+      color: '#c9a643', rimColor: '#6d7a36', alpha: 0.90, count: 12, blend: 'source-over'
+    });
+    for (let s = -4; s <= 4; s++) {
+      api.inkStroke(3, '荷蕊细丝', [[cx + s * 6, cy - 20], [cx + s * 8, cy - 48]], {
+        width: 1.6, color: '#c48324', alpha: 0.85, profile: 'uniform'
+      });
+      api.inkDot(3, '花粉点缀', cx + s * 8, cy - 50, 2.2, 2.2, { color: '#a84e18', alpha: 0.90 });
+    }
+
+    drawPetal(3, '荷花前抱中瓣', [[cx - 4, cy - 92], [cx - 10, cy - 35], [cx, cy + 18]], 48, '#a61c36', '#f2b8c4', 0.86);
+    drawPetal(3, '荷花前抱左瓣', [[cx - 66, cy - 82], [cx - 52, cy - 24], [cx - 10, cy + 16]], 44, '#ad213b', '#f2bcc7', 0.82);
+    drawPetal(3, '荷花前抱右瓣', [[cx + 64, cy - 80], [cx + 48, cy - 22], [cx + 10, cy + 16]], 44, '#ad213b', '#f2bcc7', 0.82);
+
+    drawPetal(3, '含苞红荷蕾', [[415, 225], [408, 268], [418, 305]], 26, '#a21c34', '#ea9aa9', 0.88);
+    api.inkStroke(3, '花蕾青绿萼托', [[402, 295], [418, 312], [434, 295]], {
+      width: 6, color: '#455936', alpha: 0.82
+    });
+
+    // 四 · 石青朱磦写意翠鸟（放大精刻羽色、白喉斑、点睛）
+    const bx = 805, by = 475;
+    api.inkBlob(4, '翠鸟朱磦胸腹羽', bx - 10, by + 12, 20, 24, -0.35, {
+      color: '#cf5a2c', rimColor: '#9e3818', alpha: 0.92, count: 12, blend: 'source-over'
+    });
+    api.inkStroke(4, '翠鸟石青顶冠与翅背', [
+      [bx - 8, by - 28], [bx + 12, by - 16], [bx + 22, by + 18], [bx + 16, by + 46]
+    ], { width: 28, color: '#1b648f', colorEnd: '#103e5e', alpha: 0.94, profile: 'taper', blend: 'source-over' });
+    api.inkBlob(4, '翠鸟颊侧小白羽', bx - 4, by - 8, 7, 5, 0, {
+      color: '#f5efe2', alpha: 0.85, count: 5, blend: 'source-over'
+    });
+    api.inkStroke(4, '翠鸟尾羽与爪', [[bx + 16, by + 38], [bx + 32, by + 74]], {
+      width: 7.5, color: '#12364d', alpha: 0.92, profile: 'taper', blend: 'source-over'
+    });
+    api.inkStroke(4, '鸟足立梗', [[bx - 2, by + 30], [bx - 4, by + 44]], {
+      width: 3.6, color: '#9c3620', alpha: 0.90, blend: 'source-over'
+    });
+    api.inkStroke(4, '翠鸟长尖喙', [[bx - 20, by - 18], [bx - 66, by - 14]], {
+      width: 5.2, color: '#141210', alpha: 0.96, profile: 'nailHead'
+    });
+    api.inkDot(4, '翠鸟点睛', bx - 9, by - 18, 3.4, 3.4, { color: '#0d0c0b', alpha: 0.98 });
+
+    // 五 · 水草、浮萍与题款钤印
+    [[145, 1185, 115, 960, 130, 865], [185, 1185, 210, 995, 245, 905], [840, 1185, 885, 1020, 930, 925]].forEach(([x1, y1, x2, y2, x3, y3], i) => {
+      api.inkStroke(5, `水草芦叶 ${i + 1}`, [[x1, y1], [x2, y2], [x3, y3]], {
+        width: 7, color: '#45483d', alpha: 0.62, profile: 'bambooLeaf'
+      });
+    });
+
+    [[210, 1080], [238, 1092], [268, 1084], [312, 1102], [720, 1068], [748, 1076]].forEach(([px, py], i) => {
+      api.inkDot(5, `水萍 ${i + 1}`, px, py, 9, 5, { color: '#566444', alpha: 0.56 });
+    });
+
+    api.inscription(5, '题画：映日清姿', 135, 145, '映日清姿', { size: 32, stepY: 42, color: '#262019' });
+    api.seal(5, '朱文闲章：清赏', 135, 345, '清赏', { size: 40 });
+  }
+});
+</script>
+</body>
+</html>

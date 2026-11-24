@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>江雪蓑笠翁</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '江雪蓑笠翁',
+  subtitle: '南宋梁楷减笔写意人物法：一笔斗笠定神 → 破笔横扫蓑衣 → 钉头鼠尾勾衣褶 → 三笔扁舟',
+  category: '写意人物',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 920,
+  height: 1200,
+  seed: 202608,
+  fileName: '江雪蓑笠翁',
+  layers: [
+    { id: 1, name: '一 · 远崖寒苇江影' },
+    { id: 2, name: '二 · 斗笠定势与开脸' },
+    { id: 3, name: '三 · 破笔拖墨写蓑衣' },
+    { id: 4, name: '四 · 钉头鼠尾衣袍与舟' },
+    { id: 5, name: '五 · 渔竿水纹题款' }
+  ],
+  buildStrokes(api) {
+    // 一 · 计白当黑：左上淡墨远山，枯苇一丛，江水淡影
+    api.inkStroke(1, '左上远岸淡墨抹染', [[0, 315], [140, 282], [285, 310]], {
+      width: 44, color: '#8a847a', alpha: 0.24, bleed: 0.65, profile: 'taper'
+    });
+    api.inkStroke(1, '江波隐现淡痕', [[140, 940], [460, 956], [790, 938]], {
+      width: 24, color: '#9c968b', alpha: 0.20, bleed: 0.60
+    });
+
+    // 二 · 宽大斗笠侧锋斜罩 + 面颊淡赭三笔开脸
+    api.inkStroke(2, '斗笠左檐侧锋顿拖', [
+      [486, 442], [402, 466], [312, 502]
+    ], { width: 28, color: '#26211c', alpha: 0.86, dry: 0.36, profile: 'taper', bleed: 0.16 });
+    api.inkStroke(2, '斗笠右檐侧锋呼应', [
+      [486, 442], [558, 468], [625, 504]
+    ], { width: 24, color: '#3b352d', alpha: 0.78, dry: 0.38, profile: 'taper', bleed: 0.16 });
+    api.inkStroke(2, '斗笠顶尖压墨加固', [
+      [462, 442], [486, 430], [512, 444]
+    ], { width: 11, color: '#171411', alpha: 0.92 });
+
+    api.inkBlob(2, '渔翁脸颊淡赭微染', 450, 514, 22, 24, 0, {
+      color: '#cfa882', alpha: 0.36, count: 8, bleed: 0.5
+    });
+    api.inkStroke(2, '开脸一笔：额鼻下颌悬弧', [
+      [428, 498], [418, 516], [424, 535], [442, 544]
+    ], { width: 3.2, color: '#1b1714', alpha: 0.90, profile: 'taper' });
+    api.inkStroke(2, '开脸二笔：安详微合双目', [
+      [426, 510], [438, 512], [448, 510]
+    ], { width: 2.8, color: '#171310', alpha: 0.92 });
+    api.inkStroke(2, '开脸三笔：清瘦长髯随风', [
+      [433, 542], [422, 568], [412, 598]
+    ], { width: 3.0, color: '#3b3630', alpha: 0.76, dry: 0.36, profile: 'taper' });
+
+    // 三 · 无硬边框的破笔拖墨蓑衣（毛茸茸蓬松草衣质感）
+    api.inkBlob(3, '蓑衣赭石暖意打底', 488, 632, 85, 92, 0.1, {
+      color: '#9c7344', rimColor: '#f2e9d6', alpha: 0.34, count: 18, bleed: 0.55
+    });
+
+    const strawFans = [
+      ['蓑衣左肩破笔拖扫', [450, 540], [392, 610], [352, 695], 24, '#28221b'],
+      ['蓑衣背脊破笔斜扫', [482, 534], [446, 622], [415, 725], 28, '#211c17'],
+      ['蓑衣中腰破笔叠扫', [508, 536], [502, 628], [488, 735], 28, '#26211b'],
+      ['蓑衣后背草绒拖扫', [532, 534], [558, 626], [578, 728], 26, '#2d261f'],
+      ['蓑衣下层蓬松散锋', [412, 650], [485, 672], [568, 665], 16, '#1e1a15'],
+      ['蓑衣散落枯草尾', [382, 688], [472, 725], [562, 718], 14, '#2c261f']
+    ];
+    strawFans.forEach(([label, p1, p2, p3, w, col]) => {
+      api.inkStroke(3, label, [p1, p2, p3], {
+        width: w, color: col, alpha: 0.78, dry: 0.62, bristles: 12, profile: 'taper', bleed: 0.12
+      });
+    });
+
+    // 四 · “钉头鼠尾描”衣袖长袍与三笔写意扁舟
+    api.inkStroke(4, '钉头鼠尾：拱手斜襟长袖', [
+      [410, 612], [356, 664], [362, 718], [408, 756]
+    ], { width: 12, color: '#181512', alpha: 0.90, profile: 'nailHead', dry: 0.24 });
+
+    api.inkStroke(4, '钉头鼠尾：下摆曲坐袍角', [
+      [392, 745], [472, 772], [556, 756], [588, 715]
+    ], { width: 13, color: '#181512', alpha: 0.90, profile: 'nailHead', dry: 0.24 });
+
+    api.inkStroke(4, '袖口执竿手势顿笔', [
+      [362, 662], [334, 654], [348, 678]
+    ], { width: 6, color: '#2b241d', alpha: 0.88 });
+
+    // Three-stroke Song minimalist boat
+    api.inkStroke(4, '扁舟第一笔：船头挑起主底', [
+      [155, 868], [320, 912], [510, 916], [695, 888], [785, 845]
+    ], { width: 16, color: '#1d1915', alpha: 0.92, profile: 'nailHead', dry: 0.28 });
+
+    api.inkStroke(4, '扁舟第二笔：船舷上沿弧线', [
+      [195, 855], [450, 875], [735, 850]
+    ], { width: 7.5, color: '#2e2923', alpha: 0.84, profile: 'taper', dry: 0.20 });
+
+    api.inkStroke(4, '扁舟第三笔：船尾长篙横置', [
+      [590, 825], [685, 848], [805, 872]
+    ], { width: 5.5, color: '#25211c', alpha: 0.82, profile: 'taper' });
+
+    // 五 · 长竹钓竿、细丝波纹与落款
+    api.inkStroke(5, '瘦劲弧弯竹钓竿', [
+      [345, 658], [238, 560], [115, 488]
+    ], { width: 4.8, color: '#1b1714', alpha: 0.92, profile: 'taper' });
+
+    api.inkStroke(5, '游丝长线垂江面', [
+      [115, 488], [114, 720], [112, 955]
+    ], { width: 1.4, color: '#403b34', alpha: 0.72, profile: 'uniform' });
+
+    api.inkStroke(5, '江面微漪纹一', [[72, 955], [112, 962], [152, 955]], {
+      width: 2.2, color: '#6b655c', alpha: 0.50
+    });
+    api.inkStroke(5, '江面微漪纹二', [[54, 966], [112, 976], [170, 966]], {
+      width: 1.8, color: '#7a746a', alpha: 0.42
+    });
+
+    api.inscription(5, '题画：独钓寒江', 755, 165, '独钓寒江', { size: 34, stepY: 44, color: '#241e17' });
+    api.seal(5, '朱文闲章：忘机', 755, 385, '忘机', { size: 42 });
+  }
+});
+</script>
+</body>
+</html>

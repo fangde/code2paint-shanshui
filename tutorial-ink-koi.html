@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>年年有余·水墨游鱼</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '年年有余·水墨游鱼',
+  subtitle: '没骨写意游鱼法：淡墨水韵藻萍 → 侧锋点鱼头身躯 → 飞白摆尾 → 焦墨点睛落款',
+  category: '没骨水族',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 1080,
+  height: 860,
+  seed: 202605,
+  fileName: '年年有余水墨游鱼',
+  layers: [
+    { id: 1, name: '一 · 淡墨水波柳丝' },
+    { id: 2, name: '二 · 没骨写鱼头鱼身' },
+    { id: 3, name: '三 · 飞白散尾与双鳍' },
+    { id: 4, name: '四 · 墨朱花斑与点睛' },
+    { id: 5, name: '五 · 浮萍题款钤印' }
+  ],
+  buildStrokes(api) {
+    // 一 · 淡墨水波与垂柳水丝
+    api.inkStroke(1, '右上垂柳风丝一', [[895, 18], [825, 145], [758, 295]], {
+      width: 4.5, color: '#58624d', alpha: 0.45, profile: 'taper', bleed: 0.25
+    });
+    api.inkStroke(1, '右上垂柳风丝二', [[950, 22], [890, 172], [840, 332]], {
+      width: 4.0, color: '#616c55', alpha: 0.40, profile: 'taper', bleed: 0.25
+    });
+    [[840, 115], [810, 175], [782, 232], [898, 138], [872, 205], [848, 275]].forEach(([x, y], i) => {
+      api.inkStroke(1, `柳叶 ${i + 1}`, [[x, y], [x - 18, y + 26], [x - 28, y + 48]], {
+        width: 8, color: '#556347', alpha: 0.50, profile: 'bambooLeaf'
+      });
+    });
+
+    api.inkStroke(1, '江水淡墨波纹一', [[120, 695], [340, 675], [560, 705]], {
+      width: 10, color: '#8f948e', alpha: 0.18, bleed: 0.55
+    });
+    api.inkStroke(1, '江水淡墨波纹二', [[480, 765], [710, 748], [925, 768]], {
+      width: 9, color: '#8a8e88', alpha: 0.16, bleed: 0.50
+    });
+
+    function drawKoi(k) {
+      const ca = Math.cos(k.ang), sa = Math.sin(k.ang);
+      const nx = -sa, ny = ca;
+      const p = (f, s) => [k.cx + ca * f * k.sc + nx * s * k.sc, k.cy + sa * f * k.sc + ny * s * k.sc];
+
+      // 二 · 圆润流线没骨鱼身（柔和晕染打底 + 背脊主笔 + 腮盖圆润吻部）
+      const [bcx, bcy] = p(4, 2);
+      api.inkBlob(2, `${k.name}·水润鱼腹底染`, bcx, bcy, 72 * k.sc, 28 * k.sc, k.ang, {
+        color: k.bellyCol, rimColor: '#f5efe2', alpha: 0.55, count: 16, bleed: 0.45
+      });
+
+      const [hcx, hcy] = p(56, 0);
+      api.inkBlob(2, `${k.name}·圆润鱼头吻部`, hcx, hcy, 28 * k.sc, 21 * k.sc, k.ang, {
+        color: k.headCol, rimColor: k.bodyCol, alpha: 0.84, count: 14, bleed: 0.32
+      });
+
+      // Flowing back ridge stroke tapering smoothly to tail peduncle
+      api.inkStroke(2, `${k.name}·侧锋写背脊中躯`, [p(66, -4), p(8, -12), p(-48, -6), p(-92, 0)], {
+        width: 34 * k.sc, color: k.bodyCol, colorEnd: k.tailCol, alpha: 0.82,
+        bristles: 4, profile: 'taper', bleed: 0.42
+      });
+
+      api.inkStroke(2, `${k.name}·腹侧柔弧润笔`, [p(50, 10), p(4, 15), p(-52, 8), p(-88, 2)], {
+        width: 24 * k.sc, color: k.bodyCol, colorEnd: k.bellyCol, alpha: 0.55,
+        bristles: 4, profile: 'taper', bleed: 0.45
+      });
+
+      // 三 · 灵动飞白散尾与双鳍
+      api.inkStroke(3, `${k.name}·灵动上尾鳍`, [p(-82, 0), p(-138, -28), p(-186, -38)], {
+        width: 28 * k.sc, color: k.finCol, colorEnd: k.bellyCol, alpha: 0.66, profile: 'bambooLeaf', dry: 0.32, bleed: 0.28
+      });
+      api.inkStroke(3, `${k.name}·灵动下尾鳍`, [p(-82, 2), p(-138, 24), p(-180, 42)], {
+        width: 25 * k.sc, color: k.finCol, colorEnd: k.bellyCol, alpha: 0.62, profile: 'bambooLeaf', dry: 0.35, bleed: 0.28
+      });
+      api.inkStroke(3, `${k.name}·左展胸鳍`, [p(26, -15), p(-6, -48), p(-36, -58)], {
+        width: 19 * k.sc, color: k.finCol, alpha: 0.58, profile: 'bambooLeaf', dry: 0.24, bleed: 0.25
+      });
+      api.inkStroke(3, `${k.name}·右展胸鳍`, [p(24, 17), p(-8, 46), p(-38, 54)], {
+        width: 19 * k.sc, color: k.finCol, alpha: 0.58, profile: 'bambooLeaf', dry: 0.24, bleed: 0.25
+      });
+      api.inkStroke(3, `${k.name}·薄纱背鳍`, [p(12, -14), p(-28, -32), p(-64, -22)], {
+        width: 12 * k.sc, color: k.finCol, alpha: 0.58, profile: 'taper', dry: 0.22
+      });
+
+      // 四 · 锦鲤斑纹、双须与点睛
+      if (k.spots) {
+        k.spots.forEach(([sf, ss, sr, scol]) => {
+          const [sx, sy] = p(sf, ss);
+          api.inkBlob(4, `${k.name}·墨朱背斑`, sx, sy, sr * k.sc, sr * 0.72 * k.sc, k.ang + 0.35, {
+            color: scol, alpha: 0.80, count: 10, bleed: 0.35
+          });
+        });
+      }
+
+      const mL = p(82, -5), mR = p(82, 5);
+      api.inkStroke(4, `${k.name}·游鱼口须`, [mL, p(99, -15)], { width: 1.8, color: '#2b241d', alpha: 0.72 });
+      api.inkStroke(4, `${k.name}·游鱼口须`, [mR, p(99, 15)], { width: 1.8, color: '#2b241d', alpha: 0.72 });
+
+      const eL = p(62, -13), eR = p(62, 13);
+      api.inkDot(4, `${k.name}·点睛（左）`, eL[0], eL[1], 4.5 * k.sc, 4.0 * k.sc, { color: '#110f0d', alpha: 0.96 });
+      api.inkDot(4, `${k.name}·点睛（右）`, eR[0], eR[1], 4.5 * k.sc, 4.0 * k.sc, { color: '#110f0d', alpha: 0.96 });
+      api.inkDot(4, `${k.name}·眼神光`, eL[0] + 1.4, eL[1] - 1, 1.4 * k.sc, 1.4 * k.sc, {
+        color: '#f8f3e8', alpha: 0.92, blend: 'source-over'
+      });
+    }
+
+    drawKoi({
+      name: '领游朱砂锦鲤',
+      cx: 430, cy: 365, ang: -0.34, sc: 1.25,
+      headCol: '#ba281a', bodyCol: '#d95729', tailCol: '#df8b46', bellyCol: '#eed2aa', finCol: '#c44625',
+      spots: [[5, -7, 17, '#1d1a18'], [-38, 2, 14, '#1f1c19']]
+    });
+
+    drawKoi({
+      name: '中景乌墨丹顶鱼',
+      cx: 595, cy: 525, ang: -0.45, sc: 1.08,
+      headCol: '#292623', bodyCol: '#2e2b27', tailCol: '#59534b', bellyCol: '#b8b1a6', finCol: '#38342f',
+      spots: [[58, 0, 15, '#c8291a'], [-20, -5, 14, '#151311']]
+    });
+
+    drawKoi({
+      name: '左下金橙小鲤',
+      cx: 270, cy: 585, ang: -0.22, sc: 0.88,
+      headCol: '#c64622', bodyCol: '#db7730', tailCol: '#e5a44d', bellyCol: '#f2dcb4', finCol: '#cd6129',
+      spots: [[-15, -3, 12, '#8f2518']]
+    });
+
+    // 五 · 水面浮萍与题款钤印
+    [[235, 195], [268, 212], [295, 198], [760, 560], [792, 574], [820, 556], [420, 685]].forEach(([x, y], i) => {
+      api.inkDot(5, `水萍 ${i + 1}`, x, y, 13, 8, { color: '#586c43', alpha: 0.62 });
+    });
+
+    api.inscription(5, '行书题画：年年有余', 120, 145, '年年有余', { size: 34, stepY: 44, color: '#241e17' });
+    api.seal(5, '朱文闲章：鱼乐', 120, 360, '鱼乐', { size: 42 });
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>千里青绿</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '千里青绿',
+  subtitle: '传统青绿设色五步法：中锋勾勒山骨 → 淡墨分染阴阳 → 石绿石青赭石重彩 → 云烟红树孤帆 → 点苔',
+  category: '青绿山水',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 1200,
+  height: 820,
+  seed: 202606,
+  fileName: '千里青绿',
+  layers: [
+    { id: 1, name: '一 · 勾勒三叠山骨' },
+    { id: 2, name: '二 · 淡墨分染山阴' },
+    { id: 3, name: '三 · 石绿石青云烟染' },
+    { id: 4, name: '四 · 古松红树与孤帆' },
+    { id: 5, name: '五 · 重墨点苔题款' }
+  ],
+  buildStrokes(api) {
+    // Organic rugged mountain ridges
+    const farRidge = [[55, 390], [140, 325], [220, 290], [295, 255], [365, 222], [440, 275], [515, 305], [595, 272], [685, 215], [780, 175], [875, 220], [975, 278], [1085, 315], [1165, 340]];
+    const midLeft = [[35, 485], [115, 435], [178, 390], [248, 368], [322, 345], [398, 385], [478, 435], [575, 485]];
+    const mainRight = [[505, 495], [588, 420], [662, 338], [735, 285], [818, 222], [895, 250], [972, 308], [1055, 362], [1160, 445]];
+    const nearLeft = [[20, 800], [45, 675], [95, 610], [168, 572], [248, 568], [318, 608], [385, 682], [435, 795]];
+    const nearRight = [[820, 800], [875, 712], [945, 655], [1038, 632], [1125, 648], [1185, 685]];
+
+    // 一 · 中锋披麻皴勾勒群峰轮廓与山脊结构
+    const lines = [
+      ['远山连绵主轮廓', farRidge, 3.8, '#555048', 0.56],
+      ['中景左叠嶂山骨', midLeft, 5.2, '#302b24', 0.82],
+      ['主峰右叠峦苍崖', mainRight, 6.0, '#221e19', 0.90],
+      ['近景左下松岩峭壁', nearLeft, 6.4, '#1d1a15', 0.92],
+      ['近景右下沙洲平岸', nearRight, 5.0, '#27221c', 0.84],
+      ['左崖山腹披麻皴一', [[200, 398], [225, 442], [250, 488]], 3.6, '#3a342c', 0.72],
+      ['左崖山腹披麻皴二', [[322, 355], [352, 405], [382, 465]], 4.0, '#363028', 0.74],
+      ['主峰山肋披麻皴一', [[705, 315], [672, 395], [628, 472]], 4.4, '#2a241e', 0.78],
+      ['主峰山肋披麻皴二', [[818, 232], [798, 338], [768, 445]], 4.8, '#26211b', 0.80],
+      ['主峰山肋披麻皴三', [[930, 275], [958, 372], [995, 455]], 4.4, '#2b251f', 0.76],
+      ['近崖石块结构线', [[135, 632], [185, 695], [228, 765]], 4.4, '#26211b', 0.78]
+    ];
+    lines.forEach(([label, pts, w, col, a]) => {
+      api.inkStroke(1, label, pts, { width: w, color: col, alpha: a, dry: 0.22, profile: 'taper' });
+    });
+
+    // 二 · 先墨后色：淡墨分染凹处与向背
+    api.inkWash(2, '远峰山阴淡墨打底', [
+      ...farRidge, [1165, 420], [55, 420]
+    ], { color: '#6b6862', colorEdge: '#9b978e', alpha: 0.30, passes: 22 });
+
+    api.inkWash(2, '中主峰积墨分清阴阳', [
+      ...mainRight, [1160, 520], [505, 520]
+    ], { color: '#454038', colorEdge: '#7a756c', alpha: 0.42, passes: 26 });
+
+    api.inkWash(2, '近崖暗坡淡墨烘染', [
+      ...nearLeft, [435, 815], [20, 815]
+    ], { color: '#3b362f', colorEdge: '#686258', alpha: 0.44, passes: 20 });
+
+    // 三 · 石青石绿赭石层层重彩 + 麓间云烟软虚过渡
+    api.inkWash(3, '远岭石青清润平染', [
+      ...farRidge, [1165, 425], [55, 425]
+    ], { color: '#396d8f', colorEdge: '#80a6b3', alpha: 0.56, passes: 26 });
+
+    api.inkWash(3, '中景左峦翠绿赋彩', [
+      ...midLeft, [575, 520], [35, 520]
+    ], { color: '#328263', colorEdge: '#76ab7e', alpha: 0.62, passes: 24 });
+
+    api.inkWash(3, '主峰群青石青染顶背', [
+      [662, 338], [735, 285], [818, 222], [895, 250], [972, 308], [910, 415], [690, 415]
+    ], { color: '#1d5285', colorEdge: '#2d7a5e', alpha: 0.68, passes: 22 });
+
+    api.inkWash(3, '主峰山腰阳坡艳石绿', [
+      ...mainRight, [1160, 520], [505, 520]
+    ], { color: '#297a58', colorEdge: '#66a572', alpha: 0.66, passes: 26 });
+
+    api.inkWash(3, '山脚坡麓赭石暖撞', [
+      [505, 480], [720, 445], [960, 455], [1160, 475], [1160, 530], [505, 530]
+    ], { color: '#b5743b', colorEdge: '#cca064', alpha: 0.50, passes: 18 });
+
+    // Gentle valley mist clouds softening the mountain base seamlessly!
+    [[260, 498, 240, 28], [620, 505, 210, 26], [965, 495, 220, 28]].forEach(([mx, my, rx, ry], i) => {
+      api.inkBlob(3, `山麓流云白霭 ${i + 1}`, mx, my, rx, ry, 0, {
+        color: '#f2ead8', rimColor: '#f5efe2', alpha: 0.78, count: 16, bleed: 0.6, blend: 'source-over'
+      });
+    });
+
+    // Calm turquoise river curving gently across middle plane
+    api.inkWash(3, '碧水长河浅花青平铺', [
+      [280, 535], [1185, 525], [1185, 650], [875, 720], [420, 790], [320, 620]
+    ], { color: '#83a4a6', colorEdge: '#d2dcd5', alpha: 0.30, passes: 22 });
+
+    api.inkWash(3, '近景松岩石绿赭石', [
+      ...nearLeft, [435, 815], [20, 815]
+    ], { color: '#3d7952', colorEdge: '#a86e39', alpha: 0.66, passes: 22 });
+
+    api.inkWash(3, '右岸浅渚石绿赭石', [
+      ...nearRight, [1185, 815], [820, 815]
+    ], { color: '#45845d', colorEdge: '#ba8248', alpha: 0.60, passes: 18 });
+
+    // 四 · 苍松虬枝、朱砂秋树与远帆
+    [[148, 590], [225, 578]].forEach(([tx, ty], i) => {
+      api.inkStroke(4, `古松苍干 ${i + 1}`, [[tx, ty], [tx - 6, ty - 75], [tx + 10, ty - 115]], {
+        width: 8, color: '#241c15', alpha: 0.90, profile: 'taper'
+      });
+      for (let k = 0; k < 5; k++) {
+        api.inkBlob(4, `松针团簇 ${i + 1}`, tx - 18 + k * 14, ty - 92 - (k % 2) * 18, 26, 11, 0, {
+          color: '#1b5b40', rimColor: '#2d7d57', alpha: 0.86, count: 10
+        });
+      }
+    });
+
+    [[940, 655], [995, 638], [645, 488], [305, 622]].forEach(([rx, ry], i) => {
+      api.inkStroke(4, `红树主干 ${i + 1}`, [[rx, ry], [rx - 4, ry - 44]], {
+        width: 4.5, color: '#2b2019', alpha: 0.85
+      });
+      for (let d = 0; d < 7; d++) {
+        api.inkDot(4, `朱砂红叶 ${i + 1}`, rx - 20 + (d % 4) * 12, ry - 50 - Math.floor(d / 4) * 13, 7, 5.5, {
+          color: d % 2 === 0 ? '#c93822' : '#dc5c2e', alpha: 0.88
+        });
+      }
+    });
+
+    [[545, 612, 1], [630, 588, 0.76]].forEach(([sx, sy, sc], i) => {
+      api.inkStroke(4, `远浦归帆船身 ${i + 1}`, [[sx - 18 * sc, sy], [sx + 18 * sc, sy]], {
+        width: 4 * sc, color: '#2c221b', alpha: 0.85
+      });
+      api.inkWash(4, `孤舟白帆 ${i + 1}`, [
+        [sx - 4 * sc, sy - 2], [sx - 2 * sc, sy - 34 * sc], [sx + 10 * sc, sy - 6 * sc]
+      ], { color: '#fbf6ea', alpha: 0.94, blend: 'source-over', passes: 6, edgeRing: true, edgeWidth: 1.4 });
+    });
+
+    // 五 · 山巅点苔、行楷落款与朱印
+    [
+      [178, 388], [248, 366], [322, 343], [662, 336], [735, 282], [818, 220],
+      [895, 248], [972, 305], [168, 570], [245, 566], [945, 652], [1038, 630]
+    ].forEach(([mx, my], i) => {
+      api.inkDot(5, `山脊点苔 ${i + 1}`, mx, my, 5.2, 3.8, { color: '#141210', alpha: 0.90 });
+    });
+
+    api.inscription(5, '题画：千里青绿', 95, 110, '千里青绿', { size: 32, stepY: 42, color: '#241e17' });
+    api.seal(5, '朱文闲章：青绿', 95, 305, '青绿', { size: 40 });
+  }
+});
+</script>
+</body>
+</html>

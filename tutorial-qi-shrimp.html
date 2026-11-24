@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>齐派墨虾</title>
+</head>
+<body>
+<script src="./tutorial-engine.js"></script>
+<script>
+window.Code2PaintTutorial.mount({
+  title: '齐派墨虾',
+  subtitle: '齐白石写意游虾法：侧锋定头胸 → 逐节淡墨写腰尾 → 劲笔折钳 → 钢丝长须与焦墨点睛',
+  category: '水墨水族',
+  mode: 'ink',
+  theme: 'xuan',
+  width: 900,
+  height: 1200,
+  seed: 202604,
+  fileName: '齐派墨虾',
+  layers: [
+    { id: 1, name: '一 · 淡墨水气浮草' },
+    { id: 2, name: '二 · 浓墨头胸甲壳' },
+    { id: 3, name: '三 · 逐节减淡写身尾' },
+    { id: 4, name: '四 · 长钳与钢丝长须' },
+    { id: 5, name: '五 · 焦墨点睛与落款' }
+  ],
+  buildStrokes(api) {
+    // 一 · 极简淡墨水韵与远景水丝（不夺虾势，衬托白宣清水感）
+    api.inkStroke(1, '水际淡墨浮丝一', [[90, 990], [185, 920], [295, 895]], {
+      width: 6, color: '#9c968d', alpha: 0.24, bleed: 0.45
+    });
+    api.inkStroke(1, '水际淡墨浮丝二', [[655, 290], [745, 235], [820, 210]], {
+      width: 5, color: '#9c968d', alpha: 0.22, bleed: 0.45
+    });
+    api.inkStroke(1, '水下淡波弧线', [[180, 1085], [385, 1068], [580, 1082]], {
+      width: 3.5, color: '#aba498', alpha: 0.22
+    });
+
+    // Five shrimp in rhythmic swimming diagonal flow
+    // angle = swimming heading direction (rad)
+    const shrimps = [
+      { cx: 525, cy: 405, ang: -2.25, sc: 1.15, tone: 0, name: '领头大虾' },
+      { cx: 365, cy: 565, ang: -2.05, sc: 1.02, tone: 1, name: '中左游虾' },
+      { cx: 615, cy: 625, ang: -2.42, sc: 0.96, tone: 0, name: '中右跃虾' },
+      { cx: 430, cy: 795, ang: -1.92, sc: 1.08, tone: 0, name: '下主重墨虾' },
+      { cx: 675, cy: 895, ang: -2.52, sc: 0.85, tone: 2, name: '右下伴游小虾' }
+    ];
+
+    function pt(s, forward, side) {
+      const ca = Math.cos(s.ang), sa = Math.sin(s.ang);
+      const nx = -sa, ny = ca;
+      return [
+        s.cx + ca * forward * s.sc + nx * side * s.sc,
+        s.cy + sa * forward * s.sc + ny * side * s.sc
+      ];
+    }
+
+    // 二 · 头胸甲壳（三笔：先中央头额重笔，再两侧胸甲呼应）
+    shrimps.forEach((s) => {
+      const dark = s.tone === 0 ? '#181614' : (s.tone === 1 ? '#292622' : '#4a4640');
+      const alphaHead = s.tone === 2 ? 0.65 : 0.92;
+      // Head forehead dot/stroke (墨最深处)
+      api.inkStroke(2, `${s.name}·头额第一笔`, [pt(s, 36, 0), pt(s, -6, 0)], {
+        width: 16 * s.sc, color: dark, alpha: alphaHead, profile: 'nailHead', bleed: 0.25
+      });
+      // Left & right translucent carapace cheek strokes
+      api.inkStroke(2, `${s.name}·胸壳左颊`, [pt(s, 28, -9), pt(s, -26, -15)], {
+        width: 14 * s.sc, color: '#45413b', alpha: alphaHead * 0.65, profile: 'taper', bleed: 0.32
+      });
+      api.inkStroke(2, `${s.name}·胸壳右颊`, [pt(s, 28, 9), pt(s, -26, 15)], {
+        width: 14 * s.sc, color: '#45413b', alpha: alphaHead * 0.65, profile: 'taper', bleed: 0.32
+      });
+    });
+
+    // 三 · 五节虾腰与尾部（严格逐节由浓及淡，表现晶莹通透）
+    shrimps.forEach((s) => {
+      const shades = s.tone === 2
+        ? ['#57534d', '#68635c', '#7a746c', '#8b857c', '#9e978e']
+        : ['#2c2925', '#3e3a35', '#544f48', '#6e6860', '#8a837a'];
+      const bendOffsets = [
+        [-28, 0], [-52, 4], [-76, 11], [-98, 22], [-118, 35]
+      ];
+      for (let i = 0; i < 5; i++) {
+        const [f, curveSide] = bendOffsets[i];
+        const segW = (19 - i * 2.4) * s.sc;
+        const halfArc = (13 - i * 1.4);
+        const a = s.tone === 2 ? 0.55 - i * 0.06 : 0.78 - i * 0.09;
+        api.inkStroke(3, `${s.name}·第 ${i + 1} 节虾腰`, [
+          pt(s, f + 4, curveSide - halfArc),
+          pt(s, f - 5, curveSide),
+          pt(s, f + 4, curveSide + halfArc)
+        ], { width: segW, color: shades[i], alpha: a, profile: 'taper', bleed: 0.28 });
+      }
+      // Three-blade splayed tail fan
+      const tailBase = [-122, 37];
+      [[-32, -20], [-38, 2], [-28, 24]].forEach(([df, ds], k) => {
+        api.inkStroke(3, `${s.name}·散开虾尾`, [
+          pt(s, tailBase[0], tailBase[1]),
+          pt(s, tailBase[0] + df, tailBase[1] + ds + k * 4)
+        ], { width: 7 * s.sc, color: shades[1], alpha: 0.72, profile: 'bambooLeaf' });
+      });
+    });
+
+    // 四 · 两节折笔大钳与“钢丝”放射状长须 + 小足
+    shrimps.forEach((s, idx) => {
+      const armCol = s.tone === 2 ? '#4d4842' : '#26231f';
+      const armAlpha = s.tone === 2 ? 0.65 : 0.88;
+      // Left pincer (2 jointed strokes + claw)
+      api.inkStroke(4, `${s.name}·左螯钳前节`, [pt(s, 22, -10), pt(s, 72, -32)], {
+        width: 4.5 * s.sc, color: armCol, alpha: armAlpha, profile: 'taper'
+      });
+      api.inkStroke(4, `${s.name}·左螯钳折节`, [pt(s, 72, -32), pt(s, 118, -22)], {
+        width: 6.2 * s.sc, color: armCol, alpha: armAlpha, profile: 'nailHead'
+      });
+      // Right pincer
+      api.inkStroke(4, `${s.name}·右螯钳前节`, [pt(s, 22, 10), pt(s, 68, 36)], {
+        width: 4.5 * s.sc, color: armCol, alpha: armAlpha, profile: 'taper'
+      });
+      api.inkStroke(4, `${s.name}·右螯钳折节`, [pt(s, 68, 36), pt(s, 112, 26)], {
+        width: 6.2 * s.sc, color: armCol, alpha: armAlpha, profile: 'nailHead'
+      });
+
+      // Tiny swimming legs along belly
+      for (let leg = 0; leg < 4; leg++) {
+        const lf = -10 - leg * 14;
+        api.inkStroke(4, `${s.name}·游足`, [pt(s, lf, 10), pt(s, lf - 12, 26)], {
+          width: 2.2 * s.sc, color: armCol, alpha: armAlpha * 0.65, profile: 'taper'
+        });
+      }
+
+      // 6 sweeping resilient steel-wire antennae radiating forward
+      const feelerSpecs = [
+        [28, -6, 130, -78, 225, -105],
+        [30, -4, 155, -35, 250, -52],
+        [32, -2, 165, -8, 240, 12],
+        [32, 2, 165, 16, 245, 36],
+        [30, 4, 152, 48, 242, 74],
+        [28, 6, 120, 82, 210, 115]
+      ];
+      feelerSpecs.forEach(([f0, s0, f1, s1, f2, s2], k) => {
+        const sway = ((idx + k) % 2 === 0 ? 1 : -1) * 10;
+        api.inkStroke(4, `${s.name}·弹力长须`, [
+          pt(s, f0, s0),
+          pt(s, f1, s1 + sway),
+          pt(s, f2, s2 + sway * 1.4)
+        ], { width: 2.2 * s.sc, color: armCol, alpha: armAlpha * 0.85, profile: 'taper' });
+      });
+    });
+
+    // 五 · 焦墨横笔点睛 + 题款钤印
+    shrimps.forEach((s) => {
+      const eL = pt(s, 31, -13);
+      const eR = pt(s, 31, 13);
+      api.inkDot(5, `${s.name}·焦墨点左眼`, eL[0], eL[1], 4.6 * s.sc, 2.8 * s.sc, {
+        rot: s.ang + 0.9, color: '#0d0b0a', alpha: 0.96
+      });
+      api.inkDot(5, `${s.name}·焦墨点右眼`, eR[0], eR[1], 4.6 * s.sc, 2.8 * s.sc, {
+        rot: s.ang - 0.9, color: '#0d0b0a', alpha: 0.96
+      });
+    });
+
+    api.inscription(5, '行书落款：墨趣天然', 120, 160, '墨趣天然', { size: 32, stepY: 42, color: '#241e17' });
+    api.seal(5, '朱文闲章：齐风', 120, 355, '齐风', { size: 40 });
+  }
+});
+</script>
+</body>
+</html>
