@@ -8,9 +8,16 @@
 <body>
 <script src="./tutorial-engine.js"></script>
 <script>
+const LAYERS = [
+  { id: 1, name: '一 · 暖赭打底与海空构图' },
+  { id: 2, name: '二 · 暮霞云层逆光体积感' },
+  { id: 3, name: '三 · 深海远岬与波涛明暗' },
+  { id: 4, name: '四 · 碎金落日水波与海鸥' }
+];
+
 window.Code2PaintTutorial.mount({
   title: '基础油画·海景日落',
-  subtitle: '印象派风景入门四步法：暖调打底定水平线 → 天空晚霞渐变晕染 → 深海大色 → 金光波纹与海鸥',
+  subtitle: '印象派海景四步法（3D大气云海 + 5000笔方向堆彩）：暖色构图 → 逆光立体云霞 → 菲涅耳深海波浪 → 金光波路与飞鸥',
   category: '印象派油画',
   mode: 'oil',
   theme: 'gallery-dark',
@@ -19,138 +26,88 @@ window.Code2PaintTutorial.mount({
   height: 820,
   seed: 202610,
   fileName: '基础油画海景日落',
-  layers: [
-    { id: 1, name: '一 · 暖底色与海平线' },
-    { id: 2, name: '二 · 天空与暮霞渐变' },
-    { id: 3, name: '三 · 深蓝大海与远岬' },
-    { id: 4, name: '四 · 厚涂波光与海鸥' }
-  ],
+  layers: LAYERS,
   buildStrokes(api) {
-    const H_Y = 445;
+    const M = window.Code2PaintOilMaster;
+    const W = 1200, H = 820, H_Y = 445;
+    const scene = M.createScene(W, H, 202610);
 
-    // 一 · 满幅无缝暖赭底色打底 + 清晰水平线
-    for (let y = 0; y <= 840; y += 54) {
-      api.oilStroke(1, '全幅印象派土黄暖底色打底', [[-70, y], [600, y + 6], [1270, y - 6]], {
-        width: 125, stretch: 0.80, fade: 0.02, color: [115, 72, 44], colorEnd: [84, 52, 36], alpha: 0.30, vary: 5, temp: 6
-      });
-    }
-    api.oilStroke(1, '水平线明确构图分割', [[0, H_Y], [600, H_Y], [1200, H_Y]], {
-      width: 6, color: [62, 40, 32], alpha: 0.65
+    // 1. Atmospheric sunset sky with volumetric self-shadowed backlit dusk clouds & glowing sun disc
+    scene.shadeSkyAndClouds({
+      horizonY: H_Y,
+      skyTop: [34, 46, 88],
+      skyMid: [158, 76, 94],
+      skyHorizon: [252, 206, 108],
+      sunX: 625,
+      sunY: 406,
+      sunR: 38,
+      sunCol: [255, 250, 224],
+      glowR: 380,
+      glowCol: [255, 198, 96],
+      glowStrength: 0.78,
+      cloudCover: 0.56,
+      cloudScale: 0.0056,
+      cloudLitCol: [252, 196, 108],
+      cloudDarkCol: [66, 52, 86],
+      cloudBot: H_Y * 0.92,
+      cloudAlpha: 0.88
     });
 
-    // 二 · 天空满幅无缝梯度铺设 + 霞光破笔流云
-    const skyBands = [
-      { y: 20, w: 145, c1: [44, 54, 92], c2: [64, 68, 108], lbl: '天顶深群青暮色' },
-      { y: 82, w: 145, c1: [68, 60, 98], c2: [96, 70, 102], lbl: '高空蓝紫柔顺衔接' },
-      { y: 148, w: 145, c1: [112, 72, 102], c2: [152, 86, 94], lbl: '玫瑰暮霭渐变过渡' },
-      { y: 215, w: 145, c1: [182, 88, 76], c2: [216, 114, 68], lbl: '中天绯红暖橘辉映' },
-      { y: 282, w: 145, c1: [228, 134, 66], c2: [244, 168, 78], lbl: '低空琥珀夕阳晕染' },
-      { y: 348, w: 135, c1: [242, 168, 74], c2: [252, 206, 104], lbl: '暮日金光柔和交融' },
-      { y: 406, w: 105, c1: [250, 204, 102], c2: [255, 232, 158], lbl: '水天一线金暖亮带' }
-    ];
-    skyBands.forEach((b) => {
-      api.oilStroke(2, b.lbl, [[-70, b.y], [580, b.y + 6], [1270, b.y - 6]], {
-        width: b.w, color: b.c1, colorEnd: b.c2, alpha: 0.62, vary: 5, stretch: 0.78, fade: 0.02
+    // 2. Distant twilight purple-violet headland along left horizon
+    scene.shadeMountainRange({
+      baseY: H_Y + 4,
+      peaks: [[0, H_Y - 38], [165, H_Y - 58], [320, H_Y - 22], [445, H_Y + 4], [1200, H_Y + 4]],
+      sunDirX: 0.65,
+      sunDirY: -0.35,
+      rockLit: [112, 68, 74],
+      rockDark: [44, 38, 62],
+      snowLine: 1.5,
+      mistCol: [198, 128, 92],
+      mistStrength: 0.42,
+      ridgeAmp: 22,
+      ridgeFreq: 0.012
+    });
+
+    // 3. 3D Fresnel ocean with billowing perspective swells & dazzling broken golden sun glitter path
+    scene.shadeOcean({
+      yTop: H_Y,
+      yBot: H,
+      seaTop: [72, 68, 94],
+      seaMid: [28, 52, 84],
+      seaBot: [14, 28, 52],
+      sunX: 625,
+      sunY: 406,
+      glitterCol: [255, 236, 148],
+      glitterSpread: 225,
+      glitterStrength: 0.96,
+      waveScale: 0.024,
+      skyMix: 0.34
+    });
+
+    // 4. Crisp silhouette soaring seabirds against glowing dusk sky
+    scene.draw2D((ctx) => {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#2a1d24';
+      [[345, 196, 1.0], [422, 224, 0.85], [292, 242, 0.72]].forEach(([gx, gy, sc]) => {
+        ctx.lineWidth = 4.2 * sc;
+        ctx.beginPath();
+        ctx.moveTo(gx - 22 * sc, gy + 5 * sc);
+        ctx.quadraticCurveTo(gx - 10 * sc, gy - 9 * sc, gx, gy + 2 * sc);
+        ctx.quadraticCurveTo(gx + 10 * sc, gy - 10 * sc, gx + 22 * sc, gy + 4 * sc);
+        ctx.stroke();
       });
     });
 
-    const clouds = [
-      [[90, 205], [320, 192], [530, 212], [62, '#624163', '#cc6b56']],
-      [[640, 175], [880, 158], [1110, 182], [60, '#6a4464', '#da7b58']],
-      [[260, 290], [510, 282], [750, 294], [46, '#ea9852', '#f7c86f']],
-      [[810, 268], [995, 255], [1165, 278], [48, '#dc7f4e', '#f0b266']]
-    ];
-    clouds.forEach(([p1, p2, p3, opts], i) => {
-      api.oilStroke(2, `霞光流云散笔 ${i + 1}`, [p1, p2, p3], {
-        width: opts[0], color: opts[1], colorEnd: opts[2], alpha: 0.38, vary: 6, bristle: 0.55
-      });
-    });
-
-    api.oilPatch(2, '海上落日核心暖光晕', 625, 400, 145, 98, 0, {
-      color: [255, 234, 152], colorEdge: [244, 142, 54], alpha: 0.54, count: 16
-    });
-    api.oilHighlight(2, '落日正圆金白轮', 625, 405, 42, 42, 0, {
-      color: [255, 248, 214], alpha: 0.92, count: 6
-    });
-
-    // 三 · 远岸剪影与无缝深海水平波涛
-    api.oilStroke(3, '远海紫色海岬剪影', [
-      [-30, H_Y - 12], [180, H_Y - 36], [360, H_Y - 14], [435, H_Y - 2]
-    ], {
-      width: 34, fade: 0.12, color: [52, 42, 66], colorEnd: [84, 56, 74], alpha: 0.80
-    });
-
-    for (let y = H_Y + 14; y <= 835; y += 26) {
-      const depth = (y - H_Y) / (820 - H_Y);
-      const seaC1 = [api.lerp(42, 16, depth), api.lerp(64, 34, depth), api.lerp(96, 62, depth)];
-      const seaC2 = [api.lerp(62, 22, depth), api.lerp(72, 40, depth), api.lerp(98, 68, depth)];
-      api.oilStroke(3, '深海海面大色无缝平扫', [[-70, y], [590, y + 3], [1270, y - 3]], {
-        width: 58, color: seaC1, colorEnd: seaC2, alpha: 0.66, vary: 4, stretch: 0.72, fade: 0.02
-      });
-    }
-
-    api.oilStroke(3, '水天交界深海清边', [[420, H_Y + 2], [900, H_Y + 2], [1240, H_Y + 2]], {
-      width: 6, fade: 0.04, color: [28, 42, 68], alpha: 0.70
-    });
-
-    for (let i = 0; i < 16; i++) {
-      const y = H_Y + 26 + i * 21;
-      const xL = 60 + (i * 113) % 340;
-      const xR = 820 + (i * 97) % 310;
-      api.oilStroke(3, '海面映衬暮空紫红碎笔', [[xL, y], [xL + 85, y]], {
-        width: 11, color: [138, 78, 86], alpha: 0.28, vary: 4, stretch: 0.34
-      });
-      api.oilStroke(3, '海波暖紫阴影呼应', [[xR, y + 6], [xR + 92, y + 6]], {
-        width: 11, color: [128, 74, 80], alpha: 0.26, vary: 4, stretch: 0.34
-      });
-    }
-
-    // 四 · 厚涂落日金色碎波、近浪暗脊与剪影海鸥
-    for (let row = 0; row < 28; row++) {
-      const f = row / 27;
-      const y = H_Y + 8 + Math.pow(f, 1.15) * 355;
-      const spread = 32 + f * 210;
-      const numMarks = 2 + Math.floor(f * 3);
-      for (let k = 0; k < numMarks; k++) {
-        const x = 625 + (api.rand() - 0.5) * spread * 2;
-        const halfLen = 14 + f * 38;
-        const w = 6 + f * 10;
-        const bright = k === 0 || api.rand() > 0.45;
-        api.oilStroke(4, '海面金光厚涂碎笔', [[x - halfLen, y], [x + halfLen, y]], {
-          width: w,
-          color: bright ? [255, 224, 124] : [236, 138, 60],
-          colorEnd: bright ? [255, 246, 205] : [248, 178, 86],
-          alpha: 0.72 - f * 0.16,
-          vary: 6,
-          stretch: 0.34
-        });
-      }
-    }
-
-    for (let i = 0; i < 6; i++) {
-      api.oilHighlight(4, '落日水柱核心厚涂高光', 625 + (i - 2.5) * 14, H_Y + 12 + i * 16, 28 - i * 2, 4.5, 0, {
-        color: [255, 250, 228], alpha: 0.90, count: 4
-      });
-    }
-
-    for (let i = 0; i < 6; i++) {
-      const wy = 665 + i * 24;
-      const wx = 180 + i * 145;
-      api.oilStroke(4, '近景暗海浪脊微光', [[wx - 55, wy], [wx + 55, wy + 2]], {
-        width: 7, color: [165, 118, 92], alpha: 0.34
-      });
-    }
-
-    [[345, 195, 1.0], [418, 225, 0.82], [295, 240, 0.72]].forEach(([gx, gy, sc], idx) => {
-      api.oilStroke(4, `归巢海鸥剪影 ${idx + 1}`, [
-        [gx - 22 * sc, gy + 5 * sc],
-        [gx - 9 * sc, gy - 6 * sc],
-        [gx, gy + 2 * sc],
-        [gx + 9 * sc, gy - 7 * sc],
-        [gx + 22 * sc, gy + 4 * sc]
-      ], {
-        width: 3.4 * sc, color: [38, 28, 36], alpha: 0.88, bristle: 0
-      });
+    M.synthesize(api, scene, {
+      style: 'impressionist',
+      totalStrokes: 5000,
+      seed: 202610,
+      layers: LAYERS,
+      roi: [
+        { cx: 625, cy: 420, rx: 140, ry: 90, boost: 3.4 },
+        { cx: 625, cy: 615, rx: 195, ry: 165, boost: 3.0 },
+        { cx: 350, cy: 215, rx: 120, ry: 55, boost: 2.8 }
+      ]
     });
   }
 });

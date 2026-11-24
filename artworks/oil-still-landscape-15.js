@@ -1,6 +1,4 @@
 (function () {
-  'use strict';
-
   const STILL_LAYERS = [
     { id: 1, name: '一 · 亚麻底布与暗桌壁调' },
     { id: 2, name: '二 · 构图投影与大色块' },
@@ -15,58 +13,72 @@
     { id: 4, name: '四 · 厚涂光影与倒影高光' }
   ];
 
-  function paintBackdrop(api, w, h, cTop, cMid, cBot) {
-    for (let y = -10; y <= h + 40; y += 44) {
-      const f = Math.max(0, Math.min(1, y / h));
-      const col = f < 0.5
-        ? [api.lerp(cTop[0], cMid[0], f * 2), api.lerp(cTop[1], cMid[1], f * 2), api.lerp(cTop[2], cMid[2], f * 2)]
-        : [api.lerp(cMid[0], cBot[0], (f - 0.5) * 2), api.lerp(cMid[1], cBot[1], (f - 0.5) * 2), api.lerp(cMid[2], cBot[2], (f - 0.5) * 2)];
-      api.oilStroke(1, '无缝油画大背景铺涂', [[-60, y], [w * 0.5, y + 6], [w + 60, y - 6]], {
-        width: 118, stretch: 0.78, fade: 0.02, color: col, colorEnd: col, alpha: 0.48, vary: 4, bristle: 0.28
-      });
-    }
-  }
+  function drawSunflowers(ctx, blooms, N) {
+    blooms.forEach(([bx, by, r, tilt, droop]) => {
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(tilt);
+      const scaleY = droop ? 0.62 : 0.94;
+      ctx.scale(1, scaleY);
 
-  function paintTableBand(api, w, h, yTop, cTop, cBot) {
-    for (let y = yTop; y <= h + 40; y += 42) {
-      const t = Math.min(1, (y - yTop) / Math.max(1, h - yTop));
-      const col = [api.lerp(cTop[0], cBot[0], t), api.lerp(cTop[1], cBot[1], t), api.lerp(cTop[2], cBot[2], t)];
-      api.oilStroke(1, '木案台面横笔平铺', [[-60, y], [w * 0.5, y - 4], [w + 60, y + 4]], {
-        width: 110, stretch: 0.78, fade: 0.02, color: col, colorEnd: col, alpha: 0.52, vary: 4, bristle: 0.32
-      });
-    }
-  }
+      const nPetals = 24;
+      for (let p = 0; p < nPetals; p++) {
+        const a = (p / nPetals) * Math.PI * 2 + N.rand() * 0.1;
+        const pLen = r * (0.85 + N.rand() * 0.35);
+        ctx.save();
+        ctx.rotate(a);
+        const pg = ctx.createLinearGradient(0, 0, pLen, 0);
+        pg.addColorStop(0, '#c87212');
+        pg.addColorStop(0.55, '#f6be24');
+        pg.addColorStop(1, '#ffea70');
+        ctx.fillStyle = pg;
+        ctx.beginPath();
+        ctx.ellipse(pLen * 0.62, 0, pLen * 0.44, r * 0.17, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
-  function paintSunflowerHead(api, layer, cx, cy, rOuter, petalCount, rotBias) {
-    for (let i = 0; i < petalCount; i++) {
-      const ang = (i / petalCount) * Math.PI * 2 + rotBias + (api.rand() - 0.5) * 0.08;
-      const len = rOuter * (0.86 + api.rand() * 0.24);
-      const x1 = cx + Math.cos(ang) * (rOuter * 0.34);
-      const y1 = cy + Math.sin(ang) * (rOuter * 0.34);
-      const x2 = cx + Math.cos(ang + 0.06) * (len * 0.74);
-      const y2 = cy + Math.sin(ang + 0.06) * (len * 0.74);
-      const x3 = cx + Math.cos(ang) * len;
-      const y3 = cy + Math.sin(ang) * len;
-      const col = i % 3 === 0 ? [246, 198, 42] : (i % 3 === 1 ? [226, 154, 24] : [252, 222, 76]);
-      api.oilStroke(layer, '向日葵旋转厚涂花瓣', [[x1, y1], [x2, y2], [x3, y3]], {
-        width: rOuter * 0.22, color: col, colorEnd: [255, 234, 112], alpha: 0.82, stretch: 0.38, vary: 8
-      });
-    }
-    api.oilPatch(layer, '向日葵绒心褐底', cx, cy, rOuter * 0.40, rOuter * 0.39, 0, {
-      color: [72, 42, 18], colorEdge: [112, 68, 22], alpha: 0.86, count: 16
+      const cg = ctx.createRadialGradient(-r * 0.1, -r * 0.1, r * 0.06, 0, 0, r * 0.48);
+      cg.addColorStop(0, '#784616');
+      cg.addColorStop(0.6, '#4c260c');
+      cg.addColorStop(1, '#261408');
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.46, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     });
-    for (let k = 0; k < 28; k++) {
-      const a = k * 2.39996, rad = Math.sqrt(k / 28) * rOuter * 0.36;
-      const sx = cx + Math.cos(a) * rad, sy = cy + Math.sin(a) * rad;
-      api.oilHighlight(layer + 1, '花盘螺旋籽粒高光点', sx, sy, 3.6, 3.2, a, {
-        color: k % 4 === 0 ? [224, 168, 52] : [36, 20, 10], alpha: 0.88, count: 2
-      });
+  }
+
+  function drawRoseFlower(ctx, rx, ry, rad, outerCol, midCol, centerCol) {
+    const base = ctx.createRadialGradient(rx - rad * 0.2, ry - rad * 0.2, rad * 0.1, rx, ry, rad);
+    base.addColorStop(0, centerCol);
+    base.addColorStop(0.55, midCol);
+    base.addColorStop(1, outerCol);
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.arc(rx, ry, rad, 0, Math.PI * 2);
+    ctx.fill();
+    for (let ring = 0; ring < 3; ring++) {
+      const cnt = 6 + ring * 2;
+      const rr = rad * (0.28 + ring * 0.24);
+      for (let i = 0; i < cnt; i++) {
+        const a = (i / cnt) * Math.PI * 2 + ring * 0.6;
+        ctx.save();
+        ctx.translate(rx + Math.cos(a) * rr * 0.55, ry + Math.sin(a) * rr * 0.55);
+        ctx.rotate(a + Math.PI * 0.5);
+        ctx.fillStyle = ring === 0 ? centerCol : (ring === 1 ? midCol : outerCol);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rr * 0.65, rr * 0.34, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
   }
 
   const WORKS = [
     // =========================================================================
-    // STILL LIFES (5)
+    // 1. VAN GOGH GOLDEN SUNFLOWERS IN EARTHENWARE VASE
     // =========================================================================
     {
       id: 'oil-sunflowers',
@@ -85,38 +97,71 @@
       desc: '温润明黄壁面映衬釉陶双色矮瓶，九朵盛放与低垂的向日葵高低错落，笔触短促有力、焦褐花心与金橙瓣层叠如雕。',
       layers: STILL_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 920, 1120, [218, 196, 104], [228, 204, 118], [186, 152, 74]);
-        paintTableBand(api, 920, 1120, 775, [202, 162, 78], [164, 122, 54]);
-        // Tabletop horizon line & shadow under ceramic vase
-        api.oilStroke(2, '桌壁分界水平重笔', [[80, 775], [460, 777], [840, 774]], { width: 8, color: [112, 82, 34], alpha: 0.72 });
-        api.oilPatch(2, '陶瓶右下侧柔褐投影', 530, 882, 125, 36, 0.08, { color: [72, 48, 20], alpha: 0.62, count: 14 });
-        // Stems & green leaves behind blooms
-        [[460, 560, 320, 290], [460, 560, 480, 210], [460, 560, 650, 320], [460, 560, 250, 455], [460, 560, 620, 480]].forEach(([x0, y0, x1, y1]) => {
-          api.oilStroke(2, '绿梗穿插花颈', [[x0, y0], [(x0 + x1) * 0.5, (y0 + y1) * 0.5], [x1, y1]], {
-            width: 13, color: [72, 104, 48], colorEnd: [106, 144, 62], alpha: 0.85
-          });
+        const M = window.Code2PaintOilMaster;
+        const W = 920, H = 1120;
+        const scene = M.createScene(W, H, 7001);
+
+        scene.shadeBackdropWallTable({
+          horizonY: 790,
+          lightX: 0.25, lightY: 0.22,
+          wallLit: [242, 214, 118], wallMid: [212, 176, 78], wallDark: [152, 122, 46],
+          tableType: 'wood',
+          tableLit: [216, 174, 76], tableMid: [176, 134, 48], tableDark: [118, 86, 28],
+          tableEdgeY: 802, hasBevel: true,
+          castShadows: [{ cx: 510, cy: 995, rx: 165, ry: 42, rot: 0.05, strength: 0.55 }]
         });
-        [[280, 500], [645, 515], [350, 375], [585, 370]].forEach(([lx, ly]) => {
-          api.oilPatch(2, '葵叶冷暖厚涂铺色', lx, ly, 42, 22, api.randRange(-0.7, 0.7), { color: [74, 108, 44], colorEdge: [122, 152, 62], alpha: 0.78, count: 10 });
+
+        scene.shadeLathe3D({
+          cx: 460, topY: 645, botY: 995,
+          material: 'ceramic', openTopRim: false,
+          profile: [[0.0, 96], [0.10, 88], [0.22, 108], [0.55, 146], [0.85, 114], [1.0, 86]],
+          colLit: [248, 224, 132], colMid: [216, 162, 54], colDark: [128, 82, 22],
+          bounceCol: [212, 164, 62], lightDir: [-0.68, -0.45, 0.58]
         });
-        // Iconic two-tone earthen pot
-        api.oilPatch(2, '陶瓶下半部赤褐釉底', 462, 760, 108, 120, 0, { color: [168, 104, 44], colorEdge: [112, 62, 24], alpha: 0.88, count: 22 });
-        api.oilPatch(3, '陶瓶上半部鹅黄釉面', 462, 646, 98, 72, 0, { color: [232, 208, 112], colorEdge: [184, 148, 68], alpha: 0.88, count: 18 });
-        api.oilStroke(3, '瓶腰分界钴蓝细饰线', [[364, 696], [462, 704], [560, 696]], { width: 8, color: [52, 92, 128], alpha: 0.78 });
-        // Sunflowers ensemble
-        const heads = [
-          [465, 210, 92, 22], [315, 295, 86, 20], [620, 315, 84, 20],
-          [245, 448, 78, 18], [415, 398, 96, 24], [565, 430, 88, 22],
-          [675, 482, 72, 18], [348, 520, 74, 18]
-        ];
-        heads.forEach(([x, y, r, n], idx) => paintSunflowerHead(api, 3, x, y, r, n, idx * 0.45));
-        // Vase impasto rim & tabletop scattered petals
-        api.oilHighlight(4, '陶瓶左受光面厚涂高光', 392, 650, 14, 52, -0.08, { color: [255, 248, 212], alpha: 0.82, count: 6 });
-        api.oilHighlight(4, '瓶腹左下冷灰反光', 525, 785, 16, 46, 0.12, { color: [198, 178, 134], alpha: 0.42, count: 5 });
-        api.oilStroke(4, '桌面落瓣金黄点彩', [[270, 868], [295, 874]], { width: 14, color: [248, 202, 46], alpha: 0.90 });
-        api.oilStroke(4, '右桌散落花瓣一笔', [[625, 848], [648, 856]], { width: 12, color: [238, 182, 34], alpha: 0.88 });
+
+        scene.draw2D((ctx, w, h, N) => {
+          // Two-tone glazed potter band & deep green foliage stems
+          ctx.fillStyle = '#2d4e8a';
+          ctx.fillRect(318, 795, 284, 14);
+          ctx.strokeStyle = '#3c5a2c';
+          ctx.lineWidth = 10;
+          ctx.lineCap = 'round';
+          for (const [sx, sy, tx, ty] of [
+            [455, 650, 325, 420], [462, 650, 460, 245], [472, 650, 625, 365],
+            [448, 655, 285, 565], [485, 655, 645, 535], [460, 650, 472, 445]
+          ]) {
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo((sx + tx) * 0.5, sy - 60, tx, ty); ctx.stroke();
+          }
+
+          drawSunflowers(ctx, [
+            [462, 232, 86, 0.1, false],
+            [335, 325, 78, -0.3, false],
+            [612, 315, 76, 0.4, false],
+            [268, 485, 74, -0.5, true],
+            [478, 435, 92, 0.05, false],
+            [642, 495, 78, 0.45, true],
+            [385, 565, 68, -0.2, false],
+            [565, 575, 66, 0.25, true],
+            [465, 608, 62, 0.12, true]
+          ], N);
+        });
+
+        M.synthesize(api, scene, {
+          style: 'vangogh',
+          totalStrokes: 5000,
+          seed: 7001,
+          layers: WORKS[0].layers,
+          roi: [
+            { cx: 465, cy: 425, rx: 245, ry: 255, boost: 3.8 },
+            { cx: 460, cy: 815, rx: 165, ry: 175, boost: 2.5 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 2. ANTIQUE PEWTER PITCHER & WHITE ROSES
+    // =========================================================================
     {
       id: 'oil-white-roses',
       title: '油画静物·银锡瓶白玫瑰',
@@ -134,48 +179,76 @@
       desc: '烟青冷灰背景下旧锡器银瓶泛出柔和漫反光，五朵奶油白玫瑰伴淡粉蕾苞舒展层瓣，色彩克制而莹润通透。',
       layers: STILL_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 920, 1120, [34, 38, 40], [48, 52, 54], [26, 28, 30]);
-        paintTableBand(api, 920, 1120, 795, [86, 74, 62], [44, 36, 30]);
-        api.oilPatch(2, '锡瓶投影暗赭延伸', 540, 872, 135, 32, 0.05, { color: [24, 18, 14], alpha: 0.74, count: 14 });
-        // Pewter / glass-silver pitcher
-        api.oilPatch(2, '锡银花瓶暗银基调', 455, 725, 92, 136, 0, { color: [104, 110, 112], colorEdge: [42, 46, 48], alpha: 0.88, count: 24 });
-        api.oilStroke(2, '壶柄优美弧线勾勒', [[538, 635], [588, 675], [575, 765], [528, 795]], { width: 16, color: [132, 136, 134], colorEnd: [64, 68, 66], alpha: 0.88 });
-        // Dark foliage spray
-        for (let i = 0; i < 16; i++) {
-          const ang = -Math.PI * 0.85 + (i / 15) * Math.PI * 0.72;
-          const dist = 160 + api.rand() * 145;
-          const lx = 460 + Math.cos(ang) * dist, ly = 530 + Math.sin(ang) * dist * 0.85;
-          api.oilPatch(2, '玫瑰暗绿叶片群烘托', lx, ly, 42, 22, ang, { color: [52, 74, 46], colorEdge: [28, 42, 26], alpha: 0.82, count: 8 });
-        }
-        // Layered cream-white roses
-        const blooms = [
-          { x: 455, y: 375, r: 84, core: [232, 186, 168] },
-          { x: 332, y: 455, r: 70, core: [236, 206, 184] },
-          { x: 565, y: 445, r: 72, core: [228, 178, 162] },
-          { x: 420, y: 508, r: 66, core: [240, 222, 198] },
-          { x: 505, y: 292, r: 54, core: [238, 174, 168] }
-        ];
-        blooms.forEach(b => {
-          api.oilPatch(3, '白玫瑰外瓣冷灰暗面', b.x + 8, b.y + 8, b.r, b.r * 0.92, 0, { color: [176, 174, 168], colorEdge: [122, 124, 118], alpha: 0.84, count: 16 });
-          for (let ring = 3; ring >= 1; ring--) {
-            const rad = b.r * (ring / 3.2), cnt = 5 + ring * 2;
-            for (let p = 0; p < cnt; p++) {
-              const a = (p / cnt) * Math.PI * 2 + ring * 0.4;
-              const p1 = [b.x + Math.cos(a - 0.3) * rad * 0.85, b.y + Math.sin(a - 0.3) * rad * 0.85];
-              const p2 = [b.x + Math.cos(a + 0.3) * rad * 0.95, b.y + Math.sin(a + 0.3) * rad * 0.95];
-              const isLight = Math.cos(a + 0.8) > 0;
-              const col = isLight ? [250, 246, 236] : [214, 212, 204];
-              api.oilStroke(3, '玫瑰弧形包卷花瓣', [p1, p2], { width: 22 - ring * 2, color: col, colorEnd: b.core, alpha: 0.78 });
-            }
-          }
-          api.oilPatch(3, '花心暖粉乳白过渡', b.x, b.y, b.r * 0.32, b.r * 0.28, 0, { color: b.core, colorEdge: [248, 242, 228], alpha: 0.76, count: 8 });
+        const M = window.Code2PaintOilMaster;
+        const W = 920, H = 1120;
+        const scene = M.createScene(W, H, 7002);
+
+        scene.shadeBackdropWallTable({
+          horizonY: 795,
+          lightX: 0.24, lightY: 0.22,
+          wallLit: [92, 98, 102], wallMid: [54, 58, 62], wallDark: [26, 30, 34],
+          tableType: 'wood',
+          tableLit: [74, 72, 68], tableMid: [44, 44, 42], tableDark: [22, 22, 24],
+          castShadows: [{ cx: 525, cy: 985, rx: 145, ry: 34, rot: 0.04, strength: 0.62 }]
         });
-        api.oilHighlight(4, '白玫瑰受光瓣尖钛白', 428, 342, 22, 14, -0.3, { color: [255, 253, 248], alpha: 0.92, count: 5 });
-        api.oilHighlight(4, '白玫瑰二号主亮部', 312, 434, 16, 12, 0.2, { color: [255, 252, 244], alpha: 0.88, count: 4 });
-        api.oilHighlight(4, '锡瓶瓶腹竖条冷白反光', 392, 720, 12, 68, -0.05, { color: [236, 242, 244], alpha: 0.86, count: 5 });
-        api.oilHighlight(4, '桌面落花瓣柔亮点', 310, 875, 16, 8, -0.2, { color: [248, 242, 226], alpha: 0.76, count: 3 });
+
+        scene.shadeLathe3D({
+          cx: 458, topY: 575, botY: 980,
+          material: 'metal', openTopRim: true,
+          profile: [[0.0, 62], [0.14, 54], [0.35, 72], [0.68, 118], [0.88, 92], [1.0, 74]],
+          colLit: [216, 222, 222], colMid: [118, 126, 128], colDark: [36, 40, 44],
+          bounceCol: [148, 154, 152], lightDir: [-0.72, -0.44, 0.54]
+        });
+
+        scene.draw2D((ctx) => {
+          // Pewter handle & spout lip
+          ctx.strokeStyle = '#9aa2a4';
+          ctx.lineWidth = 18;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(516, 615);
+          ctx.bezierCurveTo(618, 608, 628, 795, 562, 845);
+          ctx.stroke();
+
+          // Dark olive rose foliage & slender buds
+          for (const [lx, ly, rot] of [
+            [332, 485, -0.6], [588, 495, 0.5], [295, 365, -0.4], [615, 365, 0.45], [462, 545, 0.1]
+          ]) {
+            ctx.save(); ctx.translate(lx, ly); ctx.rotate(rot);
+            ctx.fillStyle = '#2d4630';
+            ctx.beginPath(); ctx.ellipse(0, 0, 56, 26, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+          }
+
+          drawRoseFlower(ctx, 442, 345, 72, '#b6a89a', '#eee6d6', '#fffdf6');
+          drawRoseFlower(ctx, 338, 445, 62, '#ae9e92', '#ebe0ce', '#fdfaf0');
+          drawRoseFlower(ctx, 565, 432, 64, '#b8a296', '#efe2d2', '#fffdf8');
+          drawRoseFlower(ctx, 455, 478, 68, '#b2a698', '#f2e8d8', '#ffffff');
+          drawRoseFlower(ctx, 525, 308, 46, '#c89c94', '#edd2cb', '#f9eae6');
+
+          // Delicate table rosebud & silvery dewdrop
+          ctx.fillStyle = '#e8c4be';
+          ctx.beginPath(); ctx.ellipse(278, 992, 20, 12, -0.25, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#eef4f2';
+          ctx.beginPath(); ctx.arc(622, 998, 7, 0, Math.PI * 2); ctx.fill();
+        });
+
+        M.synthesize(api, scene, {
+          style: 'classic',
+          totalStrokes: 5000,
+          seed: 7002,
+          layers: WORKS[1].layers,
+          roi: [
+            { cx: 455, cy: 415, rx: 195, ry: 175, boost: 3.8 },
+            { cx: 458, cy: 780, rx: 145, ry: 185, boost: 3.0 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 3. COBALT DRAPED CLOTH, PEARS & PORCELAIN COMPOTE
+    // =========================================================================
     {
       id: 'oil-green-pear',
       title: '油画静物·蓝布绿梨瓷碗',
@@ -193,35 +266,69 @@
       desc: '学院派基础构图，深沉灰绿背景下石青色桌布皱褶托起白瓷果盘与两颗青黄西洋梨，展现互补色与釉面质感。',
       layers: STILL_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1000, 820, [46, 50, 44], [58, 62, 54], [32, 34, 30]);
-        paintTableBand(api, 1000, 820, 520, [108, 82, 54], [62, 44, 28]);
-        // Draped cobalt-slate tablecloth
-        api.oilPatch(2, '钴蓝衬布斜铺皱褶', 560, 620, 340, 155, -0.08, { color: [52, 76, 112], colorEdge: [28, 42, 68], alpha: 0.88, count: 32 });
-        [[300, 560, 410, 695], [640, 530, 760, 675], [470, 645, 595, 760]].forEach(([x0, y0, x1, y1]) => {
-          api.oilStroke(2, '衬布布纹受光脊线', [[x0, y0], [(x0 + x1) * 0.5, (y0 + y1) * 0.5 + 14], [x1, y1]], {
-            width: 32, color: [96, 128, 168], colorEnd: [48, 68, 102], alpha: 0.65
-          });
+        const M = window.Code2PaintOilMaster;
+        const W = 1000, H = 820;
+        const scene = M.createScene(W, H, 7003);
+
+        scene.shadeBackdropWallTable({
+          horizonY: 485,
+          lightX: 0.25, lightY: 0.22,
+          wallLit: [74, 78, 72], wallMid: [44, 48, 44], wallDark: [22, 24, 22],
+          tableType: 'wood',
+          tableLit: [118, 86, 54], tableMid: [78, 52, 32], tableDark: [38, 26, 16],
+          castShadows: [
+            { cx: 535, cy: 615, rx: 140, ry: 34, rot: 0.04, strength: 0.56 },
+            { cx: 365, cy: 655, rx: 85, ry: 22, rot: -0.05, strength: 0.52 }
+          ]
         });
-        // Ceramic shallow bowl
-        api.oilPatch(2, '果盘投影稳托于布上', 530, 588, 165, 42, 0.04, { color: [22, 26, 36], alpha: 0.72, count: 16 });
-        api.oilPatch(2, '白瓷宽碗碗腹冷灰面', 495, 535, 148, 56, 0, { color: [208, 206, 198], colorEdge: [118, 126, 134], alpha: 0.90, count: 24 });
-        api.oilStroke(3, '白瓷碗口椭圆弧线', [[346, 508], [495, 542], [644, 508]], { width: 12, color: [242, 240, 232], alpha: 0.88 });
-        // Two green-gold pears (one upright beside bowl, one inside/foreground)
-        const paintPear = (cx, cy, sc, tilted) => {
-          api.oilPatch(3, '西洋梨梨腹橄榄绿体面', cx, cy, 56 * sc, 60 * sc, tilted, { color: [132, 162, 54], colorEdge: [62, 82, 28], alpha: 0.90, count: 20 });
-          api.oilPatch(3, '西洋梨梨颈窄弧延伸', cx + Math.sin(tilted) * 32 * sc, cy - 68 * sc, 34 * sc, 48 * sc, tilted * 0.8, { color: [158, 182, 62], colorEdge: [76, 98, 34], alpha: 0.88, count: 14 });
-          api.oilPatch(3, '西洋梨受光金黄颊部', cx - 18 * sc, cy - 6 * sc, 34 * sc, 38 * sc, 0, { color: [224, 204, 72], alpha: 0.62, count: 12 });
-          api.oilStroke(3, '褐木果蒂短折', [[cx + Math.sin(tilted) * 44 * sc, cy - 110 * sc], [cx + Math.sin(tilted) * 52 * sc + 8, cy - 134 * sc]], {
-            width: 8, color: [78, 48, 24], alpha: 0.92
-          });
-          api.oilHighlight(4, '梨身蜡质釉光一点', cx - 22 * sc, cy - 12 * sc, 10 * sc, 16 * sc, -0.3, { color: [255, 250, 204], alpha: 0.88, count: 4 });
-        };
-        paintPear(465, 468, 1.02, 0.12);
-        paintPear(282, 558, 0.96, -0.38);
-        api.oilHighlight(4, '白瓷碗沿釉面瓷光', 415, 530, 32, 7, 0.12, { color: [255, 254, 248], alpha: 0.94, count: 5 });
-        api.oilHighlight(4, '蓝衬布近前景边缘提亮', 640, 625, 28, 10, 0.4, { color: [152, 182, 214], alpha: 0.65, count: 5 });
+
+        scene.shadeDrapery({
+          poly: [[40, 470], [490, 485], [565, 820], [0, 820]],
+          colLit: [84, 114, 168], colMid: [44, 64, 108], colDark: [18, 26, 52], foldFreq: 0.036, foldAngle: 0.25
+        });
+
+        // White porcelain compote bowl
+        scene.shadeLathe3D({
+          cx: 545, topY: 365, botY: 605,
+          material: 'ceramic', openTopRim: true,
+          profile: [[0.0, 152], [0.18, 134], [0.42, 68], [0.58, 32], [0.85, 58], [1.0, 84]],
+          colLit: [248, 246, 238], colMid: [186, 188, 184], colDark: [94, 98, 104],
+          bounceCol: [148, 162, 186]
+        });
+
+        // Three 3D sculpted chartreuse-gold Anjou pears
+        scene.shadeFruit3D({
+          cx: 485, cy: 335, rx: 56, ry: 68, kind: 'pear',
+          colLit: [234, 222, 92], colMid: [164, 182, 62], colShadow: [68, 78, 28],
+          colBlush: [198, 124, 48], bounceCol: [212, 214, 198], shininess: 48
+        });
+        scene.shadeFruit3D({
+          cx: 598, cy: 342, rx: 54, ry: 66, kind: 'pear',
+          colLit: [228, 214, 86], colMid: [152, 174, 58], colShadow: [58, 68, 24],
+          colBlush: [192, 108, 42], bounceCol: [204, 208, 192], shininess: 46
+        });
+        scene.shadeFruit3D({
+          cx: 332, cy: 595, rx: 62, ry: 74, kind: 'pear',
+          colLit: [238, 224, 98], colMid: [168, 186, 68], colShadow: [62, 72, 26],
+          colBlush: [206, 126, 48], bounceCol: [96, 126, 176], shininess: 52
+        });
+
+        M.synthesize(api, scene, {
+          style: 'cezanne',
+          totalStrokes: 5000,
+          seed: 7003,
+          layers: WORKS[2].layers,
+          roi: [
+            { cx: 542, cy: 425, rx: 185, ry: 175, boost: 3.4 },
+            { cx: 332, cy: 595, rx: 115, ry: 105, boost: 3.2 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 4. DUTCH STILL LIFE: CLARET BOTTLE, WINE GOBLET & RUSTIC BREAD
+    // =========================================================================
     {
       id: 'oil-bread-wine',
       title: '油画静物·古典葡萄酒与法棍',
@@ -239,30 +346,81 @@
       desc: '十七世纪荷兰小画派低光调，暗橄榄绿玻璃瓶配紫红葡萄酒高脚杯，旁置金褐裂纹乡村面包，质朴深沉。',
       layers: STILL_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1000, 820, [20, 18, 14], [28, 24, 18], [16, 14, 10]);
-        paintTableBand(api, 1000, 820, 520, [74, 52, 34], [38, 26, 16]);
-        // Dark green wine bottle
-        api.oilPatch(2, '酒瓶深沉斜影', 450, 565, 118, 28, 0.08, { color: [12, 10, 8], alpha: 0.80, count: 14 });
-        api.oilPatch(2, '墨绿酒瓶圆柱瓶身', 355, 425, 58, 138, 0, { color: [38, 62, 32], colorEdge: [14, 24, 12], alpha: 0.92, count: 24 });
-        api.oilStroke(2, '细长瓶颈起势', [[355, 188], [355, 315]], { width: 34, color: [34, 54, 28], colorEnd: [44, 68, 34], alpha: 0.92 });
-        api.oilStroke(3, '瓶颈红蜡封口', [[355, 178], [355, 206]], { width: 36, color: [132, 32, 28], alpha: 0.90 });
-        api.oilPatch(3, '米白做旧酒标斜贴', 355, 430, 38, 44, 0, { color: [222, 208, 176], colorEdge: [152, 138, 108], alpha: 0.88, count: 12 });
-        // Rustic crusty loaf & grapes cluster
-        api.oilPatch(3, '乡村脆皮面包大色', 620, 525, 128, 64, -0.06, { color: [188, 126, 56], colorEdge: [104, 56, 22], alpha: 0.90, count: 24 });
-        for (let i = 0; i < 4; i++) {
-          api.oilStroke(3, '面包顶部割纹焦脆面', [[535 + i * 44, 480], [562 + i * 44, 514]], { width: 12, color: [232, 188, 118], colorEnd: [122, 68, 28], alpha: 0.85 });
-        }
-        // Wine glass half-filled with ruby burgundy
-        api.oilPatch(3, '酒杯微光透底', 485, 425, 44, 46, 0, { color: [72, 68, 62], alpha: 0.42, count: 10 });
-        api.oilPatch(3, '紫红宝石葡萄酒液', 485, 444, 38, 24, 0, { color: [138, 20, 28], colorEdge: [62, 10, 14], alpha: 0.90, count: 12 });
-        api.oilStroke(3, '细高脚玻璃杯梗', [[485, 466], [485, 558]], { width: 7, color: [184, 188, 192], alpha: 0.72 });
-        api.oilPatch(3, '玻璃杯圆底高光', 485, 560, 36, 10, 0, { color: [162, 166, 170], alpha: 0.64, count: 6 });
-        api.oilHighlight(4, '酒瓶左肩冷天光垂直高光', 318, 365, 8, 92, 0, { color: [224, 236, 228], alpha: 0.88, count: 6 });
-        api.oilHighlight(4, '酒杯边缘与酒面微光', 456, 405, 6, 30, -0.1, { color: [255, 252, 246], alpha: 0.94, count: 4 });
-        api.oilHighlight(4, '酒液内部宝石红透亮反光', 494, 448, 12, 7, 0.2, { color: [244, 76, 68], alpha: 0.86, count: 3 });
-        api.oilHighlight(4, '面包脆皮金粟酥点', 605, 486, 26, 14, -0.1, { color: [248, 218, 148], alpha: 0.72, count: 6 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1000, H = 820;
+        const scene = M.createScene(W, H, 7004);
+
+        scene.shadeBackdropWallTable({
+          horizonY: 510,
+          lightX: 0.24, lightY: 0.22,
+          wallLit: [44, 42, 34], wallMid: [26, 24, 18], wallDark: [12, 11, 9],
+          tableType: 'wood',
+          tableLit: [108, 76, 44], tableMid: [64, 44, 26], tableDark: [26, 18, 12],
+          castShadows: [
+            { cx: 435, cy: 615, rx: 115, ry: 28, rot: 0.04, strength: 0.65 },
+            { cx: 700, cy: 675, rx: 145, ry: 32, rot: -0.05, strength: 0.60 }
+          ]
+        });
+
+        // Olive-amber glass wine bottle
+        scene.shadeLathe3D({
+          cx: 385, topY: 165, botY: 605,
+          material: 'glass', openTopRim: false,
+          profile: [[0.0, 24], [0.22, 26], [0.34, 86], [0.85, 88], [1.0, 82]],
+          colLit: [92, 128, 62], colMid: [38, 64, 30], colDark: [12, 22, 10],
+          bounceCol: [148, 102, 52], specCol: [248, 246, 232]
+        });
+
+        // Half-filled crystal ruby burgundy wine goblet
+        scene.shadeLathe3D({
+          cx: 545, topY: 365, botY: 625,
+          material: 'glass', openTopRim: true,
+          profile: [[0.0, 56], [0.22, 60], [0.46, 22], [0.52, 10], [0.90, 12], [0.96, 54], [1.0, 56]],
+          colLit: [212, 216, 218], colMid: [112, 118, 124], colDark: [36, 40, 44],
+          liquidLevel: 0.20, liquidBot: 0.44, liquidCol: [142, 22, 26]
+        });
+
+        // Crusty golden-brown rustic bread loaf, sliced crumb & wooden board
+        scene.draw2D((ctx) => {
+          ctx.fillStyle = '#4e341c';
+          ctx.beginPath(); ctx.ellipse(705, 652, 175, 42, -0.05, 0, Math.PI * 2); ctx.fill();
+
+          const loaf = ctx.createRadialGradient(675, 535, 22, 710, 568, 145);
+          loaf.addColorStop(0, '#e8a852');
+          loaf.addColorStop(0.55, '#ad6824');
+          loaf.addColorStop(1, '#4a240e');
+          ctx.fillStyle = loaf;
+          ctx.beginPath(); ctx.ellipse(715, 572, 132, 68, -0.08, 0, Math.PI * 2); ctx.fill();
+
+          // Torn creamy bread slice leaning forward
+          const crumb = ctx.createLinearGradient(585, 555, 645, 650);
+          crumb.addColorStop(0, '#fcf2d6'); crumb.addColorStop(1, '#c8a46e');
+          ctx.fillStyle = crumb;
+          ctx.beginPath(); ctx.ellipse(618, 608, 42, 54, -0.25, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#9c5c1e'; ctx.lineWidth = 7; ctx.stroke();
+
+          // Ruby glow through wine meniscus
+          ctx.fillStyle = 'rgba(214, 48, 44, 0.72)';
+          ctx.beginPath(); ctx.ellipse(545, 428, 48, 12, 0, 0, Math.PI * 2); ctx.fill();
+        });
+
+        M.synthesize(api, scene, {
+          style: 'classic',
+          totalStrokes: 5000,
+          seed: 7004,
+          layers: WORKS[3].layers,
+          roi: [
+            { cx: 545, cy: 495, rx: 120, ry: 145, boost: 3.4 },
+            { cx: 695, cy: 585, rx: 175, ry: 105, boost: 3.0 },
+            { cx: 385, cy: 385, rx: 105, ry: 225, boost: 2.6 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 5. WILD DAISIES IN MING BLUE-AND-WHITE PORCELAIN VASE
+    // =========================================================================
     {
       id: 'oil-wild-daisies',
       title: '油画静物·蓝瓷瓶野生雏菊',
@@ -280,43 +438,76 @@
       desc: '明亮北欧灰蓝墙面前青花釉瓶插满野生白雏菊，松散写意的细梗与微风轻颤的白瓣洋溢春日阳光。',
       layers: STILL_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 920, 1120, [142, 158, 168], [164, 178, 184], [126, 138, 146]);
-        paintTableBand(api, 920, 1120, 790, [186, 168, 138], [142, 124, 98]);
-        // Vase + shadow
-        api.oilPatch(2, '瓷瓶柔灰投影', 520, 882, 115, 28, 0.05, { color: [88, 76, 62], alpha: 0.64, count: 12 });
-        api.oilPatch(2, '青花白底瓷瓶圆肚', 460, 742, 88, 126, 0, { color: [222, 226, 232], colorEdge: [128, 138, 152], alpha: 0.90, count: 22 });
-        for (let b = 0; b < 5; b++) {
-          api.oilPatch(3, '青花靛蓝云纹图案', 428 + b * 18, 718 + (b % 2) * 38, 22, 16, b * 0.5, { color: [42, 78, 136], alpha: 0.72, count: 6 });
-        }
-        // Loose wild foliage & crisp white daisies
-        for (let s = 0; s < 18; s++) {
-          const sx = 240 + api.rand() * 440, sy = 210 + api.rand() * 340;
-          api.oilStroke(2, '杂花草绿枝穿梭', [[460, 615], [(460 + sx) * 0.5, 510], [sx, sy]], {
-            width: 5, color: [68, 112, 58], colorEnd: [98, 142, 74], alpha: 0.78
-          });
-        }
-        const daisies = [
-          [458, 260, 62], [322, 318, 56], [598, 305, 54], [250, 425, 50],
-          [385, 392, 60], [525, 378, 58], [660, 422, 48], [335, 512, 50],
-          [465, 495, 56], [585, 508, 48], [405, 212, 46], [538, 235, 46]
-        ];
-        daisies.forEach(([cx, cy, rad]) => {
-          for (let p = 0; p < 16; p++) {
-            const a = (p / 16) * Math.PI * 2 + api.rand() * 0.14;
-            api.oilStroke(3, '野生雏菊白色放射花瓣', [
-              [cx + Math.cos(a) * 10, cy + Math.sin(a) * 10],
-              [cx + Math.cos(a) * rad, cy + Math.sin(a) * rad]
-            ], { width: 11, color: [248, 246, 238], colorEnd: [216, 222, 228], alpha: 0.86, stretch: 0.35 });
-          }
-          api.oilPatch(3, '雏菊明黄圆润花蕊', cx, cy, rad * 0.25, rad * 0.24, 0, { color: [242, 186, 42], colorEdge: [184, 122, 22], alpha: 0.94, count: 8 });
-          api.oilHighlight(4, '花蕊一侧鹅黄受光', cx - 3, cy - 3, 5, 5, 0, { color: [255, 242, 134], alpha: 0.90, count: 3 });
+        const M = window.Code2PaintOilMaster;
+        const W = 920, H = 1120;
+        const scene = M.createScene(W, H, 7005);
+
+        scene.shadeBackdropWallTable({
+          horizonY: 795,
+          lightX: 0.24, lightY: 0.22,
+          wallLit: [188, 198, 206], wallMid: [138, 150, 162], wallDark: [84, 96, 110],
+          tableType: 'wood',
+          tableLit: [188, 168, 142], tableMid: [138, 118, 96], tableDark: [86, 70, 56],
+          castShadows: [{ cx: 515, cy: 975, rx: 135, ry: 34, rot: 0.04, strength: 0.50 }]
         });
-        api.oilHighlight(4, '青花瓷肩通透高光', 402, 682, 12, 36, -0.2, { color: [255, 255, 255], alpha: 0.92, count: 5 });
+
+        scene.shadeLathe3D({
+          cx: 460, topY: 605, botY: 965,
+          material: 'ceramic', openTopRim: true,
+          profile: [[0.0, 58], [0.16, 52], [0.45, 118], [0.78, 108], [1.0, 74]],
+          colLit: [242, 246, 250], colMid: [148, 174, 212], colDark: [44, 72, 122],
+          bounceCol: [182, 174, 152]
+        });
+
+        // Cobalt porcelain motifs + airy meadow daisy stems and bright flowers
+        scene.draw2D((ctx, w, h, N) => {
+          ctx.fillStyle = '#2d589a';
+          ctx.fillRect(352, 742, 216, 18);
+          ctx.beginPath(); ctx.arc(430, 815, 28, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(492, 838, 22, 0, Math.PI * 2); ctx.fill();
+
+          const daisies = [
+            [455, 225, 42], [355, 285, 38], [568, 275, 40], [278, 385, 36],
+            [638, 378, 38], [412, 365, 44], [525, 388, 42], [335, 472, 36],
+            [465, 488, 46], [588, 468, 38], [262, 522, 32], [648, 502, 34],
+            [392, 545, 36], [535, 558, 34]
+          ];
+
+          ctx.strokeStyle = '#48743c'; ctx.lineWidth = 4;
+          daisies.forEach(([dx, dy]) => {
+            ctx.beginPath(); ctx.moveTo(460, 610); ctx.quadraticCurveTo((460 + dx) * 0.5, dy + 80, dx, dy); ctx.stroke();
+          });
+
+          daisies.forEach(([dx, dy, dr]) => {
+            for (let p = 0; p < 14; p++) {
+              const a = (p / 14) * Math.PI * 2 + N.rand() * 0.15;
+              ctx.save(); ctx.translate(dx, dy); ctx.rotate(a);
+              ctx.fillStyle = p % 2 === 0 ? '#fdfcf8' : '#e6ebf0';
+              ctx.beginPath(); ctx.ellipse(dr * 0.65, 0, dr * 0.48, dr * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+              ctx.restore();
+            }
+            ctx.fillStyle = '#f2be26';
+            ctx.beginPath(); ctx.arc(dx, dy, dr * 0.28, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#d48216';
+            ctx.beginPath(); ctx.arc(dx + 2, dy + 2, dr * 0.14, 0, Math.PI * 2); ctx.fill();
+          });
+        });
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7005,
+          layers: WORKS[4].layers,
+          roi: [
+            { cx: 458, cy: 405, rx: 245, ry: 220, boost: 3.8 },
+            { cx: 460, cy: 785, rx: 135, ry: 175, boost: 2.6 }
+          ]
+        });
       }
     },
 
     // =========================================================================
-    // LANDSCAPES & SEASCAPES (10)
+    // 6. STARRY NIGHT CYPRESS & VILLAGE (IMPASTO LANDSCAPE)
     // =========================================================================
     {
       id: 'oil-starry-cypress',
@@ -335,42 +526,90 @@
       desc: '深蓝夜幕中盘旋流动的星河与弯月光晕交相辉映，前景深墨绿火焰状丝柏直插云霄，山下村庄点亮温暖橙窗。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [18, 34, 78], [28, 54, 112], [16, 26, 52]);
-        // Swirling Milky Way bands
-        for (let r = 0; r < 22; r++) {
-          const y0 = 160 + (r - 10) * 14;
-          const col = r % 3 === 0 ? [92, 148, 212] : (r % 3 === 1 ? [54, 96, 168] : [182, 212, 238]);
-          api.oilStroke(2, '夜空涡旋流动星河笔触', [
-            [-40, y0 + 50], [280, y0 - 30], [520, y0 + 60], [780, y0 - 45], [1160, y0 + 15]
-          ], { width: 16, color: col, colorEnd: [42, 82, 152], alpha: 0.68, stretch: 0.42, fade: 0.04 });
-        }
-        // Glowing stars + crescent moon
-        const stars = [[185, 165, 58], [390, 128, 44], [610, 218, 52], [475, 295, 38], [260, 295, 34], [790, 140, 42]];
-        stars.forEach(([sx, sy, sr]) => {
-          api.oilPatch(2, '星辰外圈淡黄光晕', sx, sy, sr, sr, 0, { color: [248, 224, 108], colorEdge: [62, 108, 168], alpha: 0.58, count: 14 });
-          api.oilHighlight(4, '星核炽亮金黄高光', sx, sy, sr * 0.28, sr * 0.28, 0, { color: [255, 246, 178], alpha: 0.96, count: 4 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 535;
+        const scene = M.createScene(W, H, 7006);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [16, 34, 82],
+          skyMid: [34, 72, 146],
+          skyHorizon: [96, 142, 198],
+          sunX: 935, sunY: 165, sunR: 2, glowR: 260, glowCol: [248, 208, 86], glowStrength: 0.65,
+          cloudCover: 0.35, cloudLitCol: [148, 186, 224], cloudDarkCol: [22, 46, 104], cloudAlpha: 0.85
         });
-        api.oilPatch(2, '右上金黄弯月大光晕', 945, 165, 92, 92, 0, { color: [248, 198, 64], colorEdge: [52, 88, 156], alpha: 0.72, count: 18 });
-        api.oilPatch(3, '炽金饱满弯月本体', 948, 162, 42, 42, 0, { color: [254, 218, 68], colorEdge: [228, 152, 32], alpha: 0.94, count: 12 });
-        // Distant undulating hills & village
-        api.oilPatch(2, '远山起伏深蓝轮廓', 620, 610, 580, 130, -0.05, { color: [22, 38, 76], colorEdge: [14, 24, 52], alpha: 0.92, count: 28 });
-        paintTableBand(api, 1120, 820, 620, [24, 42, 68], [14, 24, 42]);
-        // Village spire & warm windows
-        api.oilStroke(3, '教堂尖顶刺向夜空', [[692, 648], [692, 458]], { width: 14, color: [24, 34, 58], alpha: 0.92 });
-        for (let h = 0; h < 12; h++) {
-          const hx = 440 + h * 54, hy = 640 + (h % 3) * 26;
-          api.oilPatch(3, '山村小屋群剪影', hx, hy, 22, 16, 0, { color: [26, 36, 56], alpha: 0.92, count: 6 });
-          if (h % 2 === 0) api.oilHighlight(4, '农舍灯火橙黄窗点', hx, hy, 5, 5, 0, { color: [255, 206, 84], alpha: 0.96, count: 2 });
-        }
-        // Iconic foreground dark cypress flame
-        const cypPts = [[248, 820], [232, 620], [268, 430], [244, 250], [272, 118]];
-        api.oilStroke(3, '前景火焰形丝柏墨绿躯干', cypPts, { width: 88, color: [18, 36, 22], colorEnd: [28, 52, 28], alpha: 0.95, stretch: 0.45 });
-        for (let f = 0; f < 10; f++) {
-          const t = f / 9, fx = 248 + Math.sin(f * 1.4) * 22, fy = 780 - t * 630;
-          api.oilStroke(4, '丝柏树梢冷绿逆光勾勒', [[fx - 18, fy + 24], [fx + 14, fy - 24]], { width: 12, color: [48, 82, 46], alpha: 0.80 });
-        }
+
+        scene.shadeMountainRange({
+          baseY: H_Y + 25,
+          peaks: [[0, 470], [280, 485], [560, 445], [840, 475], [1120, 442]],
+          rockLit: [52, 82, 134], rockDark: [20, 32, 68], snowLine: 1.5, mistCol: [68, 102, 152], mistStrength: 0.35
+        });
+
+        scene.draw2D((ctx) => {
+          // Rolling cobalt sky vortex ribbons for ETF to trace luminous currents
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = 'rgba(136, 184, 232, 0.55)';
+          ctx.lineWidth = 22;
+          ctx.beginPath();
+          ctx.moveTo(40, 295);
+          ctx.bezierCurveTo(280, 125, 420, 355, 625, 215);
+          ctx.bezierCurveTo(735, 145, 755, 295, 585, 315);
+          ctx.stroke();
+
+          // Luminous stars + blazing golden crescent moon
+          for (const [sx, sy, sr] of [[185, 142, 44], [385, 128, 36], [512, 235, 34], [695, 125, 32], [815, 345, 30]]) {
+            const g = ctx.createRadialGradient(sx, sy, 4, sx, sy, sr);
+            g.addColorStop(0, '#fffce0'); g.addColorStop(0.45, '#f6cb52'); g.addColorStop(1, 'rgba(64, 118, 188, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = '#ffdf64';
+          ctx.beginPath(); ctx.arc(935, 165, 46, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#386cc0';
+          ctx.beginPath(); ctx.arc(918, 152, 34, 0, Math.PI * 2); ctx.fill();
+
+          // Valley village houses & tall spire
+          ctx.fillStyle = '#182436';
+          ctx.fillRect(0, H_Y - 12, W, H - H_Y + 12);
+          ctx.fillStyle = '#263a52';
+          for (const [hx, hy, hw, hh] of [[425, 625, 68, 54], [525, 645, 82, 58], [678, 635, 76, 62], [805, 648, 86, 56]]) {
+            ctx.fillRect(hx, hy, hw, hh);
+            ctx.fillStyle = '#f8c854';
+            ctx.fillRect(hx + 18, hy + 18, 14, 16);
+            ctx.fillStyle = '#263a52';
+          }
+          ctx.fillStyle = '#283c54';
+          ctx.beginPath(); ctx.moveTo(598, 665); ctx.lineTo(622, 468); ctx.lineTo(646, 665); ctx.closePath(); ctx.fill();
+
+          // Towering foreground flame cypress silhouette
+          const cyG = ctx.createLinearGradient(175, 95, 295, 820);
+          cyG.addColorStop(0, '#0c1c12'); cyG.addColorStop(0.55, '#193624'); cyG.addColorStop(1, '#08120c');
+          ctx.fillStyle = cyG;
+          ctx.beginPath();
+          ctx.moveTo(232, 82);
+          ctx.bezierCurveTo(285, 235, 328, 495, 312, 820);
+          ctx.lineTo(155, 820);
+          ctx.bezierCurveTo(148, 525, 185, 265, 232, 82);
+          ctx.closePath(); ctx.fill();
+        });
+
+        M.synthesize(api, scene, {
+          style: 'vangogh',
+          totalStrokes: 5000,
+          seed: 7006,
+          layers: WORKS[5].layers,
+          roi: [
+            { cx: 525, cy: 235, rx: 465, ry: 175, boost: 2.8 },
+            { cx: 232, cy: 465, rx: 95, ry: 345, boost: 3.0 },
+            { cx: 625, cy: 625, rx: 225, ry: 95, boost: 2.6 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 7. PROVENCE LAVENDER FIELDS & RED-ROOFED MAS
+    // =========================================================================
     {
       id: 'oil-lavender',
       title: '油画风景·普罗旺斯薰衣草田',
@@ -388,32 +627,78 @@
       desc: '夏末艳阳下的普罗旺斯花田，紫罗兰薰衣草行垄汇聚地平线石砌小屋，远山晴云与温暖麦黄泥土交织绚丽生机。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [96, 148, 214], [156, 194, 234], [218, 226, 232]);
-        for (let c = 0; c < 6; c++) {
-          api.oilPatch(2, '天际绵柔积云受光', 180 + c * 165, 130 + (c % 2) * 35, 110, 36, 0, { color: [248, 246, 238], colorEdge: [192, 208, 232], alpha: 0.72, count: 14 });
-        }
-        // Far Provençal hills
-        api.oilPatch(2, '普罗旺斯远山浅黛青蓝', 560, 368, 620, 74, -0.02, { color: [108, 126, 168], colorEdge: [148, 162, 198], alpha: 0.84, count: 24 });
-        paintTableBand(api, 1120, 820, 375, [174, 152, 108], [136, 108, 68]);
-        // Radiating lavender rows toward vanishing point (560, 378)
-        for (let i = -9; i <= 9; i++) {
-          const xTop = 560 + i * 24, xBot = 560 + i * 116;
-          api.oilStroke(3, '紫罗兰薰衣草垄纵深排笔', [[xTop, 386], [(xTop + xBot) * 0.5, 585], [xBot, 835]], {
-            width: 34, color: [104, 68, 158], colorEnd: [146, 98, 198], alpha: 0.90, stretch: 0.48
-          });
-          api.oilStroke(4, '薰衣草垄向阳紫粉顶光', [[xTop, 386], [(xTop + xBot) * 0.5 - 6, 585], [xBot - 12, 835]], {
-            width: 14, color: [196, 164, 228], alpha: 0.72
-          });
-        }
-        // Stone farmhouse & cypress trees at horizon
-        api.oilPatch(3, '远景南法红顶农舍墙面', 558, 362, 34, 20, 0, { color: [228, 212, 182], alpha: 0.94, count: 8 });
-        api.oilStroke(3, '农舍红瓦斜顶', [[520, 348], [558, 336], [596, 348]], { width: 12, color: [176, 78, 48], alpha: 0.95 });
-        [[498, 368], [620, 370]].forEach(([tx, ty]) => {
-          api.oilStroke(3, '屋旁墨绿柏树竖立点景', [[tx, ty], [tx, ty - 68]], { width: 20, color: [48, 78, 42], alpha: 0.92 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 315;
+        const scene = M.createScene(W, H, 7007);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [68, 126, 204], skyMid: [132, 182, 234], skyHorizon: [228, 232, 238],
+          sunX: 880, sunY: 135, glowR: 260, glowCol: [254, 242, 206], glowStrength: 0.42,
+          cloudCover: 0.45, cloudLitCol: [255, 252, 246], cloudDarkCol: [148, 168, 206]
         });
-        api.oilHighlight(4, '近景花穂艳紫零星提亮', 360, 725, 22, 10, 0.2, { color: [222, 198, 246], alpha: 0.86, count: 6 });
+
+        scene.shadeMountainRange({
+          baseY: H_Y + 12,
+          peaks: [[0, 270], [280, 238], [580, 265], [880, 228], [1120, 265]],
+          rockLit: [138, 148, 194], rockDark: [88, 96, 148], snowLine: 1.5, mistCol: [198, 204, 228], mistStrength: 0.45
+        });
+
+        scene.draw2D((ctx) => {
+          const vpX = 595, vpY = H_Y;
+          const fld = ctx.createLinearGradient(0, vpY, 0, H);
+          fld.addColorStop(0, '#c69a62'); fld.addColorStop(1, '#845e32');
+          ctx.fillStyle = fld;
+          ctx.fillRect(0, vpY, W, H - vpY);
+
+          // Converging sunlit violet-magenta lavender rows in vivid perspective
+          for (let r = -7; r <= 7; r++) {
+            const bx = vpX + r * 145;
+            const lwStart = 4 + Math.abs(r) * 0.4;
+            const lwEnd = 52;
+            const g = ctx.createLinearGradient(vpX, vpY, bx, H);
+            g.addColorStop(0, '#7c56b6'); g.addColorStop(0.5, '#9866ca'); g.addColorStop(1, '#58348c');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(vpX + r * 14 - lwStart, vpY + 8);
+            ctx.lineTo(vpX + r * 14 + lwStart, vpY + 8);
+            ctx.lineTo(bx + lwEnd, H);
+            ctx.lineTo(bx - lwEnd, H);
+            ctx.closePath(); ctx.fill();
+
+            ctx.strokeStyle = 'rgba(208, 168, 236, 0.72)';
+            ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.moveTo(vpX + r * 14, vpY + 12); ctx.lineTo(bx - 12, H); ctx.stroke();
+          }
+
+          // Distant olive grove, Provençal stone house & cypress guardians
+          ctx.fillStyle = '#5c7a3e';
+          ctx.fillRect(0, vpY - 10, W, 24);
+          ctx.fillStyle = '#e8d4b2'; ctx.fillRect(545, vpY - 46, 98, 52);
+          ctx.fillStyle = '#b44830';
+          ctx.beginPath(); ctx.moveTo(536, vpY - 46); ctx.lineTo(594, vpY - 76); ctx.lineTo(652, vpY - 46); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#244224';
+          for (const [cx, h2] of [[498, 92], [525, 84], [662, 98]]) {
+            ctx.beginPath(); ctx.ellipse(cx, vpY - h2 * 0.48, 12, h2 * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+          }
+        });
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7007,
+          layers: WORKS[6].layers,
+          roi: [
+            { cx: 595, cy: 295, rx: 145, ry: 75, boost: 3.4 },
+            { cx: 560, cy: 560, rx: 480, ry: 220, boost: 2.2 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 8. GOLDEN AUTUMN BIRCH FOREST & WINDING STREAM
+    // =========================================================================
     {
       id: 'oil-autumn-birch',
       title: '油画风景·秋日白桦林溪',
@@ -431,43 +716,82 @@
       desc: '深秋晴朗白桦林畔浅溪蜿蜒，银白带黑结的白桦立柱分割画幅，满冠金橙枫叶在林表与水波间碎成满地流金。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1000, 820, [94, 146, 204], [156, 194, 224], [198, 178, 126]);
-        // Forest backdrop foliage mass
-        for (let i = 0; i < 24; i++) {
-          const cx = 60 + api.rand() * 880, cy = 80 + api.rand() * 340;
-          const col = i % 3 === 0 ? [228, 164, 38] : (i % 3 === 1 ? [196, 84, 32] : [244, 198, 62]);
-          api.oilPatch(2, '秋林繁茂金橙树冠铺涂', cx, cy, 85, 65, api.rand() * 2, { color: col, colorEdge: [128, 64, 24], alpha: 0.80, count: 14 });
-        }
-        // Creek & autumn bank — natural meandering creek flowing all the way to bottom edge
-        paintTableBand(api, 1000, 820, 520, [164, 104, 42], [116, 68, 28]);
-        api.oilStroke(2, '清溪S形碧蓝水面蜿蜒至前缘', [[620, 522], [565, 595], [475, 695], [535, 835]], {
-          width: 175, color: [84, 128, 166], colorEnd: [48, 86, 124], alpha: 0.90, stretch: 0.65, fade: 0.04
+        const M = window.Code2PaintOilMaster;
+        const W = 1000, H = 820, H_Y = 395;
+        const scene = M.createScene(W, H, 7008);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [54, 108, 174], skyMid: [118, 166, 214], skyHorizon: [218, 228, 232],
+          cloudCover: 0.35, cloudLitCol: [252, 248, 240], cloudDarkCol: [148, 176, 206]
         });
-        api.oilStroke(2, '溪畔冷赭岸边交界', [[535, 522], [480, 600], [390, 700], [445, 835]], {
-          width: 24, color: [118, 72, 34], alpha: 0.72, fade: 0.05
-        });
-        // Silver-white birch trunks
-        const trunks = [
-          [165, 720, 152, 40, 28], [268, 610, 276, 30, 20], [395, 580, 388, 20, 14],
-          [715, 630, 726, 40, 26], [835, 740, 818, 50, 34]
-        ];
-        trunks.forEach(([x0, y0, x1, y1, w]) => {
-          api.oilStroke(3, '白桦银灰圆柱树干', [[x0, y0], [(x0 + x1) * 0.5, (y0 + y1) * 0.5], [x1, y1]], {
-            width: w, color: [232, 228, 218], colorEnd: [188, 188, 186], alpha: 0.94
-          });
-          for (let b = 0; b < 8; b++) {
-            const t = 0.1 + b * 0.11, bx = api.lerp(x0, x1, t), by = api.lerp(y0, y1, t);
-            api.oilStroke(3, '桦树特征黑皮横疤', [[bx - w * 0.35, by], [bx + w * 0.28, by + 2]], { width: 4, color: [38, 34, 30], alpha: 0.86 });
+
+        scene.draw2D((ctx, w, h, N) => {
+          // Sunlit amber leaf hills + cool winding forest creek
+          const gr = ctx.createLinearGradient(0, H_Y, 0, H);
+          gr.addColorStop(0, '#c67824'); gr.addColorStop(0.55, '#964e18'); gr.addColorStop(1, '#4c260e');
+          ctx.fillStyle = gr;
+          ctx.fillRect(0, H_Y, W, H - H_Y);
+
+          const crk = ctx.createLinearGradient(520, H_Y, 440, H);
+          crk.addColorStop(0, '#88b8d6'); crk.addColorStop(0.6, '#3a688c'); crk.addColorStop(1, '#1e3854');
+          ctx.fillStyle = crk;
+          ctx.beginPath();
+          ctx.moveTo(475, H_Y + 12);
+          ctx.bezierCurveTo(645, 515, 295, 625, 245, H);
+          ctx.lineTo(665, H);
+          ctx.bezierCurveTo(545, 635, 765, 520, 545, H_Y + 12);
+          ctx.closePath(); ctx.fill();
+
+          // Brilliant golden & vermilion birch canopy puffs
+          for (let c = 0; c < 42; c++) {
+            const fx = N.rand() * W, fy = 45 + N.rand() * 345, fr = 42 + N.rand() * 58;
+            ctx.fillStyle = c % 3 === 0 ? 'rgba(244, 186, 42, 0.85)' : (c % 3 === 1 ? 'rgba(208, 92, 34, 0.82)' : 'rgba(252, 218, 86, 0.82)');
+            ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Shimmering gold leaf ripples across creek
+          for (let r = 0; r < 40; r++) {
+            const rx = 285 + N.rand() * 340, ry = H_Y + 40 + N.rand() * (H - H_Y - 55);
+            ctx.fillStyle = 'rgba(248, 202, 72, 0.65)';
+            ctx.fillRect(rx, ry, 28 + N.rand() * 38, 6);
+          }
+
+          // Vertical silver birch trunks with signature black bark marks
+          for (const [bx, topW, botW, botY] of [
+            [148, 14, 24, 715], [228, 12, 20, 695], [768, 14, 24, 725], [848, 16, 26, 755], [378, 8, 14, 525], [642, 9, 15, 535]
+          ]) {
+            const tg = ctx.createLinearGradient(bx - botW, 0, bx + botW, 0);
+            tg.addColorStop(0, '#eef0ea'); tg.addColorStop(0.65, '#c6cac6'); tg.addColorStop(1, '#585c62');
+            ctx.fillStyle = tg;
+            ctx.beginPath();
+            ctx.moveTo(bx - topW, 0); ctx.lineTo(bx + topW, 0);
+            ctx.lineTo(bx + botW, botY); ctx.lineTo(bx - botW, botY);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#242220';
+            for (let my = 45; my < botY - 20; my += 36 + N.rand() * 28) {
+              ctx.fillRect(bx - botW * 0.45, my, botW * (0.7 + N.rand() * 0.5), 5);
+            }
           }
         });
-        // Foreground sparkling foliage & creek reflections
-        for (let k = 0; k < 14; k++) {
-          const rx = 440 + api.rand() * 210, ry = 585 + api.rand() * 195;
-          api.oilHighlight(4, '溪面落叶碎金水平光斑', rx, ry, 24, 5, 0, { color: k % 2 === 0 ? [248, 206, 78] : [234, 242, 250], alpha: 0.84, count: 4 });
-        }
-        api.oilHighlight(4, '枝梢明黄叶簇受光重笔', 220, 180, 34, 24, -0.2, { color: [255, 228, 86], alpha: 0.88, count: 6 });
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7008,
+          layers: WORKS[7].layers,
+          roi: [
+            { cx: 188, cy: 380, rx: 120, ry: 320, boost: 3.0 },
+            { cx: 805, cy: 380, rx: 120, ry: 340, boost: 3.0 },
+            { cx: 465, cy: 615, rx: 195, ry: 185, boost: 2.8 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 9. ALPINE SNOW PEAKS, PINE RIDGE & EMERALD GLACIER LAKE
+    // =========================================================================
     {
       id: 'oil-alpine-peaks',
       title: '油画风景·雪山冷杉与翡翠湖',
@@ -485,34 +809,67 @@
       desc: '雄伟花岗岩雪峰耸立碧空下，左坡承晨曦呈现暖玫瑰雪色，右坡入冷紫阴面，山脚墨绿冷杉倒映如翡翠冰川湖。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [74, 122, 172], [134, 174, 212], [206, 222, 236]);
-        // Mountain ridges + sunlit pink-white & shadow blue faces
-        const peaks = [[240, 210, 460], [560, 148, 520], [860, 225, 440]];
-        peaks.forEach(([px, py, baseY]) => {
-          // Sunlit left slope
-          api.oilStroke(2, '雪峰左向阳面粉白堆砌', [[px - 220, baseY], [px - 95, (py + baseY) * 0.5], [px, py]], {
-            width: 115, color: [248, 236, 228], colorEnd: [236, 206, 198], alpha: 0.90, stretch: 0.58
-          });
-          // Cool shadow right slope
-          api.oilStroke(2, '雪峰右背阴面灰蓝冷调', [[px, py], [px + 105, (py + baseY) * 0.52], [px + 225, baseY]], {
-            width: 118, color: [74, 98, 138], colorEnd: [48, 68, 108], alpha: 0.90, stretch: 0.58
-          });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 478;
+        const scene = M.createScene(W, H, 7009);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [46, 94, 148], skyMid: [108, 156, 198], skyHorizon: [216, 226, 236],
+          cloudCover: 0.36, cloudLitCol: [252, 246, 242], cloudDarkCol: [132, 158, 194]
         });
-        // Emerald glacier lake
-        paintTableBand(api, 1120, 820, 480, [34, 114, 106], [18, 62, 74]);
-        // Pine treeline silhouette along far shoreline
-        for (let t = 0; t < 44; t++) {
-          const tx = 40 + t * 25, th = 42 + (t * 37 % 56);
-          api.oilStroke(3, '湖岸尖顶墨绿冷杉列', [[tx, 488], [tx, 488 - th]], { width: 12, color: [24, 52, 36], alpha: 0.92 });
-        }
-        // Foreground rocky spit + crisp whitewater reflection
-        api.oilPatch(3, '近景深褐砾石湖岬', 220, 745, 250, 95, 0.1, { color: [68, 56, 46], colorEdge: [34, 28, 24], alpha: 0.92, count: 22 });
-        for (let r = 0; r < 10; r++) {
-          api.oilHighlight(4, '冰湖镜面水平波光与雪峰倒影', 340 + r * 62, 540 + (r % 3) * 48, 48, 4, 0, { color: [228, 244, 246], alpha: 0.72, count: 4 });
-        }
-        api.oilHighlight(4, '主峰峰脊厚涂冰雪锐光', 540, 168, 18, 28, -0.5, { color: [255, 252, 248], alpha: 0.96, count: 4 });
+
+        scene.shadeMountainRange({
+          baseY: H_Y,
+          peaks: [[0, 320], [185, 215], [385, 118], [585, 198], [765, 128], [965, 235], [1120, 325]],
+          sunDirX: -0.78, sunDirY: -0.35,
+          rockLit: [138, 134, 146], rockDark: [48, 66, 98],
+          snowLit: [252, 238, 232], snowShadow: [106, 132, 178],
+          snowLine: 0.34, mistCol: [176, 198, 216], mistStrength: 0.32, ridgeAmp: 36
+        });
+
+        scene.shadeOcean({
+          yTop: H_Y, yBot: H,
+          seaTop: [36, 122, 114], seaMid: [22, 92, 88], seaBot: [12, 52, 54],
+          sunX: 465, glitterCol: [212, 238, 228], glitterSpread: 320, glitterStrength: 0.36, waveScale: 0.015
+        });
+
+        // Dark alpine spruce shoreline & mirrored mountain reflections
+        scene.draw2D((ctx) => {
+          ctx.fillStyle = 'rgba(232, 226, 228, 0.25)';
+          ctx.beginPath(); ctx.moveTo(265, H_Y + 4); ctx.lineTo(385, H_Y + 210); ctx.lineTo(525, H_Y + 4); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(645, H_Y + 4); ctx.lineTo(765, H_Y + 185); ctx.lineTo(885, H_Y + 4); ctx.fill();
+
+          ctx.fillStyle = '#142c1c';
+          ctx.fillRect(0, H_Y - 12, W, 22);
+          for (let tx = 18; tx < W; tx += 36) {
+            const distEdge = Math.min(tx, W - tx);
+            const hTree = distEdge < 220 ? 185 - distEdge * 0.52 : 54;
+            ctx.beginPath();
+            ctx.moveTo(tx, H_Y + 8 - hTree);
+            ctx.lineTo(tx + 20, H_Y + 12);
+            ctx.lineTo(tx - 20, H_Y + 12);
+            ctx.closePath(); ctx.fill();
+          }
+        });
+
+        M.synthesize(api, scene, {
+          style: 'knife',
+          totalStrokes: 5000,
+          seed: 7009,
+          layers: WORKS[8].layers,
+          roi: [
+            { cx: 560, cy: 275, rx: 420, ry: 175, boost: 3.0 },
+            { cx: 120, cy: 435, rx: 120, ry: 165, boost: 2.6 },
+            { cx: 1000, cy: 435, rx: 120, ry: 165, boost: 2.6 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 10. VENICE GRAND CANAL AT GOLDEN DUSK
+    // =========================================================================
     {
       id: 'oil-venice-gondola',
       title: '油画风景·威尼斯暮色运河',
@@ -530,34 +887,81 @@
       desc: '暮霭中的威尼斯大运河倒映著两侧红赭与浅米建筑立面、穹顶教堂剪影，漆黑细长的贡多拉轻轻划开水波金光。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [106, 128, 162], [218, 168, 132], [244, 198, 138]);
-        // Grand Canal water base
-        paintTableBand(api, 1120, 820, 485, [64, 92, 118], [32, 48, 72]);
-        // Distant domed basilica (Salute silhouette)
-        api.oilPatch(2, '安康圣母教堂穹顶剪影', 660, 355, 58, 68, 0, { color: [134, 118, 132], alpha: 0.86, count: 14 });
-        api.oilPatch(2, '教堂两侧古典建筑群', 480, 425, 220, 62, 0, { color: [152, 126, 124], alpha: 0.86, count: 16 });
-        // Left Venetian palaces
-        [[80, 390, 140, 190, [212, 134, 96]], [210, 405, 120, 175, [224, 186, 132]]].forEach(([bx, by, bw, bh, col]) => {
-          api.oilPatch(3, '水岸威尼斯粉墙宫殿', bx, by, bw * 0.5, bh * 0.5, 0, { color: col, colorEdge: [138, 76, 54], alpha: 0.92, count: 18 });
-          for (let w = 0; w < 3; w++) api.oilHighlight(3, '宫殿拱形窗幽影', bx - 32 + w * 32, by - 12, 8, 14, 0, { color: [48, 36, 34], alpha: 0.85, count: 2 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 475;
+        const scene = M.createScene(W, H, 7010);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [88, 114, 152], skyMid: [212, 154, 114], skyHorizon: [252, 208, 134],
+          sunX: 545, sunY: 365, glowR: 380, glowCol: [255, 224, 146], glowStrength: 0.70,
+          cloudCover: 0.42, cloudLitCol: [255, 224, 164], cloudDarkCol: [134, 112, 128]
         });
-        // Mooring poles (paline)
-        [[280, 560], [315, 575], [840, 550]].forEach(([px, py]) => {
-          api.oilStroke(3, '威尼斯斜插木桩系缆柱', [[px - 10, py + 95], [px + 12, py - 95]], { width: 14, color: [112, 46, 38], colorEnd: [228, 212, 194], alpha: 0.92 });
+
+        scene.shadeOcean({
+          yTop: H_Y, yBot: H,
+          seaTop: [72, 108, 136], seaMid: [42, 74, 108], seaBot: [24, 42, 68],
+          sunX: 545, glitterCol: [252, 212, 118], glitterSpread: 360, glitterStrength: 0.65, waveScale: 0.022
         });
-        // Iconic dark Gondola + standing gondolier
-        api.oilStroke(3, '漆黑贡多拉长弧翘首舟身', [[360, 610], [520, 636], [690, 624], [745, 586]], {
-          width: 24, color: [18, 16, 20], colorEnd: [42, 34, 38], alpha: 0.96
+
+        scene.draw2D((ctx) => {
+          // Terracotta & ochre Grand Canal palazzi + Santa Maria della Salute silhouette
+          const bld = [
+            [0, 195, 165, 285, '#c86e4c'], [155, 245, 125, 235, '#e0aa78'],
+            [270, 295, 105, 185, '#a85242'], [845, 265, 135, 215, '#c46c52'],
+            [970, 215, 155, 265, '#9e4c3c']
+          ];
+          bld.forEach(([x, y, w, h, c]) => {
+            ctx.fillStyle = c; ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#382a2a';
+            for (let wy = y + 32; wy < H_Y - 35; wy += 48) {
+              ctx.fillRect(x + 22, wy, 18, 28);
+              ctx.fillRect(x + w - 42, wy, 18, 28);
+            }
+          });
+
+          // Distant Basilica Dome & Campanile silhouette
+          ctx.fillStyle = '#4a3d4c';
+          ctx.beginPath(); ctx.arc(695, 395, 58, Math.PI, 0); ctx.fill();
+          ctx.fillRect(638, 395, 114, 82);
+          ctx.fillRect(688, 305, 14, 34);
+          ctx.fillRect(585, 345, 26, 132);
+
+          // Warm ochre/red canal facade reflections shimmering downward
+          ctx.fillStyle = 'rgba(208, 124, 82, 0.35)';
+          ctx.fillRect(0, H_Y, 345, 195);
+          ctx.fillRect(845, H_Y, 275, 215);
+
+          // Foreground sleek jet-black Venetian gondola + standing gondolier
+          ctx.fillStyle = '#141214';
+          ctx.beginPath();
+          ctx.moveTo(225, 625);
+          ctx.bezierCurveTo(325, 688, 615, 682, 745, 615);
+          ctx.lineTo(725, 652);
+          ctx.bezierCurveTo(585, 712, 335, 716, 245, 660);
+          ctx.closePath(); ctx.fill();
+          ctx.fillRect(665, 515, 22, 118); // gondolier
+          ctx.beginPath(); ctx.arc(676, 502, 14, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#62482c'; ctx.lineWidth = 6;
+          ctx.beginPath(); ctx.moveTo(676, 558); ctx.lineTo(548, 725); ctx.stroke();
         });
-        api.oilStroke(3, '船尾船夫站姿剪影与长桨', [[675, 618], [665, 524]], { width: 14, color: [24, 20, 24], alpha: 0.94 });
-        api.oilStroke(3, '斜入运河细长船桨', [[658, 556], [568, 675]], { width: 5, color: [176, 132, 82], alpha: 0.90 });
-        // Shimmering canal water highlights
-        for (let r = 0; r < 14; r++) {
-          const rx = 200 + api.rand() * 720, ry = 505 + api.rand() * 265;
-          api.oilHighlight(4, '运河暮光横向荡漾碎金波纹', rx, ry, 42, 4, 0, { color: r % 2 === 0 ? [252, 208, 124] : [188, 206, 224], alpha: 0.78, count: 4 });
-        }
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7010,
+          layers: WORKS[9].layers,
+          roi: [
+            { cx: 515, cy: 625, rx: 285, ry: 115, boost: 3.4 },
+            { cx: 695, cy: 395, rx: 145, ry: 95, boost: 2.8 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 11. BARBIZON FOREST OAK GLADE & TYNDALL SUNBEAMS
+    // =========================================================================
     {
       id: 'oil-forest-light',
       title: '油画风景·密林晨曦光柱',
@@ -575,30 +979,88 @@
       desc: '巴比松画派林间秘境，高耸古老橡树围合成深幽密林，几缕金黄晨光破开林隙斜射苔藓林道，明暗剧烈而神圣。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1000, 820, [26, 44, 24], [38, 62, 32], [18, 28, 14]);
-        // sunlit misty forest center gap
-        api.oilPatch(2, '林梢间隙晨雾金光渊', 540, 210, 145, 165, 0, { color: [232, 218, 138], colorEdge: [64, 98, 44], alpha: 0.76, count: 24 });
-        // Mossy undulating forest path floor
-        paintTableBand(api, 1000, 820, 520, [68, 92, 36], [34, 46, 20]);
-        api.oilStroke(2, '林间泥泞蜿蜒小径受光', [[520, 520], [490, 665], [440, 835]], { width: 120, color: [168, 152, 86], colorEnd: [98, 86, 46], alpha: 0.72, stretch: 0.65 });
-        // Massive dark oak trunks framing the depth
-        [[145, 830, 165, 10, 56], [280, 690, 295, 20, 32], [755, 680, 740, 10, 38], [885, 830, 860, 0, 62]].forEach(([x0, y0, x1, y1, w]) => {
-          api.oilStroke(3, '沧桑深褐林木树干', [[x0, y0], [(x0 + x1) * 0.5, 420], [x1, y1]], { width: w, color: [52, 38, 26], colorEnd: [26, 20, 14], alpha: 0.94 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1000, H = 820;
+        const scene = M.createScene(W, H, 7011);
+
+        scene.draw2D((ctx, w, h, N) => {
+          // Deep mossy cathedral woods gradient
+          const wood = ctx.createRadialGradient(220, 85, 25, 500, 410, 740);
+          wood.addColorStop(0, '#fff4b6');
+          wood.addColorStop(0.28, '#8ba848');
+          wood.addColorStop(0.62, '#284426');
+          wood.addColorStop(1, '#0e1a10');
+          ctx.fillStyle = wood;
+          ctx.fillRect(0, 0, W, H);
+
+          // Winding moss-carpeted forest floor
+          const flr = ctx.createLinearGradient(0, 525, 0, H);
+          flr.addColorStop(0, '#3a5a26'); flr.addColorStop(1, '#1a2814');
+          ctx.fillStyle = flr;
+          ctx.fillRect(0, 525, W, H - 525);
+
+          // Sun-dappled clearing glow on mossy trail
+          const dapple = ctx.createRadialGradient(545, 665, 18, 545, 675, 215);
+          dapple.addColorStop(0, 'rgba(246, 226, 128, 0.85)');
+          dapple.addColorStop(0.55, 'rgba(148, 174, 72, 0.45)');
+          dapple.addColorStop(1, 'rgba(38, 62, 30, 0)');
+          ctx.fillStyle = dapple;
+          ctx.fillRect(280, 515, 540, 295);
+
+          // Towering dark gnarled oak trunks framing the sacred glade
+          for (const [tx, tw, lean] of [[95, 56, 12], [248, 44, -8], [748, 52, -16], [895, 68, -22], [445, 24, 6], [608, 28, -4]]) {
+            const tg = ctx.createLinearGradient(tx - tw, 0, tx + tw, 0);
+            tg.addColorStop(0, '#725634'); tg.addColorStop(0.38, '#382a1a'); tg.addColorStop(1, '#14100a');
+            ctx.fillStyle = tg;
+            ctx.beginPath();
+            ctx.moveTo(tx - tw * 0.75 + lean, 0);
+            ctx.lineTo(tx + tw * 0.75 + lean, 0);
+            ctx.lineTo(tx + tw * 1.15, 695);
+            ctx.lineTo(tx - tw * 1.15, 695);
+            ctx.closePath(); ctx.fill();
+          }
+
+          // Canopy foliage clusters blocking high sky except central gap
+          for (let f = 0; f < 45; f++) {
+            const fx = N.rand() * W, fy = N.rand() * 295;
+            if (Math.hypot(fx - 310, fy - 125) < 95) continue;
+            ctx.fillStyle = f % 2 === 0 ? 'rgba(24, 42, 22, 0.86)' : 'rgba(54, 86, 36, 0.78)';
+            ctx.beginPath(); ctx.arc(fx, fy, 46 + N.rand() * 52, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Diagonal golden Tyndall light beams slicing down onto mossy floor
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          for (const [xTop, xBot, wid] of [[245, 455, 86], [285, 595, 98], [335, 725, 72]]) {
+            const ray = ctx.createLinearGradient(xTop, 75, xBot, 725);
+            ray.addColorStop(0, 'rgba(255, 238, 162, 0.52)');
+            ray.addColorStop(0.7, 'rgba(244, 214, 124, 0.28)');
+            ray.addColorStop(1, 'rgba(204, 184, 96, 0)');
+            ctx.fillStyle = ray;
+            ctx.beginPath();
+            ctx.moveTo(xTop, 65); ctx.lineTo(xTop + wid, 65);
+            ctx.lineTo(xBot + wid * 2.1, 745); ctx.lineTo(xBot - wid * 0.6, 745);
+            ctx.closePath(); ctx.fill();
+          }
+          ctx.restore();
         });
-        // Deep leafy canopy + backlit sunlit ferns
-        for (let f = 0; f < 16; f++) {
-          const lx = 60 + f * 60, ly = 60 + (f % 4) * 58;
-          api.oilPatch(3, '顶层密林茂叶掩映', lx, ly, 86, 56, 0, { color: [34, 58, 26], colorEdge: [18, 32, 14], alpha: 0.84, count: 10 });
-        }
-        // Tyndall diagonal sunbeams (lighter glaze/additive feel!)
-        for (let b = 0; b < 5; b++) {
-          api.oilStroke(4, '林隙斜射金色丁达尔光束', [[545 + b * 24, 155], [420 + b * 48, 565]], {
-            width: 38, color: [252, 236, 158], colorEnd: [188, 198, 92], alpha: 0.34, stretch: 0.75
-          });
-        }
-        api.oilHighlight(4, '小径中心苔草被金光点亮', 485, 625, 68, 28, -0.1, { color: [236, 226, 118], alpha: 0.78, count: 10 });
+
+        M.synthesize(api, scene, {
+          style: 'scumbling',
+          totalStrokes: 5000,
+          seed: 7011,
+          layers: WORKS[10].layers,
+          roi: [
+            { cx: 535, cy: 525, rx: 255, ry: 245, boost: 3.2 },
+            { cx: 310, cy: 135, rx: 145, ry: 95, boost: 2.6 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 12. STORMY SEA HEADLAND & SEARCHLIGHT LIGHTHOUSE
+    // =========================================================================
     {
       id: 'oil-lighthouse-storm',
       title: '油画风景·暴风雨夜与红白灯塔',
@@ -616,29 +1078,82 @@
       desc: '怒海狂涛之夜，黑青雷云低垂压顶，礁石上的红白条纹灯塔顶住呼啸巨浪，塔顶炽亮白光刺穿漫天飞沫。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [24, 34, 44], [46, 66, 78], [28, 42, 52]);
-        // Rolling storm clouds
-        for (let c = 0; c < 12; c++) {
-          api.oilPatch(2, '风雷暗铅云团翻涌', 80 + c * 92, 130 + (c % 3) * 58, 120, 54, -0.2, { color: [42, 56, 68], colorEdge: [22, 28, 36], alpha: 0.84, count: 12 });
-        }
-        // Churning teal sea
-        paintTableBand(api, 1120, 820, 480, [24, 74, 82], [14, 38, 48]);
-        // Rocky cliff + Red/White Lighthouse
-        api.oilPatch(3, '乌黑礁石绝壁顶风浪', 345, 585, 165, 135, -0.1, { color: [38, 36, 36], colorEdge: [18, 18, 20], alpha: 0.96, count: 24 });
-        api.oilStroke(3, '红白灯塔白身主体', [[350, 475], [350, 218]], { width: 52, color: [236, 234, 224], colorEnd: [198, 202, 202], alpha: 0.96 });
-        api.oilStroke(3, '灯塔鲜红警戒横带', [[326, 340], [374, 340]], { width: 34, color: [188, 48, 38], alpha: 0.95 });
-        api.oilStroke(3, '灯塔顶红黑灯笼亭', [[350, 218], [350, 178]], { width: 36, color: [168, 42, 34], colorEnd: [26, 26, 28], alpha: 0.95 });
-        // Beacon light beams cutting across storm sky
-        api.oilStroke(4, '灯塔右射穿透迷雾强光柱', [[368, 202], [1100, 110]], { width: 84, color: [255, 238, 162], colorEnd: [128, 148, 148], alpha: 0.36, stretch: 0.78 });
-        api.oilHighlight(4, '灯笼核心炽烈明黄火光', 350, 204, 18, 14, 0, { color: [255, 250, 204], alpha: 0.98, count: 6 });
-        // Crashing white foam waves against cliff
-        for (let w = 0; w < 14; w++) {
-          const wx = 180 + w * 68, wy = 560 + Math.sin(w * 0.9) * 58;
-          api.oilStroke(4, '拍岸雪白翻卷浪花飞沫', [[wx, wy], [wx + 65, wy - 28]], { width: 28, color: [244, 248, 248], colorEnd: [148, 182, 188], alpha: 0.88 });
-        }
-        api.oilHighlight(4, '撞礁冲天飞沫溅白点彩', 485, 495, 58, 72, -0.3, { color: [255, 255, 252], alpha: 0.86, count: 14 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 485;
+        const scene = M.createScene(W, H, 7012);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [22, 34, 48], skyMid: [44, 66, 86], skyHorizon: [112, 134, 148],
+          sunX: 350, sunY: 195, glowR: 300, glowCol: [252, 224, 128], glowStrength: 0.42,
+          cloudCover: 0.72, cloudLitCol: [148, 168, 184], cloudDarkCol: [24, 34, 48]
+        });
+
+        scene.shadeOcean({
+          yTop: H_Y, yBot: H,
+          seaTop: [24, 78, 84], seaMid: [16, 54, 68], seaBot: [8, 26, 38],
+          sunX: 350, glitterCol: [232, 236, 224], glitterSpread: 220, glitterStrength: 0.44,
+          waveScale: 0.025, crestWave: { cx: 680, cy: 565, rx: 320, ry: 95, colCore: [52, 152, 138], colFoam: [248, 250, 246] }
+        });
+
+        scene.draw2D((ctx) => {
+          // Craggy black basalt cliff headland + dramatic white crashing spray
+          ctx.fillStyle = '#181e24';
+          ctx.beginPath();
+          ctx.moveTo(0, 445); ctx.lineTo(145, 415); ctx.lineTo(425, 455); ctx.lineTo(495, 585); ctx.lineTo(0, 625);
+          ctx.closePath(); ctx.fill();
+
+          // Piercing warm golden lighthouse searchlight cone across gale sky
+          const beam = ctx.createLinearGradient(345, 195, 1080, 125);
+          beam.addColorStop(0, 'rgba(255, 248, 196, 0.92)');
+          beam.addColorStop(0.4, 'rgba(252, 222, 118, 0.36)');
+          beam.addColorStop(1, 'rgba(186, 178, 128, 0)');
+          ctx.fillStyle = beam;
+          ctx.beginPath();
+          ctx.moveTo(345, 195); ctx.lineTo(1120, 72); ctx.lineTo(1120, 315); ctx.closePath(); ctx.fill();
+
+          // Red-and-white striped cylindrical stone lighthouse tower
+          const stripes = [
+            [225, 48, '#f0ece2'], [273, 52, '#c8382c'], [325, 55, '#ede8dc'], [380, 58, '#bc3226']
+          ];
+          stripes.forEach(([sy, sh, col]) => {
+            const wTop = 26 + (sy - 225) * 0.09, wBot = 26 + (sy + sh - 225) * 0.09;
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.moveTo(345 - wTop, sy); ctx.lineTo(345 + wTop, sy);
+            ctx.lineTo(345 + wBot, sy + sh); ctx.lineTo(345 - wBot, sy + sh);
+            ctx.closePath(); ctx.fill();
+          });
+          // Lantern room & beacon glow
+          ctx.fillStyle = '#1e2228';
+          ctx.fillRect(320, 168, 50, 58);
+          ctx.fillStyle = '#fff9ce';
+          ctx.fillRect(328, 178, 34, 34);
+          ctx.beginPath(); ctx.moveTo(314, 168); ctx.lineTo(345, 138); ctx.lineTo(376, 168); ctx.closePath(); ctx.fill();
+
+          // Frothing sea foam crashing upward against cliff base
+          ctx.fillStyle = 'rgba(246, 250, 248, 0.85)';
+          for (const [fx, fy, rx, ry] of [[425, 515, 78, 42], [495, 565, 92, 46], [355, 555, 68, 34]]) {
+            ctx.beginPath(); ctx.ellipse(fx, fy, rx, ry, -0.2, 0, Math.PI * 2); ctx.fill();
+          }
+        });
+
+        M.synthesize(api, scene, {
+          style: 'knife',
+          totalStrokes: 5000,
+          seed: 7012,
+          layers: WORKS[11].layers,
+          roi: [
+            { cx: 345, cy: 315, rx: 125, ry: 215, boost: 3.6 },
+            { cx: 615, cy: 555, rx: 295, ry: 115, boost: 2.8 }
+          ]
+        });
       }
     },
+
+    // =========================================================================
+    // 13. MONET JAPANESE BRIDGE & WATER LILY POND
+    // =========================================================================
     {
       id: 'oil-waterlily-pond',
       title: '油画风景·莫奈日式拱桥睡莲池',
@@ -656,38 +1171,78 @@
       desc: '印象派色光交响：万条嫩绿柳丝披拂在蓝绿拱桥之后，池水中玫瑰紫、湖蓝与青绿短笔交织出浮光跃动的满池睡莲。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [74, 124, 64], [98, 148, 92], [52, 86, 112]);
-        // Pond surface vibrant violet-blue-green tapestry
-        paintTableBand(api, 1120, 820, 410, [48, 86, 118], [32, 68, 98]);
-        for (let r = 0; r < 24; r++) {
-          const rx = api.rand() * 1080, ry = 415 + api.rand() * 380;
-          const col = r % 3 === 0 ? [92, 148, 118] : (r % 3 === 1 ? [118, 96, 148] : [68, 118, 156]);
-          api.oilStroke(2, '池面垂柳紫蓝倒影短笔', [[rx, ry], [rx, ry + 54]], { width: 14, color: col, alpha: 0.62 });
-        }
-        // Weeping willow cascades behind bridge
-        for (let w = 0; w < 28; w++) {
-          const wx = 30 + w * 40;
-          api.oilStroke(2, '后岸柳绦鹅黄嫩绿下垂', [[wx, 10], [wx + 12, 220], [wx - 8, 395]], {
-            width: 18, color: w % 2 === 0 ? [126, 174, 72] : [68, 114, 54], alpha: 0.72
-          });
-        }
-        // Iconic teal-green Japanese arch bridge
-        api.oilStroke(3, '拱形日式木桥主拱身', [[90, 425], [560, 295], [1030, 425]], { width: 22, color: [108, 162, 146], colorEnd: [68, 118, 106], alpha: 0.94 });
-        api.oilStroke(3, '拱桥顶层扶手弧线', [[90, 365], [560, 238], [1030, 365]], { width: 10, color: [132, 184, 168], alpha: 0.94 });
-        for (let p = 0; p <= 16; p++) {
-          const t = p / 16, bx = api.lerp(110, 1010, t);
-          const arch = Math.sin(t * Math.PI) * 126;
-          api.oilStroke(3, '木桥垂直护栏柱列', [[bx, 422 - arch], [bx, 362 - arch]], { width: 6, color: [92, 142, 128], alpha: 0.92 });
-        }
-        // Floating waterlilies
-        const pads = [[260, 560], [340, 620], [520, 690], [680, 585], [810, 665], [420, 745], [755, 740]];
-        pads.forEach(([px, py]) => {
-          api.oilPatch(4, '睡莲圆润翠青浮叶群', px, py, 56, 22, 0.1, { color: [68, 118, 62], colorEdge: [38, 72, 42], alpha: 0.88, count: 10 });
-          api.oilHighlight(4, '粉白娇蕊睡莲点睛', px + 14, py - 4, 14, 7, 0, { color: [248, 178, 198], alpha: 0.94, count: 4 });
-          api.oilHighlight(4, '睡莲花心一点亮白', px + 14, py - 5, 6, 4, 0, { color: [255, 250, 224], alpha: 0.96, count: 2 });
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820;
+        const scene = M.createScene(W, H, 7013);
+
+        scene.draw2D((ctx, w, h, N) => {
+          // Lush weeping willow emerald curtain backdrop
+          const bkg = ctx.createLinearGradient(0, 0, 0, 415);
+          bkg.addColorStop(0, '#5a944a'); bkg.addColorStop(0.55, '#82b458'); bkg.addColorStop(1, '#2d5432');
+          ctx.fillStyle = bkg;
+          ctx.fillRect(0, 0, W, 415);
+
+          // Shimmering Monet blue-teal-violet-rose pond water
+          const water = ctx.createLinearGradient(0, 405, 0, H);
+          water.addColorStop(0, '#366458'); water.addColorStop(0.45, '#3b6a9a'); water.addColorStop(0.8, '#5a68a6'); water.addColorStop(1, '#26446c');
+          ctx.fillStyle = water;
+          ctx.fillRect(0, 405, W, H - 405);
+
+          // Vertical willow foliage streaks behind pond
+          for (let i = 0; i < 65; i++) {
+            const vx = N.rand() * W, vy = N.rand() * 245;
+            ctx.strokeStyle = i % 2 === 0 ? 'rgba(138, 188, 78, 0.72)' : 'rgba(42, 82, 46, 0.68)';
+            ctx.lineWidth = 10 + N.rand() * 14;
+            ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(vx + (N.rand() - 0.5) * 16, vy + 165); ctx.stroke();
+          }
+
+          // Sunlit green Japanese arched wooden bridge across center
+          ctx.strokeStyle = '#6da89a';
+          ctx.lineWidth = 22;
+          ctx.beginPath(); ctx.moveTo(45, 365); ctx.quadraticCurveTo(560, 215, 1075, 365); ctx.stroke();
+          ctx.strokeStyle = '#92cab8';
+          ctx.lineWidth = 10;
+          ctx.beginPath(); ctx.moveTo(45, 295); ctx.quadraticCurveTo(560, 145, 1075, 295); ctx.stroke();
+          for (let p = 0; p <= 16; p++) {
+            const t = p / 16;
+            const px = 45 + t * 1030;
+            const arc = 4 * t * (1 - t) * 150;
+            const pyBot = 365 - arc;
+            ctx.strokeStyle = '#4e7e72'; ctx.lineWidth = 7;
+            ctx.beginPath(); ctx.moveTo(px, pyBot); ctx.lineTo(px, pyBot - 70); ctx.stroke();
+          }
+
+          // Floating lily pads & glowing pink/ivory Monet waterlilies across water surface
+          for (let k = 0; k < 28; k++) {
+            const lx = 75 + N.rand() * 970, ly = 455 + N.rand() * 325;
+            const r = 24 + (ly - 455) * 0.14;
+            ctx.fillStyle = k % 2 === 0 ? '#4e8446' : '#3a6a38';
+            ctx.beginPath(); ctx.ellipse(lx, ly, r * 1.4, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+            if (k % 2 === 0) {
+              ctx.fillStyle = k % 4 === 0 ? '#f69eb4' : '#fdf6ce';
+              ctx.beginPath(); ctx.ellipse(lx + 4, ly - 5, r * 0.52, r * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = '#fffef0';
+              ctx.beginPath(); ctx.arc(lx + 4, ly - 6, r * 0.16, 0, Math.PI * 2); ctx.fill();
+            }
+          }
+        });
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7013,
+          layers: WORKS[12].layers,
+          roi: [
+            { cx: 560, cy: 295, rx: 495, ry: 110, boost: 3.2 },
+            { cx: 560, cy: 615, rx: 465, ry: 175, boost: 2.8 }
+          ]
         });
       }
     },
+
+    // =========================================================================
+    // 14. WINTER TWILIGHT VILLAGE & WARM GLOWING WINDOWS
+    // =========================================================================
     {
       id: 'oil-winter-village',
       title: '油画风景·冬日暮雪村落小路',
@@ -705,29 +1260,79 @@
       desc: '严冬黄昏粉紫天光抚慰静谧雪乡，厚雪屋顶反射微寒青灰，唯有村中农舍与行脚路上几扇炉火映出温暖橙辉。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [118, 136, 164], [194, 174, 176], [238, 196, 162]);
-        // Snow-blanketed ground with cool sky reflection
-        paintTableBand(api, 1120, 820, 465, [224, 228, 236], [176, 192, 214]);
-        // Winding muddy-slush country lane
-        api.oilStroke(2, '积雪压辙土路弯向村中', [[520, 470], [495, 595], [580, 710], [460, 835]], { width: 92, color: [132, 128, 134], colorEnd: [98, 92, 98], alpha: 0.72, stretch: 0.65 });
-        // Cozy snow-topped village cottages
-        const houses = [[320, 465, 92, 68], [585, 445, 110, 76], [765, 480, 96, 64]];
-        houses.forEach(([hx, hy, hw, hh]) => {
-          api.oilPatch(3, '乡村石砌小屋墙面', hx, hy, hw * 0.5, hh * 0.5, 0, { color: [108, 96, 88], colorEdge: [68, 58, 52], alpha: 0.92, count: 14 });
-          api.oilStroke(3, '屋顶覆盖松软厚积雪', [[hx - hw * 0.6, hy - 14], [hx, hy - hh * 0.85], [hx + hw * 0.6, hy - 14]], {
-            width: 24, color: [248, 248, 250], colorEnd: [198, 212, 228], alpha: 0.96
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 395;
+        const scene = M.createScene(W, H, 7014);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [108, 126, 162], skyMid: [188, 168, 182], skyHorizon: [244, 212, 192],
+          cloudCover: 0.48, cloudLitCol: [248, 224, 206], cloudDarkCol: [132, 146, 178]
+        });
+
+        scene.draw2D((ctx) => {
+          // Cool lavender-blue & ivory snow drifts + curving cart lane
+          const snow = ctx.createLinearGradient(0, H_Y, 0, H);
+          snow.addColorStop(0, '#dde4ee'); snow.addColorStop(0.5, '#b6c4dc'); snow.addColorStop(1, '#7c92b8');
+          ctx.fillStyle = snow;
+          ctx.fillRect(0, H_Y, W, H - H_Y);
+
+          // Gentle S-curved sunlit winter lane receding between snowy cottage lawns
+          ctx.fillStyle = 'rgba(138, 152, 178, 0.62)';
+          ctx.beginPath();
+          ctx.moveTo(495, H_Y + 35);
+          ctx.bezierCurveTo(445, 555, 585, 655, 365, H);
+          ctx.lineTo(745, H);
+          ctx.bezierCurveTo(645, 665, 535, 555, 535, H_Y + 35);
+          ctx.closePath(); ctx.fill();
+
+          // Snow-covered cottages with terracotta gables and blazing amber hearths
+          [[215, 345, 145, 115], [645, 335, 168, 122], [845, 385, 138, 108]].forEach(([hx, hy, hw, hh], idx) => {
+            ctx.fillStyle = '#e8e4dc';
+            ctx.fillRect(hx, hy, hw, hh);
+            ctx.fillStyle = idx === 1 ? '#b24c38' : '#786258';
+            ctx.beginPath(); ctx.moveTo(hx - 14, hy); ctx.lineTo(hx + hw * 0.5, hy - 56); ctx.lineTo(hx + hw + 14, hy); ctx.closePath(); ctx.fill();
+            // Thick white snow cap along roof slope
+            ctx.strokeStyle = '#f8f8f6'; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.moveTo(hx - 14, hy); ctx.lineTo(hx + hw * 0.5, hy - 56); ctx.lineTo(hx + hw + 14, hy); ctx.stroke();
+
+            // Glowing hearth windows + golden cast pool on snow
+            ctx.fillStyle = '#ffbe3e';
+            ctx.fillRect(hx + hw * 0.25, hy + 42, 24, 30);
+            ctx.fillRect(hx + hw * 0.62, hy + 42, 24, 30);
+            const pool = ctx.createRadialGradient(hx + hw * 0.5, hy + hh + 24, 8, hx + hw * 0.5, hy + hh + 24, 88);
+            pool.addColorStop(0, 'rgba(255, 198, 72, 0.55)');
+            pool.addColorStop(1, 'rgba(255, 198, 72, 0)');
+            ctx.fillStyle = pool;
+            ctx.beginPath(); ctx.arc(hx + hw * 0.5, hy + hh + 24, 88, 0, Math.PI * 2); ctx.fill();
           });
-          api.oilHighlight(4, '雪夜小屋炉火橙黄亮窗', hx - 16, hy + 8, 9, 10, 0, { color: [255, 196, 68], alpha: 0.96, count: 3 });
-          api.oilHighlight(4, '右窗温暖火光溢雪地', hx + 18, hy + 8, 8, 9, 0, { color: [255, 206, 88], alpha: 0.94, count: 3 });
+
+          // Gnarled bare oak branches silhouette
+          ctx.strokeStyle = '#38302e'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+          for (const [tx, ty] of [[128, 495], [965, 545]]) {
+            ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty - 265); ctx.stroke();
+            ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.moveTo(tx, ty - 165); ctx.lineTo(tx - 75, ty - 235); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(tx, ty - 195); ctx.lineTo(tx + 72, ty - 255); ctx.stroke();
+          }
         });
-        // Bare winter trees framing foreground
-        [[155, 760, 175, 165], [910, 780, 890, 145]].forEach(([x0, y0, x1, y1]) => {
-          api.oilStroke(3, '冬日落叶孤树黑褐主干', [[x0, y0], [(x0 + x1) * 0.5, 460], [x1, y1]], { width: 24, color: [52, 42, 38], alpha: 0.94 });
-          api.oilStroke(3, '寒树遒劲分叉枝丫', [[x1, y1 + 120], [x1 + (x1 < 500 ? 78 : -82), y1 - 35]], { width: 9, color: [56, 46, 42], alpha: 0.88 });
+
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 5000,
+          seed: 7014,
+          layers: WORKS[13].layers,
+          roi: [
+            { cx: 725, cy: 405, rx: 145, ry: 95, boost: 3.4 },
+            { cx: 285, cy: 415, rx: 115, ry: 85, boost: 3.0 }
+          ]
         });
-        api.oilHighlight(4, '雪路边缘被暮光染成粉白高光', 385, 650, 48, 12, -0.2, { color: [252, 232, 218], alpha: 0.78, count: 6 });
       }
     },
+
+    // =========================================================================
+    // 15. SILVER MOONLIT COVE & LONE FISHING BOAT
+    // =========================================================================
     {
       id: 'oil-moonlit-cove',
       title: '油画风景·月夜银海湾渔舟',
@@ -745,29 +1350,60 @@
       desc: '深蓝月夜云隙泻下一轮皎洁冰盘，十里幽静海面拖出波光银带，左崖松影与静泊渔舟构成空灵深沉的东方诗意油画。',
       layers: LAND_LAYERS,
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [14, 22, 42], [26, 42, 74], [38, 58, 92]);
-        // Calm nocturnal sea
-        paintTableBand(api, 1120, 820, 455, [24, 42, 72], [12, 20, 38]);
-        // Clouds & Luminous full moon
-        api.oilPatch(2, '夜空云隙月华冰蓝光晕', 595, 225, 138, 92, 0, { color: [164, 188, 218], colorEdge: [28, 44, 76], alpha: 0.72, count: 22 });
-        api.oilHighlight(4, '冰轮满月厚涂明辉', 595, 225, 36, 36, 0, { color: [255, 250, 234], alpha: 0.98, count: 8 });
-        // Rimlit dark cloud bands
-        api.oilPatch(2, '乌云横遮半天冷紫', 280, 195, 210, 44, -0.05, { color: [24, 30, 48], alpha: 0.80, count: 16 });
-        api.oilStroke(3, '乌云下沿银白镶边月光', [[140, 228], [320, 232], [485, 218]], { width: 12, color: [212, 226, 242], alpha: 0.76 });
-        // Silhouetted headland & calm moored skiff
-        api.oilPatch(3, '左岸苍黑礁崖剪影', 145, 510, 210, 115, 0.1, { color: [18, 20, 26], colorEdge: [12, 14, 18], alpha: 0.96, count: 20 });
-        api.oilStroke(3, '礁顶斜卧海松剪影', [[110, 430], [215, 355]], { width: 16, color: [18, 22, 26], alpha: 0.94 });
-        api.oilStroke(3, '海湾静泊剪影小渔船', [[385, 595], [445, 608], [505, 594]], { width: 14, color: [16, 18, 24], alpha: 0.96 });
-        // Shimmering silver moonpath on water!
-        for (let y = 468; y <= 785; y += 14) {
-          const spread = 16 + ((y - 468) / 317) * 98;
-          api.oilHighlight(4, '海面破碎皎洁银柱水波', 595 + (api.rand() - 0.5) * 16, y, spread * 0.6, 3.8, 0, {
-            color: y < 560 ? [255, 252, 234] : [194, 214, 236], alpha: 0.86, count: 3
-          });
-        }
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 445;
+        const scene = M.createScene(W, H, 7015);
+
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [14, 24, 46], skyMid: [28, 46, 78], skyHorizon: [62, 86, 126],
+          sunX: 665, sunY: 185, sunR: 32, sunCol: [252, 248, 232],
+          glowR: 265, glowCol: [212, 224, 244], glowStrength: 0.72,
+          cloudCover: 0.56, cloudLitCol: [176, 194, 218], cloudDarkCol: [14, 22, 38]
+        });
+
+        scene.shadeOcean({
+          yTop: H_Y, yBot: H,
+          seaTop: [24, 42, 72], seaMid: [16, 30, 56], seaBot: [8, 14, 28],
+          sunX: 665, glitterCol: [252, 248, 232], glitterSpread: 280, glitterStrength: 0.96, waveScale: 0.022
+        });
+
+        scene.draw2D((ctx) => {
+          // Distant island range + pine-topped basalt headland cliff left
+          ctx.fillStyle = '#121a28';
+          ctx.beginPath();
+          ctx.moveTo(0, 315); ctx.lineTo(195, 345); ctx.lineTo(345, H_Y + 20); ctx.lineTo(0, H_Y + 20);
+          ctx.closePath(); ctx.fill();
+
+          ctx.fillStyle = '#182436';
+          ctx.beginPath();
+          ctx.moveTo(415, H_Y); ctx.quadraticCurveTo(515, 412, 625, H_Y); ctx.closePath(); ctx.fill();
+
+          // Quiet moonlit fishing boat silhouetted next to silver shimmer lane
+          ctx.fillStyle = '#10141c';
+          ctx.beginPath();
+          ctx.moveTo(548, 632); ctx.quadraticCurveTo(605, 668, 675, 628);
+          ctx.lineTo(660, 654); ctx.quadraticCurveTo(605, 678, 562, 654);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = '#18202c'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(612, 636); ctx.lineTo(612, 535); ctx.stroke();
+        });
+
+        M.synthesize(api, scene, {
+          style: 'classic',
+          totalStrokes: 5000,
+          seed: 7015,
+          layers: WORKS[14].layers,
+          roi: [
+            { cx: 665, cy: 185, rx: 135, ry: 115, boost: 3.4 },
+            { cx: 655, cy: 595, rx: 165, ry: 175, boost: 3.2 }
+          ]
+        });
       }
     }
   ];
 
-  window.Code2PaintCatalog.addPack(WORKS);
+  if (typeof window !== 'undefined' && window.Code2PaintCatalog) {
+    window.Code2PaintCatalog.addPack(WORKS);
+  }
 })();

@@ -112,27 +112,34 @@
     const mode = opts.mode || 'ink';
 
     if (mode === 'oil') {
+      // Woven Belgian linen primed canvas with warm imprimatura vignette
       const base = parseColor(opts.backdropColor || '#1f1611');
       g.fillStyle = rgbStr(base);
       g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 40; i++) {
-        const cx = rand() * w, cy = rand() * h, r = 120 + rand() * 250;
+      for (let i = 0; i < 48; i++) {
+        const cx = rand() * w, cy = rand() * h, r = 110 + rand() * 260;
         const grad = g.createRadialGradient(cx, cy, r * 0.08, cx, cy, r);
-        const shift = rand() > 0.5 ? 11 : -9;
-        grad.addColorStop(0, rgbStr([base[0] + shift, base[1] + shift * 0.85, base[2] + shift * 0.65], 0.09));
+        const shift = rand() > 0.45 ? 12 : -10;
+        grad.addColorStop(0, rgbStr([base[0] + shift, base[1] + shift * 0.85, base[2] + shift * 0.65], 0.08));
         grad.addColorStop(1, rgbStr(base, 0));
         g.fillStyle = grad;
         g.fillRect(cx - r, cy - r, r * 2, r * 2);
       }
+      // Fine warp & weft linen thread relief
       g.lineWidth = 1;
-      for (let y = 0; y < h; y += 5) {
-        g.strokeStyle = y % 10 === 0 ? 'rgba(255,235,205,0.032)' : 'rgba(0,0,0,0.048)';
+      for (let y = 0; y < h; y += 3) {
+        g.strokeStyle = y % 6 === 0 ? 'rgba(255,240,214,0.036)' : 'rgba(0,0,0,0.052)';
         g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke();
       }
-      for (let x = 0; x < w; x += 5) {
-        g.strokeStyle = x % 10 === 0 ? 'rgba(255,235,205,0.026)' : 'rgba(0,0,0,0.042)';
+      for (let x = 0; x < w; x += 3) {
+        g.strokeStyle = x % 6 === 0 ? 'rgba(255,240,214,0.030)' : 'rgba(0,0,0,0.046)';
         g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke();
       }
+      const vg = g.createRadialGradient(w * 0.5, h * 0.48, Math.min(w, h) * 0.36, w * 0.5, h * 0.5, Math.max(w, h) * 0.78);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.14)');
+      g.fillStyle = vg;
+      g.fillRect(0, 0, w, h);
     } else if (mode === 'gongbi') {
       // Sized Gongbi Silk / Shuxuan (熟宣仿古绢)
       const base = parseColor(opts.backdropColor || '#ebe0c8');
@@ -200,7 +207,12 @@
     const maxOilStrokes = apiOpts.maxOilStrokes || 5000;
     const strokes = [];
     const oilEntries = [];
+    const rawOilStrokes = [];
     let finalizedOil = null;
+
+    function pushRawStroke(layer, label, drawFn) {
+      rawOilStrokes.push({ layer, label, draw: drawFn });
+    }
 
     function push(layer, label, drawFn) {
       const strokeSeed = (nextStrokeSeed++) * 2654435761 >>> 0;
@@ -916,7 +928,11 @@
       oilStroke, oilPatch, oilHighlight,
       inscription, seal,
       push,
-      get strokes() { return isOilMode ? finalizeOilStrokes() : strokes; }
+      pushRawStroke,
+      get strokes() {
+        if (!isOilMode) return strokes;
+        return rawOilStrokes.length ? rawOilStrokes : finalizeOilStrokes();
+      }
     };
   }
 

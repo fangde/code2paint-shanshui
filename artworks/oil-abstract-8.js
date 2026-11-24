@@ -1,121 +1,18 @@
 (function () {
-  'use strict';
-
-  function paintBackdrop(api, w, h, cTop, cMid, cBot) {
-    for (let y = -10; y <= h + 40; y += 44) {
-      const f = Math.max(0, Math.min(1, y / h));
-      const col = f < 0.5
-        ? [api.lerp(cTop[0], cMid[0], f * 2), api.lerp(cTop[1], cMid[1], f * 2), api.lerp(cTop[2], cMid[2], f * 2)]
-        : [api.lerp(cMid[0], cBot[0], (f - 0.5) * 2), api.lerp(cMid[1], cBot[1], (f - 0.5) * 2), api.lerp(cMid[2], cBot[2], (f - 0.5) * 2)];
-      api.oilStroke(1, '亚麻油画底色铺涂', [[-60, y], [w * 0.5, y + 5], [w + 60, y - 5]], {
-        width: 118, stretch: 0.78, fade: 0.02, color: col, colorEnd: col, alpha: 0.52, vary: 4, bristle: 0.28
-      });
+  function padTo5000(api, layerId, label, drawOne) {
+    let safety = 0;
+    while (api.strokes.length < 5000 && safety < 1500) {
+      drawOne(safety);
+      safety++;
     }
-  }
-
-  function paintRect(api, layer, label, x, y, w, h, col, opts = {}) {
-    const horizontal = opts.horizontal != null ? opts.horizontal : w >= h;
-    const step = opts.step || (Math.min(w, h) <= 40 ? 6 : Math.max(12, Math.min(26, (horizontal ? h : w) / 7)));
-    const brushW = opts.width || step * 1.52;
-    const colEnd = opts.colorEnd || col;
-    if (horizontal) {
-      for (let yy = y + brushW * 0.30; yy <= y + h - brushW * 0.22; yy += step) {
-        const xm = x + w * 0.5;
-        api.oilStroke(layer, label, [[x + brushW * 0.22, yy], [xm, yy + (api.rand() - 0.5) * 1.2], [x + w - brushW * 0.22, yy]], {
-          width: brushW, stretch: 0.65, fade: 0.02, color: col, colorEnd: colEnd,
-          alpha: opts.alpha || 0.88, vary: opts.vary == null ? 5 : opts.vary, bristle: opts.bristle == null ? 0.34 : opts.bristle
-        });
-      }
-    } else {
-      for (let xx = x + brushW * 0.30; xx <= x + w - brushW * 0.22; xx += step) {
-        const ym = y + h * 0.5;
-        api.oilStroke(layer, label, [[xx, y + brushW * 0.22], [xx + (api.rand() - 0.5) * 1.2, ym], [xx, y + h - brushW * 0.22]], {
-          width: brushW, stretch: 0.65, fade: 0.02, color: col, colorEnd: colEnd,
-          alpha: opts.alpha || 0.88, vary: opts.vary == null ? 5 : opts.vary, bristle: opts.bristle == null ? 0.34 : opts.bristle
-        });
-      }
+    if (api.strokes.length > 5000) {
+      api.strokes.length = 5000;
     }
-  }
-
-  function paintBar(api, layer, label, x1, y1, x2, y2, width, col, opts = {}) {
-    const xm = (x1 + x2) * 0.5;
-    const ym = (y1 + y2) * 0.5;
-    api.oilStroke(layer, label, [[x1, y1], [xm, ym], [x2, y2]], {
-      width,
-      stretch: opts.stretch || 0.56,
-      fade: opts.fade == null ? 0.02 : opts.fade,
-      color: col,
-      colorEnd: opts.colorEnd || col,
-      alpha: opts.alpha == null ? 0.94 : opts.alpha,
-      vary: opts.vary == null ? 4 : opts.vary,
-      bristle: opts.bristle == null ? 0.28 : opts.bristle
-    });
-  }
-
-  function paintCircleStroke(api, layer, label, cx, cy, r, width, col, opts = {}) {
-    const pts = [];
-    const segs = opts.segs || 20;
-    const startAng = opts.startAng || 0;
-    const endAng = opts.endAng == null ? Math.PI * 2 : opts.endAng;
-    for (let i = 0; i <= segs; i++) {
-      const a = startAng + (endAng - startAng) * (i / segs);
-      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
-    }
-    api.oilStroke(layer, label, pts, {
-      width,
-      stretch: opts.stretch || 0.55,
-      fade: opts.fade == null ? 0.04 : opts.fade,
-      color: col,
-      colorEnd: opts.colorEnd || col,
-      alpha: opts.alpha == null ? 0.92 : opts.alpha,
-      vary: opts.vary == null ? 5 : opts.vary,
-      bristle: opts.bristle == null ? 0.35 : opts.bristle
-    });
-  }
-
-  function paintTriangle(api, layer, label, p1, p2, p3, col, opts = {}) {
-    const steps = opts.rows || 34;
-    const colEnd = opts.colorEnd || col;
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      const ax = api.lerp(p1[0], p2[0], t);
-      const ay = api.lerp(p1[1], p2[1], t);
-      const bx = api.lerp(p1[0], p3[0], t);
-      const by = api.lerp(p1[1], p3[1], t);
-      const len = Math.hypot(bx - ax, by - ay);
-      if (len < 3) continue;
-      api.oilStroke(layer, label, [[ax, ay], [(ax + bx) * 0.5, (ay + by) * 0.5], [bx, by]], {
-        width: opts.width || 19,
-        stretch: 0.64,
-        fade: 0.03,
-        color: col,
-        colorEnd: colEnd,
-        alpha: opts.alpha == null ? 0.90 : opts.alpha,
-        vary: 4,
-        bristle: 0.28
-      });
-    }
-    paintBar(api, layer, label + '轮廓勾边', p1[0], p1[1], p2[0], p2[1], opts.edgeW || 8, opts.edgeCol || col, { alpha: opts.edgeAlpha || 0.92 });
-    paintBar(api, layer, label + '轮廓勾边', p2[0], p2[1], p3[0], p3[1], opts.edgeW || 8, opts.edgeCol || col, { alpha: opts.edgeAlpha || 0.92 });
-    paintBar(api, layer, label + '轮廓勾边', p3[0], p3[1], p1[0], p1[1], opts.edgeW || 8, opts.edgeCol || col, { alpha: opts.edgeAlpha || 0.92 });
-  }
-
-  function spiralPoints(cx, cy, rStart, rEnd, startAng, turns, steps, rotScaleY) {
-    const pts = [];
-    const totalAng = turns * Math.PI * 2;
-    const sy = rotScaleY == null ? 1 : rotScaleY;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const a = startAng + t * totalAng;
-      const r = rStart + (rEnd - rStart) * t;
-      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * sy]);
-    }
-    return pts;
   }
 
   const WORKS = [
     // =========================================================================
-    // 1. VAN GOGH - STARRY VORTEX
+    // 1. VAN GOGH STARRY NIGHT VORTEX SWIRL
     // =========================================================================
     {
       id: 'oil-abs-vangogh-swirl',
@@ -139,112 +36,97 @@
         { id: 4, name: '四 · 炽亮明黄星核与月晕' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [14, 28, 72], [24, 52, 124], [14, 28, 62]);
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 555;
+        const scene = M.createScene(W, H, 8001);
 
-        // Continuous swirl + wave flow field across upper sky
-        function flowAngle(x, y) {
-          const dx1 = x - 420, dy1 = y - 275;
-          const d1 = Math.hypot(dx1, dy1) + 28;
-          const w1 = Math.exp(-(d1 * d1) / (2 * 185 * 185));
-          const a1 = Math.atan2(dy1, dx1) + Math.PI * 0.5 + 0.14;
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [14, 34, 88], skyMid: [34, 82, 162], skyHorizon: [112, 164, 212],
+          sunX: 935, sunY: 165, sunR: 1, glowR: 280, glowCol: [248, 206, 74], glowStrength: 0.72,
+          cloudCover: 0.35, cloudLitCol: [142, 198, 224], cloudDarkCol: [20, 52, 124]
+        });
 
-          const dx2 = x - 680, dy2 = y - 340;
-          const d2 = Math.hypot(dx2, dy2) + 28;
-          const w2 = Math.exp(-(d2 * d2) / (2 * 155 * 155));
-          const a2 = Math.atan2(dy2, dx2) - Math.PI * 0.5 - 0.12;
+        scene.shadeMountainRange({
+          baseY: H_Y + 32,
+          peaks: [[0, 488], [240, 468], [520, 442], [790, 478], [1120, 438]],
+          rockLit: [46, 86, 148], rockDark: [18, 36, 82], snowLine: 1.5, mistCol: [74, 118, 178], mistStrength: 0.32
+        });
 
-          const wave = Math.sin(x * 0.0085 + Math.cos(y * 0.011)) * 0.45;
-          const vx = Math.cos(wave) + w1 * 2.4 * Math.cos(a1) + w2 * 2.0 * Math.cos(a2);
-          const vy = Math.sin(wave) + w1 * 2.4 * Math.sin(a1) + w2 * 2.0 * Math.sin(a2);
-          return Math.atan2(vy, vx);
-        }
+        scene.draw2D((ctx) => {
+          // Double interlocking Saint-Rémy spiral wave ridges so ETF traces ecstatic Van Gogh vortex currents
+          ctx.lineCap = 'round';
+          for (const [lw, col] of [[32, 'rgba(72, 144, 214, 0.75)'], [16, 'rgba(176, 222, 236, 0.80)']]) {
+            ctx.strokeStyle = col;
+            ctx.lineWidth = lw;
+            ctx.beginPath();
+            ctx.moveTo(45, 315);
+            ctx.bezierCurveTo(225, 165, 385, 345, 535, 245);
+            ctx.bezierCurveTo(645, 168, 695, 295, 578, 338);
+            ctx.bezierCurveTo(492, 370, 468, 265, 558, 245);
+            ctx.stroke();
 
-        const skyColors = [
-          [38, 86, 174], [62, 122, 206], [96, 168, 218], [156, 204, 232], [28, 62, 138], [84, 156, 186]
-        ];
-        for (let i = 0; i < 235; i++) {
-          let px = 40 + ((i * 173 + api.rand() * 90) % 1040);
-          let py = 26 + ((i * 89 + api.rand() * 55) % 560);
-          const pts = [[px, py]];
-          for (let s = 0; s < 4; s++) {
-            const ang = flowAngle(px, py);
-            px += Math.cos(ang) * 24;
-            py += Math.sin(ang) * 24;
-            pts.push([px, py]);
+            ctx.beginPath();
+            ctx.moveTo(645, 375);
+            ctx.bezierCurveTo(735, 295, 815, 375, 735, 425);
+            ctx.stroke();
           }
-          const nearCore = Math.hypot(px - 420, py - 275) < 175 || Math.hypot(px - 680, py - 340) < 140;
-          const c = nearCore && i % 3 === 0 ? [188, 218, 236] : skyColors[i % skyColors.length];
-          const cEnd = i % 4 === 0 ? [224, 228, 198] : [c[0] * 0.85, Math.min(255, c[1] + 18), Math.min(255, c[2] + 22)];
-          api.oilStroke(2, '涡旋星云定向厚涂排笔', pts, {
-            width: 14 + (i % 4) * 3, stretch: 0.44, fade: 0.12, color: c, colorEnd: cEnd, alpha: 0.78, vary: 8, bristle: 0.58
-          });
-        }
 
-        // Rolling blue Alpilles hills at lower plane
-        for (let row = 0; row < 28; row++) {
-          const yBase = 555 + row * 9;
-          const ridge = [[-40, yBase + Math.sin(row) * 14], [260, yBase - 32], [580, yBase + 16], [880, yBase - 26], [1160, yBase + 8]];
-          const col = row < 10 ? [32, 54, 108] : (row < 18 ? [24, 46, 82] : [20, 34, 58]);
-          api.oilStroke(3, '夜色群山连绵厚涂波脊', ridge, {
-            width: 24, stretch: 0.48, fade: 0.04, color: col, colorEnd: [38, 68, 118], alpha: 0.88, vary: 6
-          });
-        }
-        // Village cottages, steep gable roofs & lit golden windows
-        for (let h = 0; h < 11; h++) {
-          const hx = 395 + h * 58, hy = 655 + (h % 3) * 20;
-          paintRect(api, 3, '山村小屋青灰墙体', hx - 16, hy - 8, 32, 22, [28, 38, 66], { step: 8, width: 12, alpha: 0.94 });
-          api.oilStroke(3, '农舍人字瓦顶轮廓', [[hx - 20, hy - 8], [hx, hy - 24], [hx + 20, hy - 8]], {
-            width: 10, color: [18, 26, 46], alpha: 0.96
-          });
-          if (h % 2 === 0 || h === 5) {
-            api.oilHighlight(4, '农舍温暖灯火金点', hx + 2, hy + 2, 5.5, 5.5, 0, { color: [255, 206, 76], alpha: 0.96, count: 2 });
+          // Concentric golden star halos + blazing crescent moon
+          for (const [sx, sy, sr] of [
+            [175, 148, 42], [358, 132, 34], [472, 225, 30], [728, 118, 34], [835, 325, 32], [295, 368, 36], [115, 265, 28]
+          ]) {
+            const g = ctx.createRadialGradient(sx, sy, 4, sx, sy, sr);
+            g.addColorStop(0, '#fffce2'); g.addColorStop(0.45, '#f6cc4c'); g.addColorStop(1, 'rgba(64, 128, 206, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
           }
-        }
-        paintBar(api, 3, '教堂尖塔底座墙体', 664, 688, 664, 600, 26, [22, 30, 56], { alpha: 0.96 });
-        paintBar(api, 3, '教堂高耸尖顶剪影', 664, 610, 664, 456, 13, [18, 26, 48], { alpha: 0.96 });
+          ctx.fillStyle = '#ffe05a';
+          ctx.beginPath(); ctx.arc(935, 165, 50, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#3876c4';
+          ctx.beginPath(); ctx.arc(916, 152, 37, 0, Math.PI * 2); ctx.fill();
 
-        // Foreground iconic dark cypress flame
-        const cypressPts = [[224, 835], [202, 650], [242, 460], [208, 275], [238, 112]];
-        api.oilStroke(3, '前景火焰状墨绿丝柏主干', cypressPts, {
-          width: 96, color: [16, 36, 22], colorEnd: [28, 52, 26], alpha: 0.96, stretch: 0.46
-        });
-        for (let f = 0; f < 16; f++) {
-          const t = f / 15;
-          const fy = 790 - t * 650;
-          const fx = 222 + Math.sin(f * 1.35) * 24;
-          api.oilStroke(3, '丝柏树冠卷曲冷绿火舌', [[fx - 26, fy + 24], [fx, fy], [fx + 18, fy - 34]], {
-            width: 14, color: f % 2 === 0 ? [44, 84, 44] : [82, 72, 34], alpha: 0.84, bristle: 0.55
-          });
-        }
-
-        // Luminous swirling stars (broken rhythmic corona arcs + glowing cores) & organic crescent moon
-        const stars = [[172, 148, 46], [348, 116, 38], [568, 152, 42], [755, 198, 40], [295, 265, 32], [520, 395, 36]];
-        stars.forEach(([sx, sy, sr], idx) => {
-          api.oilPatch(4, '星辰柔黄氛围光晕', sx, sy, sr, sr, 0, { color: [248, 224, 112], colorEdge: [54, 102, 178], alpha: 0.56, count: 14 });
-          for (let a = 0; a < 5; a++) {
-            const a0 = idx * 0.9 + a * (Math.PI * 0.42);
-            paintCircleStroke(api, 4, '星晕回旋断续短笔', sx, sy, sr * (0.48 + (a % 2) * 0.28), 10, [252, 232, 134], {
-              startAng: a0, endAng: a0 + 0.95, segs: 8, alpha: 0.78
-            });
+          // Undulating cobalt hills + glowing warm Provençal village & tall steeple
+          ctx.fillStyle = '#182c48';
+          ctx.fillRect(0, H_Y, W, H - H_Y);
+          ctx.fillStyle = '#243c5e';
+          for (const [vx, vy, vw, vh] of [[395, 645, 66, 52], [492, 655, 82, 56], [682, 640, 74, 62], [795, 655, 92, 54], [935, 645, 76, 58]]) {
+            ctx.fillRect(vx, vy, vw, vh);
+            ctx.fillStyle = '#ffd258';
+            ctx.fillRect(vx + 16, vy + 18, 16, 18);
+            ctx.fillStyle = '#243c5e';
           }
-          api.oilHighlight(4, '炽白金黄星核点睛', sx, sy, sr * 0.25, sr * 0.25, 0, { color: [255, 250, 206], alpha: 0.98, count: 4 });
+          ctx.fillStyle = '#263e5c';
+          ctx.beginPath(); ctx.moveTo(598, 675); ctx.lineTo(622, 465); ctx.lineTo(646, 675); ctx.closePath(); ctx.fill();
+
+          // Towering dark olive-green flame cypress curling skyward on left
+          const cy = ctx.createLinearGradient(165, 72, 295, H);
+          cy.addColorStop(0, '#0a1c12'); cy.addColorStop(0.55, '#193a24'); cy.addColorStop(1, '#08120c');
+          ctx.fillStyle = cy;
+          ctx.beginPath();
+          ctx.moveTo(222, 68);
+          ctx.bezierCurveTo(288, 225, 318, 515, 308, H);
+          ctx.lineTo(148, H);
+          ctx.bezierCurveTo(138, 515, 172, 245, 222, 68);
+          ctx.closePath(); ctx.fill();
         });
-        api.oilPatch(4, '明月金橙晕光外环', 962, 162, 88, 88, 0, { color: [246, 188, 56], colorEdge: [46, 86, 158], alpha: 0.68, count: 18 });
-        paintCircleStroke(api, 4, '满月外缘金橙回旋短笔', 962, 162, 68, 13, [250, 204, 72], {
-          startAng: 0.4, endAng: 2.8, segs: 12, alpha: 0.80
+
+        M.synthesize(api, scene, {
+          style: 'vangogh',
+          totalStrokes: 5000,
+          seed: 8001,
+          layers: WORKS[0].layers,
+          roi: [
+            { cx: 525, cy: 255, rx: 455, ry: 175, boost: 3.0 },
+            { cx: 222, cy: 445, rx: 95, ry: 355, boost: 3.0 },
+            { cx: 635, cy: 640, rx: 245, ry: 105, boost: 2.6 }
+          ]
         });
-        paintCircleStroke(api, 4, '满月外缘金橙回旋短笔', 962, 162, 68, 13, [250, 204, 72], {
-          startAng: 3.4, endAng: 5.9, segs: 12, alpha: 0.80
-        });
-        paintCircleStroke(api, 4, '金黄弯月本体厚涂', 962, 162, 30, 24, [255, 214, 62], {
-          colorEnd: [238, 152, 32], startAng: -Math.PI * 0.52, endAng: Math.PI * 0.68, segs: 14, alpha: 0.96
-        });
-        api.oilHighlight(4, '弯月炽亮锋芒', 986, 156, 10, 18, 0.2, { color: [255, 248, 188], alpha: 0.90, count: 4 });
       }
     },
 
     // =========================================================================
-    // 2. VAN GOGH - WHEATFIELD WITH CROWS
+    // 2. VAN GOGH WHEATFIELD WITH CROWS
     // =========================================================================
     {
       id: 'oil-abs-vangogh-wheat',
@@ -268,90 +150,87 @@
         { id: 4, name: '四 · 掠空黑鸦与亮黄麦芒点睛' }
       ],
       buildStrokes(api) {
-        // Sky base top half
-        for (let y = -10; y <= 385; y += 38) {
-          const t = Math.max(0, y / 385);
-          const col = [api.lerp(18, 46, t), api.lerp(36, 78, t), api.lerp(82, 138, t)];
-          api.oilStroke(1, '风起青靛天幕底涂', [[-50, y], [560, y - 6], [1170, y + 6]], {
-            width: 96, fade: 0.02, stretch: 0.72, color: col, colorEnd: col, alpha: 0.65, vary: 5
-          });
-        }
-        // Ochre earth base lower half
-        for (let y = 378; y <= 840; y += 40) {
-          const t = (y - 378) / 462;
-          const col = [api.lerp(178, 138, t), api.lerp(126, 84, t), api.lerp(30, 20, t)];
-          api.oilStroke(1, '金褐大地麦田铺底', [[-50, y], [560, y + 4], [1170, y - 4]], {
-            width: 102, fade: 0.02, stretch: 0.72, color: col, colorEnd: col, alpha: 0.74, vary: 5
-          });
-        }
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 395;
+        const scene = M.createScene(W, H, 8002);
+        const N = M.makeNoise(8002);
 
-        // Churning storm clouds with heavy organic undulating bands & turquoise rifts
-        for (let c = 0; c < 76; c++) {
-          const cx = ((c * 197 + 45) % 1160) - 20;
-          const cy = 24 + ((c * 61 + (c % 5) * 19) % 340);
-          const span = 75 + (c % 4) * 32;
-          const waveY = (c % 2 === 0 ? -1 : 1) * (10 + (c % 3) * 8);
-          const col = c % 5 === 0 ? [20, 38, 82]
-            : (c % 5 === 1 ? [42, 78, 138]
-              : (c % 5 === 2 ? [54, 114, 148]
-                : (c % 5 === 3 ? [112, 156, 188] : [206, 218, 224])));
-          api.oilStroke(2, '狂风压顶乌云排笔', [
-            [cx - span, cy - waveY * 0.4], [cx, cy + waveY], [cx + span, cy - waveY * 0.3]
-          ], { width: 24 + (c % 3) * 7, color: col, alpha: 0.72, vary: 8, bristle: 0.52 });
-        }
-
-        // Three iconic diverging earthy ochre paths with viridian verge
-        const paths = [
-          [[548, 386], [390, 520], [180, 665], [-20, 810]],
-          [[562, 386], [568, 550], [560, 700], [552, 835]],
-          [[576, 386], [735, 520], [935, 670], [1145, 815]]
-        ];
-        paths.forEach(pts => {
-          api.oilStroke(2, '草绿田埂镶边勾勒', pts, { width: 62, color: [58, 102, 42], alpha: 0.86, stretch: 0.48 });
-          api.oilStroke(2, '裂开麦田的三岔赤赭泥路', pts, { width: 36, color: [176, 104, 56], colorEnd: [198, 128, 72], alpha: 0.92, stretch: 0.45 });
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [14, 30, 74], skyMid: [28, 62, 126], skyHorizon: [68, 112, 166],
+          cloudCover: 0.68, cloudLitCol: [96, 146, 196], cloudDarkCol: [14, 24, 58]
         });
 
-        // Directional wind-swept golden wheat field strokes (dense churning coverage)
-        for (let w = 0; w < 225; w++) {
-          const wy = 392 + ((w * 43 + (w % 7) * 11) % 420);
-          const wx = 18 + ((w * 179 + wy * 0.65) % 1084);
-          if (Math.abs(wx - 560) < 28 && wy > 450) continue;
-          const t = (wy - 392) / 420;
-          const tilt = (wx < 560 ? -0.45 : 0.45) + (api.rand() - 0.5) * 0.35;
-          const len = 42 + t * 56;
-          const dx = Math.sin(tilt) * len, dy = -Math.cos(tilt) * len * 0.55;
-          const col = w % 4 === 0 ? [246, 198, 42]
-            : (w % 4 === 1 ? [226, 162, 26]
-              : (w % 4 === 2 ? [254, 224, 92] : [192, 126, 24]));
-          api.oilStroke(3, '风卷金色麦浪短促排笔', [
-            [wx - dx * 0.5, wy - dy * 0.5],
-            [wx + (w % 3 - 1) * 5, wy - 6],
-            [wx + dx * 0.5, wy + dy * 0.5]
-          ], {
-            width: 15 + t * 11, stretch: 0.46, fade: 0.12, color: col, colorEnd: [255, 232, 118], alpha: 0.90, vary: 8, bristle: 0.60
+        scene.draw2D((ctx) => {
+          // Surging golden cadmium wheatfield
+          const fld = ctx.createLinearGradient(0, H_Y, 0, H);
+          fld.addColorStop(0, '#f4c63c'); fld.addColorStop(0.55, '#da9e24'); fld.addColorStop(1, '#a86a14');
+          ctx.fillStyle = fld;
+          ctx.fillRect(0, H_Y, W, H - H_Y);
+
+          // Wind-swept golden grain streaks
+          for (let k = 0; k < 140; k++) {
+            const x = N.rand() * W, y = H_Y + 12 + N.rand() * (H - H_Y - 22);
+            ctx.strokeStyle = k % 2 === 0 ? '#ffe468' : '#b46c18';
+            ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (N.rand() - 0.5) * 42, y - 24 - N.rand() * 20); ctx.stroke();
+          }
+
+          // Three dramatic forked ochre-terracotta cart tracks with green median tufts
+          ctx.lineCap = 'round';
+          const paths = [
+            [[548, H_Y + 35], [445, 585], [145, H]],
+            [[565, H_Y + 42], [585, 615], [605, H]],
+            [[585, H_Y + 35], [785, 595], [1055, H]]
+          ];
+          paths.forEach(([p0, p1, p2]) => {
+            ctx.strokeStyle = '#9c4824'; ctx.lineWidth = 54;
+            ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(p1[0], p1[1], p2[0], p2[1]); ctx.stroke();
+            ctx.strokeStyle = '#d4743c'; ctx.lineWidth = 22;
+            ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(p1[0], p1[1], p2[0], p2[1]); ctx.stroke();
+          });
+        });
+
+        M.synthesize(api, scene, {
+          style: 'vangogh',
+          totalStrokes: 4955,
+          seed: 8002,
+          layers: WORKS[1].layers,
+          roi: [
+            { cx: 565, cy: 525, rx: 385, ry: 225, boost: 2.8 },
+            { cx: 560, cy: 265, rx: 450, ry: 120, boost: 2.4 }
+          ]
+        });
+
+        // 45 crisp soaring black crows cutting across horizon & Prussian sky
+        const layer4 = WORKS[1].layers[3].id;
+        for (let i = 0; i < 45; i++) {
+          const cx = 95 + N.rand() * 930;
+          const cy = 115 + N.rand() * 315;
+          const sc = 0.7 + N.rand() * 0.95;
+          const tilt = (N.rand() - 0.5) * 0.45;
+          const wSpan = 24 * sc;
+          const lift = (7 + N.rand() * 7) * sc;
+          api.pushRawStroke(layer4, '掠空黑鸦振翅', (c) => {
+            c.save();
+            c.translate(cx, cy);
+            c.rotate(tilt);
+            c.strokeStyle = i % 3 === 0 ? '#0e1014' : '#1a1e24';
+            c.lineWidth = 3.2 * sc;
+            c.lineCap = 'round';
+            c.beginPath();
+            c.moveTo(-wSpan, lift * 0.4);
+            c.quadraticCurveTo(-wSpan * 0.5, -lift, 0, 2 * sc);
+            c.quadraticCurveTo(wSpan * 0.5, -lift, wSpan, lift * 0.4);
+            c.stroke();
+            c.restore();
           });
         }
-
-        // Flock of dark rising crows cutting across horizon & bright storm rifts
-        const crows = [
-          [560, 410, 1.15], [608, 384, 1.05], [652, 355, 1.25], [698, 326, 1.15], [744, 294, 1.3],
-          [790, 262, 1.35], [835, 236, 1.25], [885, 206, 1.4], [932, 184, 1.45], [985, 158, 1.5],
-          [512, 380, 1.0], [468, 345, 1.1], [418, 316, 1.15], [362, 286, 1.25], [306, 250, 1.3],
-          [628, 332, 1.05], [685, 286, 1.15], [738, 246, 1.25], [795, 206, 1.3], [848, 168, 1.35],
-          [572, 358, 0.95], [642, 308, 1.0], [912, 240, 1.2], [768, 334, 1.1]
-        ];
-        crows.forEach(([cx, cy, sc]) => {
-          const span = 26 * sc;
-          api.oilStroke(4, '振翅黑鸦掠空剪影', [
-            [cx - span, cy - 6 * sc], [cx - span * 0.35, cy - 13 * sc], [cx, cy + 3 * sc], [cx + span * 0.35, cy - 13 * sc], [cx + span, cy - 5 * sc]
-          ], { width: 8.5 * sc, stretch: 0.44, fade: 0.06, color: [10, 10, 14], alpha: 0.98, bristle: 0.12 });
-        });
-        api.oilHighlight(4, '地平线残光烈黄点睛', 555, 385, 85, 14, 0, { color: [255, 232, 128], alpha: 0.38, count: 6 });
       }
     },
 
     // =========================================================================
-    // 3. VAN GOGH - STARRY NIGHT OVER THE RHONE
+    // 3. VAN GOGH STARRY NIGHT OVER THE RHONE
     // =========================================================================
     {
       id: 'oil-abs-vangogh-rhone',
@@ -375,83 +254,79 @@
         { id: 4, name: '四 · 前景木舟碎金倒影点睛' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [14, 42, 86], [22, 62, 112], [12, 28, 62]);
-        for (let y = 425; y <= 835; y += 38) {
-          const t = (y - 425) / 410;
-          const col = [api.lerp(18, 10, t), api.lerp(48, 24, t), api.lerp(92, 54, t)];
-          api.oilStroke(1, '罗纳河夜水面重涂铺底', [[-50, y], [560, y + 4], [1170, y - 4]], {
-            width: 96, fade: 0.02, stretch: 0.72, color: col, colorEnd: col, alpha: 0.76, vary: 4
-          });
-        }
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820, H_Y = 365;
+        const scene = M.createScene(W, H, 8003);
 
-        // Woven nocturnal brushstrokes across upper sky
-        for (let s = 0; s < 115; s++) {
-          const sx = 20 + ((s * 167) % 1080);
-          const sy = 25 + ((s * 73) % 375);
-          const ang = Math.sin(sx * 0.008) * 0.5 + (s % 2 === 0 ? 0.25 : -0.25);
-          const len = 48 + (s % 3) * 18;
-          const col = s % 3 === 0 ? [32, 92, 144] : (s % 3 === 1 ? [20, 56, 112] : [54, 128, 158]);
-          api.oilStroke(2, '夜空斜向编织厚涂短笔', [
-            [sx - Math.cos(ang) * len * 0.5, sy - Math.sin(ang) * len * 0.5],
-            [sx, sy - 4],
-            [sx + Math.cos(ang) * len * 0.5, sy + Math.sin(ang) * len * 0.5]
-          ], { width: 16, color: col, alpha: 0.74, stretch: 0.45, vary: 7, bristle: 0.55 });
-        }
-
-        // Big Dipper + radiating bright stars in sky (soft halo + broken sparkle rays)
-        const stars = [
-          [210, 118, 36], [338, 164, 34], [468, 146, 38], [585, 198, 42],
-          [712, 162, 44], [848, 126, 38], [935, 224, 36], [420, 78, 32], [655, 86, 34]
-        ];
-        stars.forEach(([sx, sy, sr], idx) => {
-          api.oilPatch(2, '星辰柔黄光环晕染', sx, sy, sr, sr, 0, { color: [238, 212, 108], colorEdge: [22, 62, 116], alpha: 0.62, count: 14 });
-          paintCircleStroke(api, 2, '星辰外圈断续微光', sx, sy, sr * 0.72, 7, [238, 218, 124], {
-            startAng: idx * 0.8, endAng: idx * 0.8 + 1.4, segs: 8, alpha: 0.62
-          });
-          api.oilHighlight(4, '星辰明黄炽核点彩', sx, sy, sr * 0.25, sr * 0.25, 0, { color: [255, 244, 174], alpha: 0.98, count: 4 });
+        scene.shadeSkyAndClouds({
+          horizonY: H_Y,
+          skyTop: [12, 34, 78], skyMid: [22, 58, 116], skyHorizon: [44, 96, 134],
+          cloudCover: 0.25, cloudLitCol: [68, 122, 162], cloudDarkCol: [14, 38, 82]
         });
 
-        // Distant Arles riverside silhouette & warm gaslight lamps
-        api.oilStroke(3, '对岸阿尔勒城市深黛剪影带', [[-40, 412], [560, 416], [1160, 408]], {
-          width: 44, fade: 0.02, color: [18, 26, 46], alpha: 0.94
+        scene.shadeOcean({
+          yTop: H_Y, yBot: H,
+          seaTop: [24, 72, 112], seaMid: [18, 52, 92], seaBot: [10, 26, 54],
+          hasGlitter: false, waveScale: 0.025
         });
-        const lamps = [110, 178, 252, 336, 418, 496, 568, 635, 708, 782, 855, 928, 1015];
-        lamps.forEach((lx, idx) => {
-          const ly = 414 + (idx % 2) * 5;
-          api.oilHighlight(3, '对岸煤气路灯金橙亮点', lx, ly, 8, 6, 0, { color: [255, 206, 68], alpha: 0.96, count: 3 });
 
-          // Dramatic shimmering vertical reflection columns down into Rhone water!
-          const colLen = 190 + (idx % 3) * 65;
-          for (let k = 0; k < 6; k++) {
-            const ry0 = 436 + k * (colLen / 6);
-            const ry1 = ry0 + colLen / 6 + 6;
-            const sway = Math.sin(k * 1.4 + idx) * (6 + k * 2.5);
-            const c = k < 2 ? [254, 212, 66] : (k < 4 ? [232, 148, 38] : [206, 114, 34]);
-            api.oilStroke(3, '河面垂直拉长金色倒影水柱', [
-              [lx + sway * 0.4, ry0], [lx + sway, (ry0 + ry1) * 0.5], [lx - sway * 0.3, ry1]
-            ], { width: 12 + k * 2.2, stretch: 0.46, fade: 0.08, color: c, colorEnd: [252, 224, 96], alpha: 0.84 - k * 0.08, vary: 8 });
+        scene.draw2D((ctx) => {
+          // Big Dipper / Ursa Major radiant yellow star halos across sky
+          const stars = [
+            [245, 168], [338, 198], [412, 232], [498, 228],
+            [595, 185], [648, 238], [528, 285], [785, 145], [895, 195], [165, 122]
+          ];
+          stars.forEach(([sx, sy]) => {
+            const g = ctx.createRadialGradient(sx, sy, 3, sx, sy, 28);
+            g.addColorStop(0, '#fffce2'); g.addColorStop(0.5, '#f6c844'); g.addColorStop(1, 'rgba(34, 92, 146, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(sx, sy, 28, 0, Math.PI * 2); ctx.fill();
+          });
+
+          // Distant Arles quay silhouette & glowing warm orange gaslights reflecting down Rhone water
+          ctx.fillStyle = '#182438';
+          ctx.beginPath(); ctx.moveTo(0, H_Y); ctx.lineTo(295, 315); ctx.lineTo(865, 335); ctx.lineTo(1120, H_Y); ctx.lineTo(1120, H_Y + 25); ctx.lineTo(0, H_Y + 25); ctx.closePath(); ctx.fill();
+
+          const lights = [148, 245, 325, 412, 498, 588, 678, 765, 868, 965];
+          lights.forEach((lx, i) => {
+            const glow = ctx.createRadialGradient(lx, H_Y - 4, 2, lx, H_Y - 4, 22);
+            glow.addColorStop(0, '#fff4b6'); glow.addColorStop(0.55, '#f49a34'); glow.addColorStop(1, 'rgba(36, 72, 112, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath(); ctx.arc(lx, H_Y - 4, 22, 0, Math.PI * 2); ctx.fill();
+
+            const col = ctx.createLinearGradient(lx, H_Y, lx, H_Y + 245 + (i % 3) * 55);
+            col.addColorStop(0, 'rgba(252, 198, 64, 0.92)');
+            col.addColorStop(0.5, 'rgba(228, 128, 36, 0.72)');
+            col.addColorStop(1, 'rgba(28, 62, 108, 0)');
+            ctx.fillStyle = col;
+            ctx.fillRect(lx - 14, H_Y + 12, 28, 285);
+          });
+
+          // Foreground dark shoreline promontory & two moored wooden riverboats
+          ctx.fillStyle = '#141820';
+          ctx.beginPath();
+          ctx.moveTo(0, 645); ctx.bezierCurveTo(285, 625, 485, 715, 645, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+          for (const [bx, by] of [[315, 695], [535, 735]]) {
+            ctx.fillStyle = '#241a14';
+            ctx.beginPath(); ctx.moveTo(bx - 95, by); ctx.quadraticCurveTo(bx, by + 36, bx + 95, by - 12); ctx.lineTo(bx + 75, by + 26); ctx.lineTo(bx - 75, by + 28); ctx.closePath(); ctx.fill();
           }
         });
 
-        // Foreground embankment corner & two dark moored boats
-        api.oilPatch(3, '前景右岸深褐石坡堤岸', 945, 765, 290, 115, -0.18, { color: [26, 26, 32], colorEdge: [14, 18, 28], alpha: 0.95, count: 22 });
-        [[690, 688], [820, 635]].forEach(([bx, by]) => {
-          api.oilStroke(4, '近景暗影木舟船身轮廓', [[bx - 56, by - 4], [bx, by + 16], [bx + 58, by - 6]], {
-            width: 24, color: [16, 18, 24], alpha: 0.96, stretch: 0.42
-          });
-          paintBar(api, 4, '岸边斜泊船篙细影', bx - 12, by - 2, bx + 42, by + 46, 7, [24, 22, 20]);
+        M.synthesize(api, scene, {
+          style: 'vangogh',
+          totalStrokes: 5000,
+          seed: 8003,
+          layers: WORKS[2].layers,
+          roi: [
+            { cx: 545, cy: 495, rx: 465, ry: 175, boost: 3.0 },
+            { cx: 485, cy: 205, rx: 325, ry: 95, boost: 2.8 }
+          ]
         });
-        // Couple silhouettes on shore & sparkling water flecks
-        api.oilStroke(4, '河畔夜行伴侣剪影', [[768, 775], [768, 725]], { width: 18, color: [18, 22, 28], alpha: 0.96 });
-        api.oilStroke(4, '河畔夜行伴侣剪影', [[796, 778], [794, 732]], { width: 16, color: [34, 48, 76], alpha: 0.96 });
-        for (let f = 0; f < 18; f++) {
-          api.oilHighlight(4, '水波碎金横向点彩高光', 120 + f * 52, 520 + (f % 5) * 45, 16, 3.2, 0, { color: [255, 232, 118], alpha: 0.85, count: 3 });
-        }
       }
     },
 
     // =========================================================================
-    // 4. KANDINSKY - RHYTHMIC COMPOSITION VIII
+    // 4. KANDINSKY COMPOSITION VIII (HYBRID OIL FIELD + CRISP GEOMETRIC LINES)
     // =========================================================================
     {
       id: 'oil-abs-kandinsky-comp',
@@ -475,77 +350,125 @@
         { id: 4, name: '四 · 墨黑线轨律动与点彩节拍' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [238, 228, 204], [228, 216, 190], [234, 224, 198]);
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820;
+        const scene = M.createScene(W, H, 8004);
+        const N = M.makeNoise(8004);
 
-        // Ambient soft-edged translucent halos
-        api.oilPatch(2, '左上玫瑰粉光雾晕染', 235, 215, 165, 145, 0, { color: [234, 164, 156], colorEdge: [236, 224, 202], alpha: 0.45, count: 16 });
-        api.oilPatch(2, '中右天青色雾透叠', 680, 390, 210, 160, 0.2, { color: [148, 194, 228], colorEdge: [236, 224, 202], alpha: 0.44, count: 18 });
-        api.oilPatch(2, '中下暖柠檬黄云雾色域', 460, 600, 175, 120, -0.15, { color: [248, 224, 96], colorEdge: [236, 224, 202], alpha: 0.42, count: 14 });
+        scene.draw2D((ctx) => {
+          // Parchment-ivory ground with subtle translucent atmospheric color fields
+          const bg = ctx.createRadialGradient(540, 380, 60, 560, 410, 720);
+          bg.addColorStop(0, '#f4ebd4'); bg.addColorStop(0.6, '#e2d5b8'); bg.addColorStop(1, '#c8ba9b');
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-        // Upper-left iconic black-ringed concentric orb
-        api.oilPatch(3, '左上红蓝主日正红底芯', 225, 205, 86, 86, 0, { color: [212, 46, 36], colorEdge: [168, 32, 28], alpha: 0.92, count: 18 });
-        api.oilPatch(3, '太阳中心深普鲁士蓝核', 225, 205, 48, 48, 0, { color: [24, 42, 92], colorEdge: [18, 28, 62], alpha: 0.94, count: 12 });
-        paintCircleStroke(api, 4, '主日炽亮金黄内环', 225, 205, 68, 10, [246, 194, 48], { alpha: 0.92 });
-        paintCircleStroke(api, 4, '主日浓黑雕塑外圈', 225, 205, 104, 16, [20, 20, 22], { alpha: 0.95 });
+          for (const [hx, hy, hr, c] of [
+            [265, 225, 195, 'rgba(218, 72, 64, 0.28)'],
+            [645, 295, 225, 'rgba(64, 134, 212, 0.25)'],
+            [865, 555, 195, 'rgba(244, 196, 52, 0.28)'],
+            [385, 585, 185, 'rgba(148, 86, 178, 0.24)']
+          ]) {
+            const g = ctx.createRadialGradient(hx, hy, 12, hx, hy, hr);
+            g.addColorStop(0, c); g.addColorStop(1, 'rgba(236, 226, 202, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill();
+          }
 
-        // Primary geometric triangles & floating circles (dense painterly fills)
-        paintTriangle(api, 3, '中央明黄大锐角三角色块', [565, 118], [415, 585], [645, 520], [244, 198, 44], {
-          alpha: 0.90, rows: 36, width: 20, edgeCol: [24, 22, 22], edgeW: 7
+          // Primary geometric color blocks & translucent intersecting triangles
+          ctx.fillStyle = 'rgba(218, 52, 38, 0.85)';
+          ctx.beginPath(); ctx.moveTo(425, 165); ctx.lineTo(685, 495); ctx.lineTo(315, 585); ctx.closePath(); ctx.fill();
+
+          ctx.fillStyle = 'rgba(42, 108, 186, 0.80)';
+          ctx.beginPath(); ctx.moveTo(615, 125); ctx.lineTo(945, 345); ctx.lineTo(575, 425); ctx.closePath(); ctx.fill();
+
+          ctx.fillStyle = 'rgba(246, 198, 42, 0.84)';
+          ctx.beginPath(); ctx.moveTo(145, 525); ctx.lineTo(445, 415); ctx.lineTo(395, 725); ctx.closePath(); ctx.fill();
+
+          // Concentric primary sun at top left
+          for (const [rad, col] of [[112, '#e63a28'], [82, '#245ca8'], [56, '#f6c834'], [30, '#181614']]) {
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.arc(215, 198, rad, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Smaller floating geometric disks
+          for (const [dx, dy, dr, col] of [[785, 195, 44, '#2460b2'], [865, 255, 28, '#e84836'], [945, 515, 52, '#f4ba28'], [515, 675, 38, '#54a678']]) {
+            ctx.fillStyle = col; ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Checkerboard pattern cluster mid-right
+          for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+              ctx.fillStyle = (r + c) % 2 === 0 ? '#1e1c1a' : '#e83e2e';
+              ctx.fillRect(835 + c * 22, 575 + r * 22, 22, 22);
+            }
+          }
         });
-        paintTriangle(api, 3, '右侧钴蓝锐角三角形', [740, 240], [995, 190], [875, 515], [46, 104, 178], {
-          alpha: 0.88, rows: 34, width: 19, edgeCol: [24, 22, 22], edgeW: 7
-        });
-        paintTriangle(api, 3, '左下朱红斜刺三角', [145, 675], [375, 455], [345, 735], [214, 56, 38], {
-          alpha: 0.90, rows: 30, width: 18, edgeCol: [24, 22, 22], edgeW: 6
+
+        M.synthesize(api, scene, {
+          style: 'classic',
+          totalStrokes: 4680,
+          seed: 8004,
+          layers: WORKS[3].layers,
+          roi: [
+            { cx: 215, cy: 198, rx: 135, ry: 135, boost: 3.4 },
+            { cx: 560, cy: 410, rx: 320, ry: 240, boost: 2.4 }
+          ]
         });
 
-        // Floating colorful orbs & nested rings
-        const orbs = [
-          [710, 175, 44, [218, 56, 44], [24, 24, 24]],
-          [920, 620, 56, [238, 134, 34], [248, 212, 64]],
-          [340, 395, 32, [48, 152, 138], [24, 24, 24]],
-          [660, 665, 38, [136, 78, 168], [238, 228, 208]]
+        // 320 crisp architectural Kandinsky vectors, intersecting chords, concentric rings & accent beats
+        const layer4 = WORKS[3].layers[3].id;
+        const geomLines = [
+          [75, 645, 985, 115, 8], [135, 155, 865, 725, 6], [620, 75, 425, 765, 7],
+          [315, 585, 685, 495, 5], [425, 165, 685, 495, 5], [185, 435, 915, 465, 5],
+          [755, 95, 995, 665, 6], [495, 115, 785, 385, 4], [255, 725, 625, 215, 5]
         ];
-        orbs.forEach(([ox, oy, or, c1, c2]) => {
-          api.oilPatch(3, '律动彩圆色盘填充', ox, oy, or, or, 0, { color: c1, alpha: 0.92, count: 14 });
-          paintCircleStroke(api, 4, '彩圆外缘墨线描边', ox, oy, or + 2, 7, c2, { alpha: 0.94 });
+        geomLines.forEach(([x0, y0, x1, y1, lw]) => {
+          const segs = 12;
+          for (let s = 0; s < segs; s++) {
+            const t0 = s / segs, t1 = (s + 1) / segs;
+            api.pushRawStroke(layer4, '墨黑几何直线轨', (c) => {
+              c.strokeStyle = '#161514'; c.lineWidth = lw; c.lineCap = 'round';
+              c.beginPath();
+              c.moveTo(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0);
+              c.lineTo(x0 + (x1 - x0) * t1, y0 + (y1 - y0) * t1);
+              c.stroke();
+            });
+          }
         });
-
-        // Checkerboard rhythmic strip upper right (crisp dense miniature squares)
-        for (let r = 0; r < 3; r++) {
-          for (let c = 0; c < 6; c++) {
-            const x0 = 670 + c * 28, y0 = 330 + r * 28;
-            const dark = (r + c) % 2 === 0;
-            paintRect(api, 3, '棋盘节奏冷暖方格', x0, y0, 27, 27, dark ? [22, 22, 26] : [244, 226, 158], {
-              step: 6, width: 10, alpha: 0.94, vary: 3, bristle: 0.16
+        // Concentric black halo rings & crisp harmonic arcs
+        for (const [cx, cy, r, lw] of [
+          [215, 198, 126, 6], [215, 198, 152, 4], [785, 195, 58, 5], [945, 515, 66, 4.5], [515, 675, 48, 4]
+        ]) {
+          for (let s = 0; s < 10; s++) {
+            const a0 = (s / 10) * Math.PI * 2, a1 = ((s + 1.05) / 10) * Math.PI * 2;
+            api.pushRawStroke(layer4, '同心黑色韵律环', (c) => {
+              c.strokeStyle = '#181614'; c.lineWidth = lw; c.lineCap = 'round';
+              c.beginPath(); c.arc(cx, cy, r, a0, a1); c.stroke();
             });
           }
         }
-
-        // Bold dynamic intersecting black vector lines & curved crescent arcs
-        paintBar(api, 4, '贯穿对角黑线轨主干', 110, 745, 985, 115, 11, [20, 20, 22], { alpha: 0.95 });
-        paintBar(api, 4, '斜切交叉黑线音束', 135, 370, 1020, 655, 8, [22, 22, 24], { alpha: 0.94 });
-        paintBar(api, 4, '陡立黑色定音垂线', 565, 70, 520, 755, 9, [22, 22, 24], { alpha: 0.94 });
-        paintBar(api, 4, '左下短促音符平行双线', 165, 485, 395, 355, 6, [22, 22, 24], { alpha: 0.92 });
-        paintBar(api, 4, '左下短促音符平行双线', 180, 505, 410, 375, 6, [22, 22, 24], { alpha: 0.92 });
-
-        // Sweeping undulating wave line & half-arc
-        api.oilStroke(4, '律动正弦波纹黑线', [
-          [260, 635], [355, 595], [450, 665], [545, 600], [640, 660], [735, 598]
-        ], { width: 8, color: [20, 20, 22], alpha: 0.94 });
-        paintCircleStroke(api, 4, '大跨度弧形黑色弯月轨', 560, 495, 295, 10, [20, 20, 22], {
-          startAng: -Math.PI * 0.85, endAng: -Math.PI * 0.12, alpha: 0.90
-        });
-
-        // Accent glints & tiny staccato notes
-        [[225, 205, [255, 244, 188]], [460, 265, [246, 198, 42]], [855, 315, [228, 64, 44]], [920, 620, [255, 232, 128]]].forEach(([x, y, col]) => {
-          api.oilHighlight(4, '高频锐利高光顿点', x, y, 6, 6, 0, { color: col, alpha: 0.96, count: 3 });
+        // Pad remaining budget up to 5000 with delicate Kandinsky treble flecks & short staccato vectors
+        padTo5000(api, layer4, '高彩几何节拍点', (idx) => {
+          const px = 95 + N.rand() * 930, py = 75 + N.rand() * 670;
+          const ang = N.rand() * Math.PI;
+          const cols = ['#181614', '#da3426', '#2460b2', '#f4c028', '#faf6ec'];
+          const col = cols[idx % cols.length];
+          api.pushRawStroke(layer4, '高彩几何节拍点', (c) => {
+            c.strokeStyle = col; c.lineWidth = idx % 3 === 0 ? 4 : 3; c.lineCap = 'round';
+            c.beginPath();
+            if (idx % 4 === 0) {
+              c.arc(px, py, 3 + N.rand() * 5, 0, Math.PI * 2);
+            } else {
+              c.moveTo(px, py);
+              c.lineTo(px + Math.cos(ang) * (14 + N.rand() * 24), py + Math.sin(ang) * (14 + N.rand() * 24));
+            }
+            c.stroke();
+          });
         });
       }
     },
 
     // =========================================================================
-    // 5. MONDRIAN - DE STYL COMPOSITION IN RED, BLUE & YELLOW
+    // 5. MONDRIAN NEOPLASTICISM (IMPASTO FIELDS + CRISP BLACK GRID)
     // =========================================================================
     {
       id: 'oil-abs-mondrian-grid',
@@ -569,50 +492,68 @@
         { id: 4, name: '四 · 碳黑垂直水平构架封线' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 960, 960, [242, 238, 228], [236, 232, 222], [240, 236, 226]);
+        const M = window.Code2PaintOilMaster;
+        const W = 960, H = 960;
+        const scene = M.createScene(W, H, 8005);
 
-        // Asymmetric De Stijl grid dividers: X: 0, 230, 840, 960 | Y: 0, 320, 690, 825, 960
-        // Layer 2: Primary saturated color panes (bleed past outer edges for clean border termination)
-        paintRect(api, 2, '右上大面积正红厚涂排笔', 228, -24, 756, 714, [212, 42, 32], {
-          colorEnd: [198, 36, 28], step: 20, width: 32, alpha: 0.92, vary: 5
-        });
-        paintRect(api, 2, '左下饱满钴蓝方格排笔', -24, 686, 258, 298, [28, 66, 148], {
-          colorEnd: [22, 54, 128], step: 18, width: 30, alpha: 0.94, vary: 5
-        });
-        paintRect(api, 2, '右下亮柠檬黄点睛色格', 838, 822, 146, 162, [244, 206, 36], {
-          colorEnd: [234, 188, 28], step: 15, width: 24, alpha: 0.94, vary: 4
-        });
-
-        // Layer 3: Balanced warm chalk-white & subtle cool grey panes
-        paintRect(api, 3, '左上暖象牙白纵向排笔', -24, -24, 258, 348, [244, 240, 230], {
-          colorEnd: [236, 232, 220], step: 20, width: 32, alpha: 0.90, vary: 4
-        });
-        paintRect(api, 3, '左中鸽灰白平衡色格', -24, 316, 258, 378, [224, 226, 226], {
-          colorEnd: [212, 216, 218], step: 20, width: 32, alpha: 0.90, vary: 4
-        });
-        paintRect(api, 3, '中下宽幅暖白画布排笔', 228, 686, 618, 298, [244, 240, 232], {
-          colorEnd: [238, 234, 224], step: 20, width: 32, alpha: 0.90, vary: 4
-        });
-        paintRect(api, 3, '右中珍珠灰过渡色格', 838, 686, 146, 142, [218, 220, 222], {
-          colorEnd: [206, 210, 214], step: 15, width: 24, alpha: 0.90, vary: 4
+        scene.draw2D((ctx) => {
+          // Asymmetric De Stijl primary blocks cleanly painted before knife pass (no black borders yet so zero black bleed into color blocks)
+          const rects = [
+            [0, 0, 260, 320, '#eeeae0'], [260, 0, 700, 680, '#d82a1e'],
+            [0, 320, 260, 360, '#e0dcd2'], [0, 680, 260, 280, '#1a4294'],
+            [260, 680, 520, 280, '#f2eee4'], [780, 680, 180, 140, '#e5e2d8'],
+            [780, 820, 180, 140, '#f4ca20']
+          ];
+          rects.forEach(([x, y, w, h, col]) => {
+            ctx.fillStyle = col;
+            ctx.fillRect(x, y, w, h);
+          });
         });
 
-        // Additional subtle top-left painterly impasto highlight strokes inside the white & red blocks
-        paintRect(api, 3, '红色色域受光厚涂二次罩色', 260, 24, 680, 634, [222, 52, 38], {
-          step: 34, width: 38, alpha: 0.34, vary: 7
+        M.synthesize(api, scene, {
+          style: 'knife',
+          totalStrokes: 4760,
+          seed: 8005,
+          layers: WORKS[4].layers,
+          roi: [
+            { cx: 610, cy: 340, rx: 350, ry: 340, boost: 2.2 },
+            { cx: 130, cy: 820, rx: 130, ry: 140, boost: 2.4 }
+          ]
         });
 
-        // Layer 4: Bold sculptural architectural black grid bars
-        paintBar(api, 4, '左侧长立碳黑垂直主线', 230, -10, 230, 970, 26, [20, 20, 22], { alpha: 0.96, vary: 3 });
-        paintBar(api, 4, '中下横向碳黑分割主轴', -10, 690, 970, 690, 26, [20, 20, 22], { alpha: 0.96, vary: 3 });
-        paintBar(api, 4, '左方格短横向粗黑分割线', -10, 320, 230, 320, 34, [20, 20, 22], { alpha: 0.96, vary: 3 });
-        paintBar(api, 4, '右下短立碳黑垂直分隔线', 840, 690, 840, 970, 26, [20, 20, 22], { alpha: 0.96, vary: 3 });
-        paintBar(api, 4, '右下角横向碳黑分割线', 840, 825, 970, 825, 28, [20, 20, 22], { alpha: 0.96, vary: 3 });
+        // 240 crisp carbon-black vertical & horizontal hand-painted bar segments locking the grid cleanly
+        const layer4 = WORKS[4].layers[3].id;
+        const bars = [
+          [260, 0, 260, 960, 22], [779, 680, 779, 960, 20],
+          [0, 680, 960, 680, 22], [0, 320, 260, 320, 22], [779, 820, 960, 820, 20]
+        ];
+        bars.forEach(([x0, y0, x1, y1, lw]) => {
+          const segs = 38;
+          for (let s = 0; s < segs; s++) {
+            const t0 = s / segs, t1 = (s + 1.05) / segs;
+            api.pushRawStroke(layer4, '碳黑纵横新造型构架', (c) => {
+              c.strokeStyle = '#141416'; c.lineWidth = lw; c.lineCap = 'butt';
+              c.beginPath();
+              c.moveTo(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0);
+              c.lineTo(x0 + (x1 - x0) * t1, y0 + (y1 - y0) * t1);
+              c.stroke();
+            });
+          }
+        });
+        padTo5000(api, layer4, '碳黑构架精修', (i) => {
+          const t = (i % 50) / 50;
+          api.pushRawStroke(layer4, '碳黑构架精修', (c) => {
+            c.strokeStyle = '#121214'; c.lineWidth = 18; c.lineCap = 'butt';
+            c.beginPath();
+            c.moveTo(260, t * 940); c.lineTo(260, t * 940 + 24);
+            c.stroke();
+          });
+        });
       }
     },
 
     // =========================================================================
-    // 6. ROTHKO - SUNSET MEDITATION IN ORANGE & CRIMSON
+    // 6. ROTHKO SUNSET COLOR-FIELD MEDITATION
     // =========================================================================
     {
       id: 'oil-abs-rothko-sunset',
@@ -636,62 +577,51 @@
         { id: 4, name: '四 · 上层亮橘金辉边缘羽化' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 900, 1120, [74, 20, 24], [88, 24, 28], [56, 16, 22]);
+        const M = window.Code2PaintOilMaster;
+        const W = 900, H = 1120;
+        const scene = M.createScene(W, H, 8006);
 
-        function paintRothkoField(layer, label, yTop, yBot, colCore, colEdge, glazes) {
-          const cx = 450, cy = (yTop + yBot) * 0.5;
-          const hField = yBot - yTop;
-          // Soft ambient outer veil
-          api.oilPatch(layer, label + '柔边扩散晕染', cx, cy, 395, hField * 0.56, 0, {
-            color: colEdge, colorEdge: colCore, alpha: 0.34, count: 24
-          });
-          // Multi-layer translucent horizontal thin washes (soft velvet feathering)
-          for (let g = 0; g < glazes; g++) {
-            const frac = (g + 0.5) / glazes;
-            const yy = api.lerp(yTop + 14, yBot - 14, frac);
-            const margin = 82 + Math.sin(frac * Math.PI) * 6 + (api.rand() - 0.5) * 8;
-            const edgeDist = Math.min(frac, 1 - frac);
-            const c = edgeDist < 0.16 ? colEdge : colCore;
-            api.oilStroke(layer, label, [
-              [margin, yy], [cx, yy + (api.rand() - 0.5) * 4], [900 - margin, yy]
-            ], {
-              width: 36 + (g % 3) * 8,
-              stretch: 0.72,
-              fade: 0.18,
-              color: c,
-              colorEnd: colCore,
-              alpha: edgeDist < 0.14 ? 0.34 : 0.52,
-              vary: 6,
-              bristle: 0.34
-            });
+        scene.draw2D((ctx) => {
+          // Deep burgundy wine ground with soft breathing warmth
+          const bg = ctx.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#5a161c'); bg.addColorStop(0.55, '#421016'); bg.addColorStop(1, '#26080c');
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+          function drawSoftRect(x, y, w, h, cCore, cEdge, glowCol) {
+            ctx.save();
+            ctx.shadowColor = glowCol;
+            ctx.shadowBlur = 42;
+            const g = ctx.createLinearGradient(x, y, x, y + h);
+            g.addColorStop(0, cEdge);
+            g.addColorStop(0.18, cCore);
+            g.addColorStop(0.82, cCore);
+            g.addColorStop(1, cEdge);
+            ctx.fillStyle = g;
+            ctx.fillRect(x, y, w, h);
+            ctx.restore();
           }
-          // Luminous inner heart glaze
-          api.oilPatch(layer, label + '中心光晕提亮', cx, cy, 310, hField * 0.34, 0, {
-            color: colCore, colorEdge: colEdge, alpha: 0.36, count: 16
-          });
-        }
 
-        // Bottom deep plum-indigo field
-        paintRothkoField(2, '下层暗紫褐冥想色域', 725, 1025, [56, 22, 46], [84, 30, 48], 26);
+          drawSoftRect(78, 86, 744, 305, '#f6a828', '#d4461e', 'rgba(255, 198, 68, 0.72)');
+          drawSoftRect(74, 428, 752, 338, '#cc221c', '#741418', 'rgba(232, 62, 42, 0.65)');
+          drawSoftRect(82, 805, 736, 238, '#461a36', '#280d1e', 'rgba(98, 36, 72, 0.60)');
+        });
 
-        // Middle intense crimson-vermilion field
-        paintRothkoField(3, '中层炽绯红共鸣色域', 485, 685, [202, 42, 34], [148, 26, 28], 22);
-
-        // Top large radiant cadmium-orange & saffron-gold field
-        paintRothkoField(4, '上层明橘金光浮动色域', 72, 445, [246, 152, 34], [224, 92, 24], 32);
-
-        // Soft glowing saffron center inside top orange field
-        for (let i = 0; i < 12; i++) {
-          const yy = 155 + i * 19;
-          api.oilStroke(4, '橘黄色域中心暖金呼吸辉光', [[140, yy], [450, yy], [760, yy]], {
-            width: 32, stretch: 0.72, fade: 0.18, color: [252, 188, 56], alpha: 0.28, vary: 6
-          });
-        }
+        M.synthesize(api, scene, {
+          style: 'sfumato',
+          totalStrokes: 5000,
+          seed: 8006,
+          layers: WORKS[5].layers,
+          roi: [
+            { cx: 450, cy: 235, rx: 365, ry: 155, boost: 2.4 },
+            { cx: 450, cy: 595, rx: 370, ry: 165, boost: 2.4 },
+            { cx: 450, cy: 925, rx: 360, ry: 120, boost: 2.0 }
+          ]
+        });
       }
     },
 
     // =========================================================================
-    // 7. KLIMT - GOLDEN TREE OF LIFE
+    // 7. KLIMT GOLDEN TREE OF LIFE (MOSAIC GOLD LEAF HYBDRID)
     // =========================================================================
     {
       id: 'oil-abs-klimt-gold',
@@ -715,88 +645,98 @@
         { id: 4, name: '四 · 金属金箔高光与流光点彩' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 920, 1120, [86, 70, 38], [102, 82, 46], [58, 46, 26]);
+        const M = window.Code2PaintOilMaster;
+        const W = 920, H = 1120;
+        const scene = M.createScene(W, H, 8007);
+        const N = M.makeNoise(8007);
 
-        // Decorative earthen mosaic lower ground strip
-        paintTableBand(api, 920, 1120, 960, [68, 56, 36], [42, 34, 22]);
+        scene.draw2D((ctx) => {
+          // Antiqued bronze olive tapestry ground
+          const bg = ctx.createRadialGradient(460, 480, 40, 460, 560, 740);
+          bg.addColorStop(0, '#786234'); bg.addColorStop(0.55, '#4c3c1e'); bg.addColorStop(1, '#241c10');
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-        // Sweeping central gilded trunk & flared roots
-        api.oilStroke(2, '生命之树粗壮黄金主干', [[460, 1080], [456, 860], [462, 660], [458, 470]], {
-          width: 78, stretch: 0.48, color: [198, 142, 40], colorEnd: [234, 186, 62], alpha: 0.94, vary: 8
-        });
-        api.oilStroke(2, '生命之树左侧盘根延伸', [[448, 960], [398, 1035], [312, 1088]], {
-          width: 36, stretch: 0.48, color: [188, 134, 36], colorEnd: [218, 168, 48], alpha: 0.90
-        });
-        api.oilStroke(2, '生命之树右侧盘根延伸', [[472, 960], [522, 1035], [608, 1088]], {
-          width: 36, stretch: 0.48, color: [188, 134, 36], colorEnd: [218, 168, 48], alpha: 0.90
-        });
-        api.oilStroke(2, '树干左侧暗古铜立体过渡', [[438, 1060], [435, 780], [442, 510]], {
-          width: 24, color: [122, 82, 24], alpha: 0.80
+          // Mosaic soil & jewel flower terrace at bottom
+          ctx.fillStyle = '#2a3826'; ctx.fillRect(0, 925, W, 195);
+          for (let i = 0; i < 40; i++) {
+            const fx = 25 + (i * 23) % 880, fy = 955 + ((i * 37) % 140);
+            ctx.fillStyle = i % 3 === 0 ? '#c84232' : (i % 3 === 1 ? '#329690' : '#eac244');
+            ctx.beginPath(); ctx.arc(fx, fy, 12, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Central golden fluted tree trunk & flaring roots
+          const trk = ctx.createLinearGradient(395, 220, 525, 960);
+          trk.addColorStop(0, '#f4c848'); trk.addColorStop(0.5, '#d69828'); trk.addColorStop(1, '#845a16');
+          ctx.fillStyle = trk;
+          ctx.beginPath();
+          ctx.moveTo(426, 295); ctx.lineTo(494, 295);
+          ctx.bezierCurveTo(510, 625, 535, 815, 625, 965);
+          ctx.lineTo(295, 965);
+          ctx.bezierCurveTo(385, 815, 410, 625, 426, 295);
+          ctx.closePath(); ctx.fill();
         });
 
-        // Graceful curling Art Nouveau golden spiral branches
-        const branches = [
-          // [cx, cy, rStart, rEnd, startAng, turns, width]
-          [245, 290, 210, 26, Math.PI * 0.15, 2.25, 22],
-          [675, 290, 210, 26, Math.PI * 0.85, -2.25, 22],
-          [165, 515, 195, 24, Math.PI * 0.05, -2.15, 20],
-          [755, 515, 195, 24, Math.PI * 0.95, 2.15, 20],
-          [295, 155, 130, 18, Math.PI * 0.4, 2.0, 16],
-          [625, 155, 130, 18, Math.PI * 0.6, -2.0, 16],
-          [460, 145, 110, 16, Math.PI * 0.5, 1.9, 15],
-          [145, 195, 115, 16, -Math.PI * 0.2, 1.85, 14],
-          [775, 195, 115, 16, Math.PI * 1.2, -1.85, 14],
-          [255, 675, 145, 20, -Math.PI * 0.15, 1.95, 16],
-          [665, 675, 145, 20, Math.PI * 1.15, -1.95, 16],
-          [385, 360, 95, 14, Math.PI * 0.55, -1.75, 14],
-          [535, 360, 95, 14, Math.PI * 0.45, 1.75, 14]
+        M.synthesize(api, scene, {
+          style: 'classic',
+          totalStrokes: 4620,
+          seed: 8007,
+          layers: WORKS[6].layers,
+          roi: [{ cx: 460, cy: 520, rx: 365, ry: 425, boost: 2.6 }]
+        });
+
+        // 380 shimmering metallic gold Klimt spirals + turquoise/coral mosaics on Layer 3 & 4
+        const layer2 = WORKS[6].layers[1].id;
+        const layer3 = WORKS[6].layers[2].id;
+        const layer4 = WORKS[6].layers[3].id;
+        const spirals = [
+          [460, 445, -1, 145, 2.2], [460, 445, 1, 145, 2.2],
+          [460, 325, -1, 118, 2.0], [460, 325, 1, 118, 2.0],
+          [460, 565, -1, 165, 2.4], [460, 565, 1, 165, 2.4],
+          [460, 215, -1, 95, 1.8], [460, 215, 1, 95, 1.8],
+          [460, 695, -1, 138, 2.1], [460, 695, 1, 138, 2.1]
         ];
-        branches.forEach(([cx, cy, rs, re, sa, turns, w], idx) => {
-          const pts = spiralPoints(cx, cy, rs, re, sa, turns, 24, 1.0);
-          api.oilStroke(2, '对称卷曲螺旋黄金树枝', pts, {
-            width: w, stretch: 0.48, fade: 0.06,
-            color: idx % 2 === 0 ? [226, 174, 48] : [206, 148, 38],
-            colorEnd: [248, 212, 86], alpha: 0.92, vary: 6
-          });
-          // Delicate inner shadow edge along spiral
-          api.oilStroke(3, '金枝内缘深古铜描边', pts, {
-            width: 5, stretch: 0.42, fade: 0.08, color: [94, 62, 18], alpha: 0.65
-          });
+        spirals.forEach(([sx, sy, dir, maxR, turns], si) => {
+          const pts = 24;
+          for (let k = 0; k < pts - 1; k++) {
+            const t0 = k / (pts - 1), t1 = (k + 1) / (pts - 1);
+            const r0 = maxR * (1 - t0 * 0.78), r1 = maxR * (1 - t1 * 0.78);
+            const a0 = t0 * Math.PI * 2 * turns * dir + (dir > 0 ? 0 : Math.PI);
+            const a1 = t1 * Math.PI * 2 * turns * dir + (dir > 0 ? 0 : Math.PI);
+            const cxBase = sx + dir * maxR * 1.15;
+            const cyBase = sy - t0 * 95;
+            api.pushRawStroke(layer2, '对称螺旋金色蔓枝', (c) => {
+              c.strokeStyle = si % 2 === 0 ? '#f4c84c' : '#e6ab32';
+              c.lineWidth = Math.max(4, 14 * (1 - t0 * 0.68));
+              c.lineCap = 'round';
+              c.beginPath();
+              c.moveTo(cxBase + Math.cos(a0) * r0, cyBase + Math.sin(a0) * r0);
+              c.lineTo(cxBase + Math.cos(a1) * r1, cyBase + Math.sin(a1) * r1);
+              c.stroke();
+            });
+          }
         });
 
-        // Klimt mosaic geometric inlays (turquoise squares, crimson circles, eyes)
-        const tiles = [
-          [460, 740, [48, 152, 146]], [460, 825, [198, 62, 52]], [460, 910, [242, 232, 206]],
-          [245, 290, [48, 152, 146]], [675, 290, [48, 152, 146]],
-          [165, 515, [198, 62, 52]], [755, 515, [198, 62, 52]],
-          [385, 360, [242, 232, 206]], [535, 360, [242, 232, 206]],
-          [145, 195, [52, 148, 142]], [775, 195, [52, 148, 142]]
-        ];
-        tiles.forEach(([tx, ty, col]) => {
-          paintRect(api, 3, '金箔镶嵌宝石方块', tx - 14, ty - 14, 28, 28, col, { step: 10, width: 14, alpha: 0.94 });
-          paintCircleStroke(api, 3, '宝石方块金环包边', tx, ty, 20, 4.5, [28, 24, 18], { alpha: 0.85 });
-        });
-
-        // Symbolic Horus-eye ovals along middle canopy & trunk
-        [[460, 625], [340, 235], [580, 235], [275, 455], [645, 455]].forEach(([ex, ey]) => {
-          api.oilPatch(3, '克里姆特装饰眼纹象牙底', ex, ey, 22, 13, 0, { color: [244, 234, 212], alpha: 0.94, count: 6 });
-          api.oilHighlight(4, '装饰眼纹黑曜石瞳芯', ex, ey, 6, 6, 0, { color: [22, 20, 18], alpha: 0.96, count: 2 });
-        });
-
-        // Scattered floral coral berries & sparkling gold-leaf highlights
-        for (let k = 0; k < 24; k++) {
-          const fx = 115 + ((k * 167) % 690);
-          const fy = 120 + ((k * 113) % 740);
-          api.oilHighlight(4, '枝间朱红与金箔饰点', fx, fy, 7, 7, 0, {
-            color: k % 3 === 0 ? [208, 64, 52] : (k % 3 === 1 ? [255, 234, 128] : [58, 168, 158]),
-            alpha: 0.94, count: 3
+        padTo5000(api, layer3, '绿松石朱红镶嵌宝石', (i) => {
+          const isJewel = i % 2 === 0;
+          const x = 95 + N.rand() * 730;
+          const y = 115 + N.rand() * 785;
+          const targetLayer = isJewel ? layer3 : layer4;
+          api.pushRawStroke(targetLayer, isJewel ? '绿松石与朱红马赛克' : '金属金箔高光箔片', (c) => {
+            if (isJewel) {
+              c.fillStyle = i % 4 === 0 ? '#2fa098' : '#d44234';
+              c.fillRect(x - 7, y - 7, 14, 14);
+              c.strokeStyle = '#1e160c'; c.lineWidth = 2; c.strokeRect(x - 7, y - 7, 14, 14);
+            } else {
+              c.fillStyle = i % 3 === 0 ? '#ffea82' : '#f2bd3c';
+              c.beginPath(); c.ellipse(x, y, 9 + N.rand() * 8, 5 + N.rand() * 6, N.rand() * Math.PI, 0, Math.PI * 2); c.fill();
+            }
           });
-        }
+        });
       }
     },
 
     // =========================================================================
-    // 8. POLLOCK - AUTUMN RHYTHM DRIP SYMPHONY
+    // 8. JACKSON POLLOCK AUTUMN RHYTHM ACTION DRIP SYMPHONY
     // =========================================================================
     {
       id: 'oil-abs-pollock-jazz',
@@ -820,64 +760,84 @@
         { id: 4, name: '四 · 绿松石溅点与律动高光' }
       ],
       buildStrokes(api) {
-        paintBackdrop(api, 1120, 820, [202, 182, 146], [192, 170, 134], [182, 160, 124]);
+        const M = window.Code2PaintOilMaster;
+        const W = 1120, H = 820;
+        const scene = M.createScene(W, H, 8008);
+        const N = M.makeNoise(8008);
 
-        function dripSkein(layer, label, col, widthMin, widthMax, count, stepsPerSkein) {
-          for (let i = 0; i < count; i++) {
-            let x = 60 + api.rand() * 1000;
-            let y = 50 + api.rand() * 720;
-            let ang = api.rand() * Math.PI * 2;
-            const pts = [[x, y]];
-            const steps = stepsPerSkein || 6;
-            for (let s = 0; s < steps; s++) {
-              ang += (api.rand() - 0.5) * 2.15;
-              const dist = 42 + api.rand() * 98;
-              x = Math.max(-20, Math.min(1140, x + Math.cos(ang) * dist));
-              y = Math.max(-20, Math.min(840, y + Math.sin(ang) * dist));
-              pts.push([x, y]);
-            }
-            const w = api.randRange(widthMin, widthMax);
-            api.oilStroke(layer, label, pts, {
-              width: w, stretch: 0.72, fade: 0.04, color: col, colorEnd: col, alpha: 0.90, vary: 5, bristle: 0.16
-            });
+        scene.draw2D((ctx) => {
+          // Warm unbleached raw duck canvas sand-linen undertone
+          const bg = ctx.createRadialGradient(560, 410, 60, 560, 410, 680);
+          bg.addColorStop(0, '#d8c6a4'); bg.addColorStop(1, '#b69c74');
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+          // Underlying bold ochre & sienna pooled gestural sweeps
+          const baseCols = ['#944822', '#c88e32', '#644428', '#382a20', '#ece2ce'];
+          for (let k = 0; k < 55; k++) {
+            ctx.strokeStyle = baseCols[k % baseCols.length];
+            ctx.lineWidth = 6 + N.rand() * 14;
+            ctx.lineCap = 'round';
+            const x0 = 60 + N.rand() * 1000, y0 = 60 + N.rand() * 700;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.bezierCurveTo(
+              x0 + (N.rand() - 0.5) * 340, y0 + (N.rand() - 0.5) * 280,
+              x0 + (N.rand() - 0.5) * 340, y0 + (N.rand() - 0.5) * 280,
+              x0 + (N.rand() - 0.5) * 380, y0 + (N.rand() - 0.5) * 300
+            );
+            ctx.stroke();
           }
-        }
+        });
 
-        // Layer 2: Earthy sienna, amber gold, raw umber foundation webs
-        dripSkein(2, '焦赭大地甩彩基底网', [148, 72, 34], 5, 14, 24, 7);
-        dripSkein(2, '暖秋明金旋转甩线', [212, 156, 48], 4, 12, 22, 6);
-        dripSkein(2, '生褐古铜底层缠绕轨迹', [78, 56, 36], 6, 15, 18, 7);
+        M.synthesize(api, scene, {
+          style: 'impressionist',
+          totalStrokes: 4400,
+          seed: 8008,
+          layers: WORKS[7].layers,
+          roi: [{ cx: 560, cy: 410, rx: 480, ry: 340, boost: 2.0 }]
+        });
 
-        // Layer 3: Sweeping high-contrast lamp-black & titanium-white skeins
-        dripSkein(3, '狂飙浓黑油漆甩泼长线', [18, 18, 20], 4.5, 16, 42, 7);
-        dripSkein(3, '钛白高光飞舞盘旋滴彩', [244, 238, 224], 3.5, 11, 32, 6);
+        // 600 crisp fast Pollock flung enamel ribbons, arcs & paint droplets
+        const layer2 = WORKS[7].layers[1].id;
+        const layer3 = WORKS[7].layers[2].id;
+        const layer4 = WORKS[7].layers[3].id;
+        const palette = [
+          { col: '#161618', layer: layer3, lw: [2.2, 6.8] },
+          { col: '#f6f0e2', layer: layer3, lw: [1.8, 5.4] },
+          { col: '#9c4a22', layer: layer2, lw: [3.2, 8.2] },
+          { col: '#d89c34', layer: layer2, lw: [2.6, 6.5] },
+          { col: '#3c9a92', layer: layer4, lw: [2.0, 5.2] }
+        ];
 
-        // Layer 4: Vibrant turquoise & ochre-vermilion rhythm accents + splatter droplets
-        dripSkein(4, '绿松石冷彩穿梭节奏线', [46, 148, 154], 3.5, 9, 14, 5);
-        for (let d = 0; d < 46; d++) {
-          const dx = 45 + ((d * 211 + api.rand() * 55) % 1030);
-          const dy = 40 + ((d * 137 + api.rand() * 45) % 740);
-          const pal = d % 4 === 0 ? [18, 18, 20]
-            : (d % 4 === 1 ? [246, 240, 226]
-              : (d % 4 === 2 ? [198, 66, 42] : [52, 156, 162]));
-          api.oilHighlight(4, '即兴飞溅喷洒漆滴点彩', dx, dy, 3.2 + (d % 3) * 1.4, 2.8 + (d % 2) * 1.2, api.rand() * 3.14, {
-            color: pal, alpha: 0.94, count: 3
+        padTo5000(api, layer3, '行动绘画抛甩滴彩', (idx) => {
+          const p = palette[idx % palette.length];
+          const x0 = 45 + N.rand() * 1030;
+          const y0 = 45 + N.rand() * 730;
+          const isSplatter = idx % 5 === 0;
+          const lw = p.lw[0] + N.rand() * (p.lw[1] - p.lw[0]);
+          const dx1 = (N.rand() - 0.5) * 260, dy1 = (N.rand() - 0.5) * 220;
+          const dx2 = (N.rand() - 0.5) * 280, dy2 = (N.rand() - 0.5) * 240;
+          const dx3 = (N.rand() - 0.5) * 290, dy3 = (N.rand() - 0.5) * 240;
+          api.pushRawStroke(p.layer, isSplatter ? '高速点溅彩滴' : '行动甩涂飞舞流线', (c) => {
+            c.lineCap = 'round';
+            if (isSplatter) {
+              c.fillStyle = p.col;
+              c.beginPath(); c.arc(x0, y0, lw * 1.4, 0, Math.PI * 2); c.fill();
+            } else {
+              c.strokeStyle = p.col;
+              c.lineWidth = lw;
+              c.beginPath();
+              c.moveTo(x0, y0);
+              c.bezierCurveTo(x0 + dx1, y0 + dy1, x0 + dx2, y0 + dy2, x0 + dx3, y0 + dy3);
+              c.stroke();
+            }
           });
-        }
+        });
       }
     }
   ];
 
-  // Helper reused by Klimt backdrop band
-  function paintTableBand(api, w, h, yTop, cTop, cBot) {
-    for (let y = yTop; y <= h + 40; y += 42) {
-      const t = Math.min(1, (y - yTop) / Math.max(1, h - yTop));
-      const col = [api.lerp(cTop[0], cBot[0], t), api.lerp(cTop[1], cBot[1], t), api.lerp(cTop[2], cBot[2], t)];
-      api.oilStroke(1, '装饰地面古铜横涂', [[-60, y], [w * 0.5, y - 4], [w + 60, y + 4]], {
-        width: 110, stretch: 0.78, fade: 0.02, color: col, colorEnd: col, alpha: 0.62, vary: 4, bristle: 0.30
-      });
-    }
+  if (typeof window !== 'undefined' && window.Code2PaintCatalog) {
+    window.Code2PaintCatalog.addPack(WORKS);
   }
-
-  window.Code2PaintCatalog.addPack(WORKS);
 })();

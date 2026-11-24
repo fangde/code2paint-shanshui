@@ -8,9 +8,16 @@
 <body>
 <script src="./tutorial-engine.js"></script>
 <script>
+const LAYERS = [
+  { id: 1, name: '一 · 熟褐有色底与投影' },
+  { id: 2, name: '二 · 固有色与明暗交界' },
+  { id: 3, name: '三 · 球体体积与反光塑形' },
+  { id: 4, name: '四 · 印象笔触与高光点睛' }
+];
+
 window.Code2PaintTutorial.mount({
   title: '基础油画·光影红苹果',
-  subtitle: '古典静物入门四步法：熟褐起稿铺暗底 → 固有色与明暗交界线 → 体积与反光 → 厚涂高光点睛',
+  subtitle: '古典静物四步法（3D体积光影 + 5000笔方向性堆彩）：熟褐底与投影 → 固有色与交界线 → 环境反光与叶梗 → 窗影高光点睛',
   category: '古典油画',
   mode: 'oil',
   theme: 'gallery-dark',
@@ -19,129 +26,115 @@ window.Code2PaintTutorial.mount({
   height: 920,
   seed: 202609,
   fileName: '基础油画光影红苹果',
-  layers: [
-    { id: 1, name: '一 · 熟褐起稿与暗底' },
-    { id: 2, name: '二 · 固有色与交界线' },
-    { id: 3, name: '三 · 体积塑造与反光' },
-    { id: 4, name: '四 · 厚涂高光点睛' }
-  ],
+  layers: LAYERS,
   buildStrokes(api) {
-    const cx = 490, cy = 492, rx = 164, ry = 152;
+    const M = window.Code2PaintOilMaster;
+    const W = 1000, H = 920;
+    const cx = 490, cy = 498, rx = 166, ry = 154;
+    const scene = M.createScene(W, H, 202609);
 
-    // 一 · 熟褐单色起稿（宽重叠深景背景 + 桌面木纹 + 投影 + 苹果单色底形）
-    for (let y = 0; y <= 580; y += 44) {
-      api.oilStroke(1, '背景深熟褐无缝刷底', [[-60, y], [490, y + 10], [1060, y - 8]], {
-        width: 120, stretch: 0.72, fade: 0.02, color: [34, 23, 17], colorEnd: [20, 14, 10], alpha: 0.44, vary: 3, bristle: 0.2
-      });
-    }
-    for (let y = 585; y <= 940; y += 38) {
-      api.oilStroke(1, '桌面木纹暖褐平刷', [[-60, y], [500, y + 4], [1060, y - 4]], {
-        width: 98, stretch: 0.72, fade: 0.02, color: [72, 48, 33], colorEnd: [48, 31, 21], alpha: 0.46, vary: 4, temp: 3
-      });
-    }
-
-    // Contact shadow right under base and stretching gently right
-    api.oilPatch(1, '苹果底部重影与向右斜投', cx + 88, cy + 122, 185, 48, 0.06, {
-      color: [14, 9, 7], colorEdge: [34, 23, 17], alpha: 0.64, count: 24
-    });
-
-    // Dual-shoulder apple silhouette base in burnt umber
-    api.oilPatch(1, '苹果左肩单色起稿', cx - 34, cy - 16, 128, 134, -0.08, {
-      color: [84, 34, 22], colorEdge: [34, 18, 14], alpha: 0.78, count: 22
-    });
-    api.oilPatch(1, '苹果右肩单色起稿', cx + 34, cy - 14, 124, 132, 0.08, {
-      color: [66, 26, 18], colorEdge: [28, 15, 11], alpha: 0.78, count: 22
-    });
-    api.oilPatch(1, '苹果下腹收拢起稿', cx, cy + 36, 128, 112, 0, {
-      color: [62, 22, 16], colorEdge: [26, 14, 11], alpha: 0.74, count: 20
+    scene.shadeBackdropWallTable({
+      horizonY: 584,
+      lightX: 250,
+      lightY: 190,
+      wallLit: [62, 46, 33],
+      wallMid: [30, 21, 15],
+      wallDark: [12, 9, 7],
+      tableType: 'wood',
+      tableLit: [122, 84, 52],
+      tableMid: [72, 47, 29],
+      tableDark: [26, 17, 11],
+      tableEdgeY: 855,
+      castShadows: [
+        { cx: cx + 78, cy: cy + 126, rx: 198, ry: 48, rot: 0.05, strength: 0.78, col: [14, 9, 7] },
+        { cx: cx + 12, cy: cy + 144, rx: 105, ry: 22, rot: 0.02, strength: 0.88, col: [10, 6, 5] }
+      ]
     });
 
-    // 二 · 固有正红与明暗交界线（精准球体受光分层，边缘光滑浑厚）
-    api.oilPatch(2, '红苹果主体鲜红固有色', cx - 26, cy - 22, 124, 120, -0.1, {
-      color: [188, 36, 28], colorEdge: [128, 22, 22], alpha: 0.72, count: 28
-    });
-    api.oilPatch(2, '右侧过渡暗红罩涂', cx + 32, cy + 4, 116, 118, 0.1, {
-      color: [132, 24, 22], colorEdge: [52, 14, 16], alpha: 0.62, count: 24
-    });
-
-    // Soft smooth curved color strokes wrapping body
-    for (let row = -0.35; row <= 0.45; row += 0.22) {
-      const yMid = cy + row * ry;
-      api.oilStroke(2, '苹果球面顺弧裹笔', [
-        [cx - 95, yMid - 8],
-        [cx - 12, yMid + 12],
-        [cx + 82, yMid + 4]
-      ], {
-        width: 48, stretch: 0.58, fade: 0.30,
-        color: row < 0.1 ? [204, 52, 34] : [162, 30, 26],
-        colorEnd: [84, 18, 20],
-        alpha: 0.30, vary: 3, bristle: 0.25
-      });
-    }
-
-    // Core shadow terminator crescent hugging right shadow side cleanly
-    api.oilStroke(2, '明暗交界线暗红弧过渡', [
-      [cx + 46, cy - 86],
-      [cx + 82, cy + 8],
-      [cx + 42, cy + 102],
-      [cx - 38, cy + 120]
-    ], {
-      width: 46, stretch: 0.56, fade: 0.28, color: [58, 14, 17], colorEnd: [42, 12, 15], alpha: 0.46, vary: 2
+    // Soft red reflected glow cast onto tabletop just under sunlit cheek
+    scene.draw2D((ctx) => {
+      const g = ctx.createRadialGradient(cx - 25, cy + 158, 10, cx - 10, cy + 158, 95);
+      g.addColorStop(0, 'rgba(138, 46, 28, 0.34)');
+      g.addColorStop(1, 'rgba(138, 46, 28, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(cx - 10, cy + 158, 95, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
     });
 
-    // 三 · 深入塑造暖橙受光、果蒂凹窝、底部环境反光、木柄绿叶
-    api.oilPatch(3, '受光肩部金橘暖光过渡', cx - 54, cy - 42, 86, 78, -0.3, {
-      color: [228, 112, 46], colorEdge: [194, 42, 30], alpha: 0.52, count: 24
+    // 3D Sculpted bi-color crimson & golden apple with top dimple cavity & studio specular
+    scene.shadeFruit3D({
+      cx, cy, rx, ry,
+      kind: 'apple',
+      colLit: [236, 134, 56],
+      colMid: [188, 38, 28],
+      colShadow: [44, 12, 14],
+      colBlush: [242, 184, 82],
+      bounceCol: [184, 92, 48],
+      specCol: [255, 248, 232],
+      lightDir: [-0.64, -0.58, 0.50],
+      shininess: 38,
+      specStrength: 0.86
     });
 
-    api.oilPatch(3, '果蒂凹陷暗窝塑造', cx - 4, cy - 88, 36, 18, 0.05, {
-      color: [34, 12, 10], colorEdge: [128, 36, 24], alpha: 0.68, count: 14
+    // Woody curved stem & illuminated olive-green veined leaf emerging from cavity
+    scene.draw2D((ctx) => {
+      ctx.lineCap = 'round';
+      // Stem cast shadow onto top shoulder
+      ctx.strokeStyle = 'rgba(28, 12, 10, 0.55)';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 88);
+      ctx.quadraticCurveTo(cx + 18, cy - 92, cx + 32, cy - 86);
+      ctx.stroke();
+
+      // Shaded woody stem
+      const sg = ctx.createLinearGradient(cx - 12, cy - 180, cx + 22, cy - 86);
+      sg.addColorStop(0, '#a67b4b');
+      sg.addColorStop(0.5, '#684429');
+      sg.addColorStop(1, '#321e13');
+      ctx.strokeStyle = sg;
+      ctx.lineWidth = 13;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy - 90);
+      ctx.quadraticCurveTo(cx + 2, cy - 138, cx + 24, cy - 186);
+      ctx.stroke();
+
+      // Veined olive-green leaf curving right
+      ctx.save();
+      ctx.translate(cx + 12, cy - 154);
+      ctx.rotate(-0.24);
+      const lg = ctx.createLinearGradient(-10, -28, 115, 24);
+      lg.addColorStop(0, '#78963c');
+      lg.addColorStop(0.5, '#53722b');
+      lg.addColorStop(1, '#2f4518');
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(36, -34, 88, -28, 128, 4);
+      ctx.bezierCurveTo(84, 28, 34, 24, 0, 0);
+      ctx.fill();
+
+      // Central golden-green midrib & lateral veins
+      ctx.strokeStyle = '#a8be64';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(6, -1);
+      ctx.quadraticCurveTo(64, -8, 118, 3);
+      ctx.stroke();
+      ctx.restore();
     });
 
-    // Subtle reflected bounce light along inner bottom belly (kept snugly inside apple!)
-    api.oilStroke(3, '苹果底缘微弱桌面反光', [
-      [cx - 26, cy + 124],
-      [cx + 32, cy + 118],
-      [cx + 84, cy + 86]
-    ], {
-      width: 18, fade: 0.30, color: [188, 96, 52], colorEnd: [126, 62, 36], alpha: 0.34, vary: 2
-    });
-
-    api.oilStroke(3, '木质果梗弯曲受光', [
-      [cx - 4, cy - 90], [cx + 4, cy - 138], [cx + 22, cy - 184]
-    ], {
-      width: 14, color: [68, 44, 28], colorEnd: [128, 92, 58], alpha: 0.86, vary: 3
-    });
-
-    api.oilStroke(3, '斜展橄榄绿叶片', [
-      [cx + 8, cy - 150], [cx + 68, cy - 188], [cx + 130, cy - 174]
-    ], {
-      width: 34, color: [72, 96, 40], colorEnd: [128, 148, 62], alpha: 0.84, vary: 4
-    });
-    api.oilStroke(3, '叶片亮叶脉', [
-      [cx + 12, cy - 152], [cx + 70, cy - 182], [cx + 122, cy - 173]
-    ], {
-      width: 4.5, color: [168, 184, 96], alpha: 0.74
-    });
-
-    // 四 · 厚涂法亮部、钛白高光点睛与桌面红光映影
-    api.oilPatch(4, '左侧受光桌面微暖铺亮', 260, 650, 175, 42, 0, {
-      color: [110, 76, 50], alpha: 0.25, count: 14
-    });
-    api.oilPatch(4, '受光颊部水润亮膜', cx - 60, cy - 50, 42, 32, -0.5, {
-      color: [248, 186, 118], alpha: 0.46, count: 10
-    });
-    api.oilHighlight(4, '点睛厚涂亮高光（钛白暖黄）', cx - 66, cy - 56, 22, 13, -0.55, {
-      color: [255, 248, 232], alpha: 0.94, count: 6
-    });
-    api.oilHighlight(4, '极亮高光核心一点', cx - 68, cy - 58, 10, 6, -0.5, {
-      color: [255, 255, 250], alpha: 0.98, count: 4
-    });
-    api.oilHighlight(4, '叶片高光微点', cx + 76, cy - 184, 13, 4.0, -0.15, {
-      color: [228, 232, 168], alpha: 0.65, count: 4
-    });
-    api.oilPatch(4, '近处桌面红光隐约映影', cx - 12, cy + 162, 85, 16, 0, {
-      color: [126, 46, 30], alpha: 0.22, count: 10
+    M.synthesize(api, scene, {
+      style: 'classic',
+      totalStrokes: 5000,
+      seed: 202609,
+      layers: LAYERS,
+      roi: [
+        { cx, cy, rx: 215, ry: 220, boost: 4.2 },
+        { cx: cx - 58, cy: cy - 52, rx: 60, ry: 48, boost: 2.5 },
+        { cx: cx + 45, cy: cy - 155, rx: 88, ry: 55, boost: 3.0 }
+      ]
     });
   }
 });
