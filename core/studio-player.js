@@ -209,7 +209,7 @@
         return;
       }
       const speed = SPEEDS[speedIdx];
-      const baseRate = config.baseSpeed || Math.max(0.5, total / 180);
+      const baseRate = config.baseSpeed || (mode === 'oil' && total >= 1500 ? Math.max(12, total / 240) : Math.max(0.5, total / 180));
       acc += baseRate * speed;
 
       while (acc >= 1 && current < total) {
@@ -251,7 +251,10 @@
           mode,
           backdropColor: config.backdropColor
         }, rand);
-        const api = B.createBrushAPI(W, H, seedCounter);
+        const api = B.createBrushAPI(W, H, seedCounter, {
+          mode,
+          maxOilStrokes: config.maxOilStrokes || 5000
+        });
         config.buildStrokes(api);
         actions = api.strokes;
       }

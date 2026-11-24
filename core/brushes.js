@@ -193,21 +193,30 @@
     return off;
   }
 
-  function createBrushAPI(W, H, baseSeed) {
+  function createBrushAPI(W, H, baseSeed, apiOpts = {}) {
     let rand = mulberry32(baseSeed);
     let nextStrokeSeed = 101;
+    const isOilMode = apiOpts.mode === 'oil';
+    const maxOilStrokes = apiOpts.maxOilStrokes || 5000;
     const strokes = [];
+    const oilEntries = [];
+    let finalizedOil = null;
 
     function push(layer, label, drawFn) {
       const strokeSeed = (nextStrokeSeed++) * 2654435761 >>> 0;
-      strokes.push({
+      const strokeObj = {
         layer,
         label,
         draw: (c) => {
           const sr = mulberry32(strokeSeed);
           drawFn(c, sr);
         }
-      });
+      };
+      if (isOilMode) {
+        oilEntries.push({ kind: 'raw', weight: 1, fixed: true, strokeObj });
+      } else {
+        strokes.push(strokeObj);
+      }
     }
 
     // =========================================================================
@@ -513,59 +522,76 @@
     }
 
     // =========================================================================
-    // 3. OIL & PORTRAIT BRUSHES
+    // 3. OIL & PORTRAIT BRUSHES (Scalable painterly mode up to 5,000 strokes)
     // =========================================================================
-    function oilStroke(layer, label, pts, opts = {}) {
-      const samples = resampleCurve(catmullRom(pts, opts.samples || 12, opts.closed), opts.step || 6.0);
+    const OIL_DAB = [[1, 0.58], [1.25, 0.26], [1.52, 0.095]];
+
+    function drawOilSampleRange(c, sr, samples, startIdx, endIdx, opts, c1, c2, brCol, alpha0) {
       const w0 = opts.width || 24;
-      const c1 = parseColor(opts.color || [180, 90, 50]);
-      const c2 = opts.colorEnd ? parseColor(opts.colorEnd) : c1;
-      const alpha0 = opts.alpha == null ? 0.30 : opts.alpha;
       const stretch = opts.stretch == null ? 0.52 : opts.stretch;
       const fade = opts.fade == null ? 0.16 : opts.fade;
       const vary = opts.vary == null ? 5 : opts.vary;
       const temp = opts.temp || 0;
       const bristleProb = opts.bristle == null ? 0.45 : opts.bristle;
-      const brCol = opts.bristleColor ? parseColor(opts.bristleColor) : [235, 222, 196];
-      const DAB = [[1, 0.58], [1.25, 0.26], [1.52, 0.095]];
-
-      push(layer, label, (c, sr) => {
-        c.save();
-        if (opts.blend) c.globalCompositeOperation = opts.blend;
-        for (let i = 0; i < samples.length; i++) {
-          const p = samples[i], u = p.u;
-          const edge = Math.min(1, u / fade, (1 - u) / fade);
-          const prof = 0.42 + 0.58 * smooth(edge);
-          const ang = p.a + (opts.angOff || 0) + (sr() - 0.5) * 0.09;
-          const nx = Math.cos(ang + Math.PI / 2), ny = Math.sin(ang + Math.PI / 2);
-          const off = (sr() - 0.5) * 2.2;
-          const x = p.x + nx * off, y = p.y + ny * off;
-          const colBase = mixRGB(c1, c2, u);
-          const col = [
-            clamp(colBase[0] + (sr() - 0.5) * vary * 2 + temp * (sr() * 1.4 - 0.4), 0, 255),
-            clamp(colBase[1] + (sr() - 0.5) * vary * 2 + temp * (sr() * 0.8 - 0.3), 0, 255),
-            clamp(colBase[2] + (sr() - 0.5) * vary * 2 - temp * (sr() * 0.9), 0, 255)
-          ];
-          const r = Math.max(0.8, w0 * 0.5 * prof * (0.88 + sr() * 0.24));
-          const a = alpha0 * prof;
-          c.fillStyle = rgbStr(col);
-          for (let d = 0; d < DAB.length; d++) {
-            c.globalAlpha = clamp(a * DAB[d][1], 0, 1);
-            c.beginPath();
-            c.ellipse(x, y, Math.max(0.4, r * DAB[d][0]), Math.max(0.25, r * DAB[d][0] * stretch), ang, 0, TAU);
-            c.fill();
-          }
-          if (r > 3.5 && sr() < bristleProb) {
-            const bo = (sr() - 0.5) * r * 1.3;
-            const bc = mixRGB(col, brCol, 0.22);
-            c.fillStyle = rgbStr(bc);
-            c.globalAlpha = clamp(a * 0.32, 0, 1);
-            c.beginPath();
-            c.ellipse(x + nx * bo, y + ny * bo, r * 0.46, r * 0.46 * stretch * 0.8, ang, 0, TAU);
-            c.fill();
-          }
+      c.save();
+      if (opts.blend) c.globalCompositeOperation = opts.blend;
+      for (let i = startIdx; i < endIdx; i++) {
+        const p = samples[i], u = p.u;
+        const edge = Math.min(1, u / fade, (1 - u) / fade);
+        const prof = 0.42 + 0.58 * smooth(edge);
+        const ang = p.a + (opts.angOff || 0) + (sr() - 0.5) * 0.09;
+        const nx = Math.cos(ang + Math.PI / 2), ny = Math.sin(ang + Math.PI / 2);
+        const off = (sr() - 0.5) * 2.2;
+        const x = p.x + nx * off, y = p.y + ny * off;
+        const colBase = mixRGB(c1, c2, u);
+        const col = [
+          clamp(colBase[0] + (sr() - 0.5) * vary * 2 + temp * (sr() * 1.4 - 0.4), 0, 255),
+          clamp(colBase[1] + (sr() - 0.5) * vary * 2 + temp * (sr() * 0.8 - 0.3), 0, 255),
+          clamp(colBase[2] + (sr() - 0.5) * vary * 2 - temp * (sr() * 0.9), 0, 255)
+        ];
+        const r = Math.max(0.8, w0 * 0.5 * prof * (0.88 + sr() * 0.24));
+        const a = alpha0 * prof;
+        c.fillStyle = rgbStr(col);
+        for (let d = 0; d < OIL_DAB.length; d++) {
+          c.globalAlpha = clamp(a * OIL_DAB[d][1], 0, 1);
+          c.beginPath();
+          c.ellipse(x, y, Math.max(0.4, r * OIL_DAB[d][0]), Math.max(0.25, r * OIL_DAB[d][0] * stretch), ang, 0, TAU);
+          c.fill();
         }
-        c.restore();
+        if (r > 3.5 && sr() < bristleProb) {
+          const bo = (sr() - 0.5) * r * 1.3;
+          const bc = mixRGB(col, brCol, 0.22);
+          c.fillStyle = rgbStr(bc);
+          c.globalAlpha = clamp(a * 0.32, 0, 1);
+          c.beginPath();
+          c.ellipse(x + nx * bo, y + ny * bo, r * 0.46, r * 0.46 * stretch * 0.8, ang, 0, TAU);
+          c.fill();
+        }
+      }
+      c.restore();
+    }
+
+    function oilStroke(layer, label, pts, opts = {}) {
+      const c1 = parseColor(opts.color || [180, 90, 50]);
+      const c2 = opts.colorEnd ? parseColor(opts.colorEnd) : c1;
+      const alpha0 = opts.alpha == null ? 0.30 : opts.alpha;
+      const brCol = opts.bristleColor ? parseColor(opts.bristleColor) : [235, 222, 196];
+      const baseCurve = catmullRom(pts, opts.samples || 12, opts.closed);
+      if (!isOilMode) {
+        const samples = resampleCurve(baseCurve, opts.step || 6.0);
+        push(layer, label, (c, sr) => drawOilSampleRange(c, sr, samples, 0, samples.length, opts, c1, c2, brCol, alpha0));
+        return;
+      }
+      let curveLen = 0;
+      for (let i = 1; i < baseCurve.length; i++) {
+        curveLen += Math.hypot(baseCurve[i][0] - baseCurve[i - 1][0], baseCurve[i][1] - baseCurve[i - 1][1]);
+      }
+      const w0 = opts.width || 24;
+      const isBackdrop = (opts.fade != null && opts.fade <= 0.05 && w0 >= 75);
+      const weight = isBackdrop ? clamp(curveLen / 34, 12, 42) : clamp(curveLen / 7.5, 10, 120);
+      oilEntries.push({
+        kind: 'oilStroke', layer, label, weight, fixed: false,
+        baseCurve, curveLen, opts, c1, c2, brCol, alpha0, seed: (nextStrokeSeed++) * 2654435761 >>> 0
       });
     }
 
@@ -574,43 +600,256 @@
       const c2 = opts.colorEdge ? parseColor(opts.colorEdge) : c1;
       const alpha0 = opts.alpha == null ? 0.24 : opts.alpha;
       const count = opts.count || 20;
-      const cos = Math.cos(rot), sin = Math.sin(rot);
-      push(layer, label, (c, sr) => {
-        c.save();
-        if (opts.blend) c.globalCompositeOperation = opts.blend;
-        for (let i = 0; i < count; i++) {
-          const ang = sr() * TAU, dist = Math.sqrt(sr()) * 0.85;
-          const lx = Math.cos(ang) * rx * dist, ly = Math.sin(ang) * ry * dist;
-          const px = cx + lx * cos - ly * sin, py = cy + lx * sin + ly * cos;
-          const r = Math.max(rx, ry) * (0.28 + sr() * 0.38);
-          const col = mixRGB(c1, c2, dist);
-          const g = c.createRadialGradient(px, py, r * 0.08, px, py, r);
-          g.addColorStop(0, rgbStr(col, alpha0));
-          g.addColorStop(0.6, rgbStr(col, alpha0 * 0.55));
-          g.addColorStop(1, rgbStr(col, 0));
-          c.fillStyle = g;
-          c.beginPath(); c.arc(px, py, r, 0, TAU); c.fill();
-        }
-        c.restore();
+      const maxR = Math.max(rx, ry);
+      if (!isOilMode) {
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        push(layer, label, (c, sr) => {
+          c.save();
+          if (opts.blend) c.globalCompositeOperation = opts.blend;
+          for (let i = 0; i < count; i++) {
+            const ang = sr() * TAU, dist = Math.sqrt(sr()) * 0.85;
+            const lx = Math.cos(ang) * rx * dist, ly = Math.sin(ang) * ry * dist;
+            const px = cx + lx * cos - ly * sin, py = cy + lx * sin + ly * cos;
+            const r = maxR * (0.28 + sr() * 0.38);
+            const col = mixRGB(c1, c2, dist);
+            const g = c.createRadialGradient(px, py, r * 0.08, px, py, r);
+            g.addColorStop(0, rgbStr(col, alpha0));
+            g.addColorStop(0.6, rgbStr(col, alpha0 * 0.55));
+            g.addColorStop(1, rgbStr(col, 0));
+            c.fillStyle = g;
+            c.beginPath(); c.arc(px, py, r, 0, TAU); c.fill();
+          }
+          c.restore();
+        });
+        return;
+      }
+      const isTiny = maxR < 18 || count <= 6;
+      const weight = isTiny ? clamp(count, 1, 6) : clamp(Math.sqrt(Math.max(1, rx * ry)) * 0.85, 18, 180);
+      oilEntries.push({
+        kind: 'oilPatch', layer, label, weight, fixed: isTiny, isTiny,
+        cx, cy, rx, ry, rot, opts, c1, c2, alpha0, count, seed: (nextStrokeSeed++) * 2654435761 >>> 0
       });
     }
 
     function oilHighlight(layer, label, x, y, rx, ry, rot = 0, opts = {}) {
       const col = parseColor(opts.color || [255, 244, 224]);
-      push(layer, label, (c, sr) => {
-        c.save();
-        const a = opts.alpha == null ? 0.88 : opts.alpha;
-        const count = opts.count || 6;
-        for (let i = 0; i < count; i++) {
-          const dx = (sr() - 0.5) * rx * 0.7, dy = (sr() - 0.5) * ry * 0.7;
-          const scale = 1 - i * 0.12;
-          c.fillStyle = rgbStr(col, (a / count) * 2.2);
-          c.beginPath();
-          c.ellipse(x + dx, y + dy, Math.max(1, rx * scale), Math.max(0.8, ry * scale), rot + (sr() - 0.5) * 0.25, 0, TAU);
-          c.fill();
-        }
-        c.restore();
+      const a = opts.alpha == null ? 0.88 : opts.alpha;
+      const count = opts.count || 6;
+      if (!isOilMode) {
+        push(layer, label, (c, sr) => {
+          c.save();
+          for (let i = 0; i < count; i++) {
+            const dx = (sr() - 0.5) * rx * 0.7, dy = (sr() - 0.5) * ry * 0.7;
+            const scale = 1 - i * 0.12;
+            c.fillStyle = rgbStr(col, (a / count) * 2.2);
+            c.beginPath();
+            c.ellipse(x + dx, y + dy, Math.max(1, rx * scale), Math.max(0.8, ry * scale), rot + (sr() - 0.5) * 0.25, 0, TAU);
+            c.fill();
+          }
+          c.restore();
+        });
+        return;
+      }
+      const isTiny = Math.max(rx, ry) < 8;
+      const weight = isTiny ? clamp(count, 1, 4) : clamp(count * 2.5, 6, 48);
+      oilEntries.push({
+        kind: 'oilHighlight', layer, label, weight, fixed: isTiny, isTiny,
+        x, y, rx, ry, rot, opts, col, a, count, seed: (nextStrokeSeed++) * 2654435761 >>> 0
       });
+    }
+
+    function finalizeOilStrokes() {
+      if (finalizedOil) return finalizedOil;
+      const out = [];
+      let fixedTotal = 0;
+      let flexTotal = 0;
+      for (let i = 0; i < oilEntries.length; i++) {
+        const e = oilEntries[i];
+        if (e.fixed) fixedTotal += Math.max(1, Math.round(e.weight));
+        else flexTotal += e.weight;
+      }
+      const availMax = Math.max(0, maxOilStrokes - fixedTotal);
+      const desiredFlex = flexTotal > 0
+        ? Math.min(availMax, Math.max(Math.min(availMax, 4200), Math.round(flexTotal)))
+        : 0;
+      const scale = flexTotal > 0 ? Math.min(28, desiredFlex / flexTotal) : 1;
+
+      const allocs = new Array(oilEntries.length);
+      const rems = [];
+      let flexUsed = 0;
+      for (let i = 0; i < oilEntries.length; i++) {
+        const e = oilEntries[i];
+        if (e.fixed) {
+          allocs[i] = Math.max(1, Math.round(e.weight));
+        } else {
+          const exact = Math.max(1, e.weight * scale);
+          const fl = Math.floor(exact);
+          allocs[i] = fl;
+          flexUsed += fl;
+          rems.push({ i, rem: exact - fl });
+        }
+      }
+      const flexCap = Math.min(availMax, Math.round(flexTotal * scale));
+      if (flexUsed < flexCap && rems.length) {
+        rems.sort((a, b) => b.rem - a.rem);
+        for (let r = 0; r < rems.length && flexUsed < flexCap; r++) {
+          allocs[rems[r].i]++;
+          flexUsed++;
+        }
+      }
+      while (flexUsed > availMax) {
+        let bestIdx = -1, bestVal = 1;
+        for (let i = 0; i < oilEntries.length; i++) {
+          if (!oilEntries[i].fixed && allocs[i] > bestVal) {
+            bestVal = allocs[i];
+            bestIdx = i;
+          }
+        }
+        if (bestIdx < 0) break;
+        allocs[bestIdx]--;
+        flexUsed--;
+      }
+
+      for (let idx = 0; idx < oilEntries.length; idx++) {
+        const e = oilEntries[idx];
+        const kWanted = Math.max(1, allocs[idx]);
+        if (e.kind === 'raw') {
+          out.push(e.strokeObj);
+          continue;
+        }
+        if (e.kind === 'oilStroke') {
+          const baseStep = e.opts.step || 6.0;
+          const targetStep = clamp(Math.min(baseStep, e.curveLen / Math.max(1, kWanted * 2)), 2.2, baseStep);
+          const samples = resampleCurve(e.baseCurve, targetStep);
+          const kEff = Math.min(kWanted, samples.length);
+          const actualStep = e.curveLen / Math.max(1, samples.length - 1);
+          const stepMul = targetStep < baseStep ? clamp(actualStep / baseStep, 0.36, 1.0) : 1.0;
+          const alphaAdj = e.alpha0 * stepMul;
+          for (let s = 0; s < kEff; s++) {
+            const st = Math.floor((s * samples.length) / kEff);
+            const en = Math.floor(((s + 1) * samples.length) / kEff);
+            if (en <= st) continue;
+            const cSeed = (e.seed + (s + 1) * 2654435761) >>> 0;
+            out.push({
+              layer: e.layer,
+              label: e.label,
+              draw: (c) => {
+                const sr = mulberry32(cSeed);
+                drawOilSampleRange(c, sr, samples, st, en, e.opts, e.c1, e.c2, e.brCol, alphaAdj);
+              }
+            });
+          }
+          continue;
+        }
+        if (e.kind === 'oilPatch') {
+          const { cx, cy, rx, ry, rot, opts, c1, c2, alpha0, count, isTiny } = e;
+          const cos = Math.cos(rot), sin = Math.sin(rot);
+          const maxR = Math.max(rx, ry);
+          if (isTiny || kWanted <= 3) {
+            const kEff = Math.min(kWanted, count);
+            for (let s = 0; s < kEff; s++) {
+              const st = Math.floor((s * count) / kEff);
+              const en = Math.floor(((s + 1) * count) / kEff);
+              const cSeed = (e.seed + (s + 1) * 2654435761) >>> 0;
+              out.push({
+                layer: e.layer,
+                label: e.label,
+                draw: (c) => {
+                  const sr = mulberry32(cSeed);
+                  c.save();
+                  if (opts.blend) c.globalCompositeOperation = opts.blend;
+                  for (let i = st; i < en; i++) {
+                    const ang = sr() * TAU, dist = Math.sqrt(sr()) * 0.85;
+                    const lx = Math.cos(ang) * rx * dist, ly = Math.sin(ang) * ry * dist;
+                    const px = cx + lx * cos - ly * sin, py = cy + lx * sin + ly * cos;
+                    const r = maxR * (0.28 + sr() * 0.38);
+                    const col = mixRGB(c1, c2, dist);
+                    const g = c.createRadialGradient(px, py, r * 0.08, px, py, r);
+                    g.addColorStop(0, rgbStr(col, alpha0));
+                    g.addColorStop(0.6, rgbStr(col, alpha0 * 0.55));
+                    g.addColorStop(1, rgbStr(col, 0));
+                    c.fillStyle = g;
+                    c.beginPath(); c.arc(px, py, r, 0, TAU); c.fill();
+                  }
+                  c.restore();
+                }
+              });
+            }
+          } else {
+            // Painterly directional elliptical radial-gradient strokes (velvety solid volume + crisp brush cadence)
+            const rMajor = clamp(maxR * (0.33 + 0.16 * Math.exp(-kWanted / 90)), 14, maxR * 0.56);
+            const dabAlpha = clamp((alpha0 * 1.15) / Math.sqrt(Math.max(1, kWanted / Math.max(8, count))), 0.10, 0.78);
+            for (let s = 0; s < kWanted; s++) {
+              const cSeed = (e.seed + (s + 1) * 2654435761) >>> 0;
+              const spiralFrac = (s + 0.5) / kWanted;
+              out.push({
+                layer: e.layer,
+                label: e.label,
+                draw: (c) => {
+                  const sr = mulberry32(cSeed);
+                  c.save();
+                  if (opts.blend) c.globalCompositeOperation = opts.blend;
+                  const ang = s * 2.3999632 + (sr() - 0.5) * 0.42;
+                  const dist = Math.sqrt(spiralFrac) * 0.86;
+                  const lx = Math.cos(ang) * rx * dist, ly = Math.sin(ang) * ry * dist;
+                  const px = cx + lx * cos - ly * sin, py = cy + lx * sin + ly * cos;
+                  const brushAng = rot + (sr() - 0.5) * 0.48 + Math.atan2(ly / Math.max(1, ry), lx / Math.max(1, rx)) * 0.18;
+                  const colBase = mixRGB(c1, c2, clamp(dist * 1.05, 0, 1));
+                  const col = [
+                    clamp(colBase[0] + (sr() - 0.5) * 10, 0, 255),
+                    clamp(colBase[1] + (sr() - 0.5) * 9, 0, 255),
+                    clamp(colBase[2] + (sr() - 0.5) * 9, 0, 255)
+                  ];
+                  const rad = rMajor * (0.84 + sr() * 0.34);
+                  c.translate(px, py);
+                  c.rotate(brushAng);
+                  c.scale(1.28, 0.74);
+                  const g = c.createRadialGradient(0, 0, rad * 0.10, 0, 0, rad);
+                  g.addColorStop(0, rgbStr(col, dabAlpha));
+                  g.addColorStop(0.58, rgbStr(col, dabAlpha * 0.56));
+                  g.addColorStop(1, rgbStr(col, 0));
+                  c.fillStyle = g;
+                  c.beginPath();
+                  c.arc(0, 0, rad, 0, TAU);
+                  c.fill();
+                  c.restore();
+                }
+              });
+            }
+          }
+          continue;
+        }
+        if (e.kind === 'oilHighlight') {
+          const { x, y, rx, ry, rot, col, a, count, isTiny } = e;
+          const kEff = isTiny ? Math.min(kWanted, count) : kWanted;
+          const fleckAlpha = isTiny
+            ? clamp((a / Math.max(1, kEff)) * 2.2, 0.24, 0.96)
+            : clamp((a / Math.max(1, kEff)) * 2.4, 0.05, 0.88);
+          for (let s = 0; s < kEff; s++) {
+            const cSeed = (e.seed + (s + 1) * 2654435761) >>> 0;
+            const frac = (s + 0.5) / kEff;
+            out.push({
+              layer: e.layer,
+              label: e.label,
+              draw: (c) => {
+                const sr = mulberry32(cSeed);
+                c.save();
+                const ang = s * 2.3999632 + (sr() - 0.5) * 0.48;
+                const d = isTiny ? sr() * 0.45 : Math.sqrt(frac) * 0.72;
+                const dx = Math.cos(ang) * rx * d, dy = Math.sin(ang) * ry * d;
+                const scale = isTiny ? (1 - (s / kEff) * 0.16) : (0.38 + 0.42 * (1 - d));
+                c.fillStyle = rgbStr(col, fleckAlpha);
+                c.beginPath();
+                c.ellipse(x + dx, y + dy, Math.max(1, rx * scale), Math.max(0.8, ry * scale), rot + (sr() - 0.5) * 0.3, 0, TAU);
+                c.fill();
+                c.restore();
+              }
+            });
+          }
+        }
+      }
+      finalizedOil = out.slice(0, maxOilStrokes);
+      return finalizedOil;
     }
 
     // Calligraphic inscription & red seal
@@ -677,7 +916,7 @@
       oilStroke, oilPatch, oilHighlight,
       inscription, seal,
       push,
-      get strokes() { return strokes; }
+      get strokes() { return isOilMode ? finalizeOilStrokes() : strokes; }
     };
   }
 
