@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code2Paint · 中国传统写意山水画集</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #e6dfd0;
+      background-image: radial-gradient(circle at 50% 45%, rgba(255, 252, 244, 0.35), rgba(182, 168, 140, 0.2));
+      color: #2c2b28;
+      font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", Georgia, serif;
+      padding: 36px 20px;
+    }
+
+    .container {
+      width: min(920px, 94vw);
+      background: #efe8d7;
+      border: 1px solid #cdc3ad;
+      box-shadow: 0 14px 40px rgba(32, 29, 24, 0.12), inset 0 0 0 1px rgba(255, 252, 245, 0.65);
+      padding: 36px 32px;
+    }
+
+    header {
+      text-align: center;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(92, 84, 70, 0.22);
+    }
+
+    h1 {
+      font-size: clamp(24px, 3.2vw, 32px);
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      color: #23221f;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #5b574f;
+      letter-spacing: 0.08em;
+      line-height: 1.7;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 28px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-decoration: none;
+      color: inherit;
+      background: #f5efe2;
+      border: 1px solid #bdb39d;
+      padding: 24px 22px;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      background: #f8f3e8;
+      border-color: #5a5449;
+      box-shadow: 0 8px 22px rgba(34, 31, 25, 0.1);
+    }
+
+    .seal {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      color: #7c382b;
+      border: 1px solid rgba(124, 56, 43, 0.45);
+      padding: 2px 8px;
+      margin-bottom: 14px;
+      align-self: flex-start;
+    }
+
+    .card h2 {
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: #1f1e1c;
+      margin-bottom: 10px;
+    }
+
+    .card p {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #4f4c45;
+      margin-bottom: 18px;
+    }
+
+    .swatch-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid rgba(60, 56, 48, 0.25);
+    }
+
+    .enter {
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      color: #2f2e2a;
+      border-top: 1px solid rgba(92, 84, 70, 0.18);
+      padding-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer {
+      margin-top: 26px;
+      text-align: center;
+      font-size: 12px;
+      color: #6d6960;
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>传统写意山水画集</h1>
+      <p class="subtitle">原生 HTML5 Canvas 2D 逐笔渲染 · 宣纸肌理 · 墨分五色 · 零外部依赖</p>
+    </header>
+
+    <section class="gallery">
+      <a class="card" href="./shuimo-shanshui.html">
+        <div>
+          <span class="seal">五层水墨</span>
+          <h2>写意水墨山水</h2>
+          <p>
+            严循国画五层作画法度：清墨晕染远山、淡墨勾勒坡岸、中墨披麻皴理、浓墨写石树干、焦墨点苔飞白，左下大片留白以显江水空濛。
+          </p>
+          <div class="swatch-row" aria-label="墨分五色">
+            <span class="swatch" style="background: rgb(18, 19, 20);" title="焦墨"></span>
+            <span class="swatch" style="background: rgb(34, 36, 38);" title="浓墨"></span>
+            <span class="swatch" style="background: rgb(58, 61, 64);" title="中墨"></span>
+            <span class="swatch" style="background: rgb(92, 96, 100);" title="淡墨"></span>
+            <span class="swatch" style="background: rgb(126, 130, 134);" title="清墨"></span>
+          </div>
+        </div>
+        <div class="enter">
+          <span>进入逐笔赏析</span>
+          <span>&rarr;</span>
+        </div>
+      </a>
+
+      <a class="card" href="./qianjiang-shanshui.html">
+        <div>
+          <span class="seal">六层浅绛</span>
+          <h2>浅绛山水（花青·赭石）</h2>
+          <p>
+            以五层墨骨立其形神，第六层采用正片叠底薄罩淡彩：山石向阳面暖罩赭石，背阴、远峰与水际冷染花青，清润淡雅而不掩墨韵。
+          </p>
+          <div class="swatch-row" aria-label="墨骨与浅绛淡彩">
+            <span class="swatch" style="background: rgb(34, 36, 38);" title="浓墨"></span>
+            <span class="swatch" style="background: rgb(58, 61, 64);" title="中墨"></span>
+            <span class="swatch" style="background: rgb(176, 128, 92);" title="赭石"></span>
+            <span class="swatch" style="background: rgb(86, 112, 130);" title="花青"></span>
+          </div>
+        </div>
+        <div class="enter">
+          <span>进入逐笔赏析</span>
+          <span>&rarr;</span>
+        </div>
+      </a>
+    </section>
+
+    <footer>
+      打开任意画作即可观看逐笔绘制动画，支持【重新绘制】、【加速】及绘毕自动保存 PNG
+    </footer>
+  </main>
+</body>
+</html>
