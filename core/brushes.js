@@ -211,7 +211,11 @@
     let finalizedOil = null;
 
     function pushRawStroke(layer, label, drawFn) {
-      rawOilStrokes.push({ layer, label, draw: drawFn });
+      if (isOilMode) {
+        rawOilStrokes.push({ layer, label, draw: drawFn });
+      } else {
+        strokes.push({ layer, label, draw: drawFn });
+      }
     }
 
     function push(layer, label, drawFn) {
@@ -929,6 +933,11 @@
       inscription, seal,
       push,
       pushRawStroke,
+      sortByLayer() {
+        if (!isOilMode && strokes.length > 1) {
+          strokes.sort((a, b) => a.layer - b.layer);
+        }
+      },
       get strokes() {
         if (!isOilMode) return strokes;
         return rawOilStrokes.length ? rawOilStrokes : finalizeOilStrokes();

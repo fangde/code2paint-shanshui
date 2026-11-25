@@ -23,11 +23,12 @@
 
   const coreReady = loadScript('./core/brushes.js', '__c2p_brushes')
     .then(() => loadScript('./core/oil-master.js', '__c2p_oil_master'))
+    .then(() => loadScript('./core/gongbi-master.js', '__c2p_gongbi_master'))
     .then(() => loadScript('./core/studio-player.js', '__c2p_studio'));
 
   window.Code2PaintTutorial = {
     mount(config) {
-      if (window.Code2PaintStudio && window.Code2PaintBrushes && window.Code2PaintOilMaster) {
+      if (window.Code2PaintStudio && window.Code2PaintBrushes && window.Code2PaintOilMaster && window.Code2PaintGongbiMaster) {
         return window.Code2PaintStudio.mount(config);
       }
       coreReady.then(() => window.Code2PaintStudio.mount(config));
