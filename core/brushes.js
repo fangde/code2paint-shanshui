@@ -210,11 +210,11 @@
     const rawOilStrokes = [];
     let finalizedOil = null;
 
-    function pushRawStroke(layer, label, drawFn) {
+    function pushRawStroke(layer, label, drawFn, depth = 0) {
       if (isOilMode) {
         rawOilStrokes.push({ layer, label, draw: drawFn });
       } else {
-        strokes.push({ layer, label, draw: drawFn });
+        strokes.push({ layer, label, depth, draw: drawFn });
       }
     }
 
@@ -935,7 +935,7 @@
       pushRawStroke,
       sortByLayer() {
         if (!isOilMode && strokes.length > 1) {
-          strokes.sort((a, b) => a.layer - b.layer);
+          strokes.sort((a, b) => (a.layer - b.layer) || ((a.depth || 0) - (b.depth || 0)));
         }
       },
       get strokes() {

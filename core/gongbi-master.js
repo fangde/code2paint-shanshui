@@ -249,13 +249,35 @@
     if (closed) c.closePath();
   }
 
-  function pushRaw(api, layer, label, fn, tag) {
+  let _activeOccluders = [];
+
+  function setOccluders(list) {
+    _activeOccluders = Array.isArray(list) ? list : [];
+  }
+
+  function isPointOccluded(x, y, customList) {
+    const list = customList || _activeOccluders;
+    if (!list || !list.length) return false;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (!o) continue;
+      if (o.poly) {
+        if (pointInPoly(x, y, o.poly)) return true;
+      } else {
+        const dx = x - o.x, dy = y - o.y;
+        if (dx * dx + dy * dy <= o.r * o.r) return true;
+      }
+    }
+    return false;
+  }
+
+  function pushRaw(api, layer, label, fn, tag, depth = 0) {
     fn._gbTag = tag || 'detail';
-    api.pushRawStroke(layer, label, fn);
+    api.pushRawStroke(layer, label, fn, depth);
   }
 
   // =========================================================================
-  // 1. LAYER 1: BAIMIAO CALLIGRAPHIC CONTOURS (十八描：游丝/铁线/钉头鼠尾)
+  // 1. LAYER 1: BAIMIAO CALLIGRAPHIC CONTOURS (十八描：游丝/铁线/钉头鼠尾/折带)
   // =========================================================================
   function baimiaoStroke(api, layer, label, pts, opts = {}) {
     if (!pts || pts.length < 2) return;
@@ -266,46 +288,76 @@
     const w0 = opts.width != null ? opts.width : 1.1;
     const colHex = opts.color || PIGMENTS.inkMid;
     const alpha = opts.alpha != null ? opts.alpha : 0.78;
-    const style = opts.style || 'yousi'; // 'yousi' | 'tiexian' | 'dingtou' | 'bark'
+    const style = opts.style || 'yousi'; // 'yousi' | 'tiexian' | 'dingtou' | 'bark' | 'rock'
+    const depth = opts.depth || 0;
+    const checkOcc = !!opts.clipOccluders;
+    const customOcc = opts.occluders || null;
     const chunkSize = clamp(opts.chunkSize || Math.max(6, Math.round(smoothPts.length / (opts.chunks || 6))), 4, 24);
-    const taperStart = opts.taperStart != null ? opts.taperStart : (style === 'dingtou' ? 1.38 : 0.78);
-    const taperEnd = opts.taperEnd != null ? opts.taperEnd : (style === 'dingtou' ? 0.36 : 0.76);
+    const taperStart = opts.taperStart != null ? opts.taperStart : (style === 'dingtou' ? 1.48 : 0.82);
+    const taperEnd = opts.taperEnd != null ? opts.taperEnd : (style === 'dingtou' ? 0.34 : 0.78);
     const nTotal = smoothPts.length;
+
+    // Precompute turning sharpness at each vertex for authentic corner press (顿笔)
+    const bends = new Float32Array(nTotal);
+    for (let i = 1; i < nTotal - 1; i++) {
+      const ax = smoothPts[i][0] - smoothPts[i - 1][0];
+      const ay = smoothPts[i][1] - smoothPts[i - 1][1];
+      const bx = smoothPts[i + 1][0] - smoothPts[i][0];
+      const by = smoothPts[i + 1][1] - smoothPts[i][1];
+      const la = Math.hypot(ax, ay) || 1, lb = Math.hypot(bx, by) || 1;
+      const dot = clamp((ax * bx + ay * by) / (la * lb), -1, 1);
+      bends[i] = clamp(1 - dot, 0, 1.5);
+    }
 
     for (let i = 0; i < nTotal - 1; i += chunkSize) {
       const end = Math.min(nTotal - 1, i + chunkSize);
       const sub = smoothPts.slice(i, end + 1);
       if (sub.length < 2) continue;
+
+      if (checkOcc) {
+        const midPt = sub[Math.floor(sub.length * 0.5)];
+        if (isPointOccluded(midPt[0], midPt[1], customOcc) && isPointOccluded(sub[0][0], sub[0][1], customOcc)) {
+          continue;
+        }
+      }
+
       const uMid = ((i + end) * 0.5) / Math.max(1, nTotal - 1);
+      let maxBend = 0;
+      for (let b = i; b <= end; b++) if (bends[b] > maxBend) maxBend = bends[b];
+
       let wMod = 1.0;
       if (style === 'dingtou') {
-        wMod = lerp(taperStart, taperEnd, Math.pow(uMid, 0.78));
-      } else if (style === 'tiexian') {
-        wMod = (uMid < 0.08 || uMid > 0.92) ? 1.15 : 1.0;
+        wMod = lerp(taperStart, taperEnd, Math.pow(uMid, 0.76)) + maxBend * 0.25;
+      } else if (style === 'tiexian' || style === 'rock') {
+        wMod = (uMid < 0.08 || uMid > 0.92 ? 1.18 : 0.96) + Math.min(0.45, maxBend * 0.55);
       } else if (style === 'bark') {
-        wMod = 0.72 + 0.56 * Math.sin(uMid * 9.5 + i * 0.7) * 0.5 + 0.28;
+        wMod = 0.72 + 0.56 * Math.sin(uMid * 9.5 + i * 0.7) * 0.5 + 0.28 + maxBend * 0.3;
       } else {
-        // High-antiquity silk thread (高古游丝描): gentle end taper
-        wMod = (1 - Math.pow(Math.abs(uMid * 2 - 1), 3.2) * 0.22);
+        wMod = (1 - Math.pow(Math.abs(uMid * 2 - 1), 3.0) * 0.26) + maxBend * 0.28;
       }
-      const lw = Math.max(0.35, w0 * wMod);
-      const segAlpha = clamp(alpha * (style === 'bark' ? (0.82 + 0.18 * ((i * 17 % 10) / 10)) : 1), 0.1, 0.95);
+      const lw = Math.max(0.32, w0 * wMod);
+      const segAlpha = clamp(alpha * (style === 'bark' ? (0.82 + 0.18 * ((i * 17 % 10) / 10)) : (0.94 + Math.min(0.08, maxBend * 0.12))), 0.1, 0.96);
       const strokeCol = rgbaStr(colHex, segAlpha);
+      const halfIdx = Math.max(1, Math.floor(sub.length * 0.5));
+      const tailLw = Math.max(0.28, lw * (style === 'dingtou' ? 0.62 : (style === 'yousi' ? 0.82 : 0.92)));
 
       pushRaw(api, layer, label, (c) => {
         c.save();
         c.strokeStyle = strokeCol;
-        c.lineWidth = lw;
         c.lineCap = 'round';
         c.lineJoin = 'round';
+        c.lineWidth = lw;
         c.beginPath();
         c.moveTo(sub[0][0], sub[0][1]);
-        for (let k = 1; k < sub.length; k++) {
-          c.lineTo(sub[k][0], sub[k][1]);
-        }
+        for (let k = 1; k <= halfIdx; k++) c.lineTo(sub[k][0], sub[k][1]);
+        c.stroke();
+        c.lineWidth = tailLw;
+        c.beginPath();
+        c.moveTo(sub[halfIdx][0], sub[halfIdx][1]);
+        for (let k = halfIdx + 1; k < sub.length; k++) c.lineTo(sub[k][0], sub[k][1]);
         c.stroke();
         c.restore();
-      }, 'contour');
+      }, 'contour', depth);
     }
   }
 
@@ -382,6 +434,7 @@
     const shadeStart = rgbaStr(shadeHex, shadeAlpha);
     const shadeEnd = rgbaStr(shadeHex, 0.02);
     const bounds = polyBounds(poly);
+    const depth = opts.depth || 0;
 
     pushRaw(api, layer, label, (c) => {
       c.save();
@@ -400,7 +453,7 @@
         c.fillRect(bounds.minX - 6, bounds.minY - 6, bounds.w + 12, bounds.h + 12);
       }
       c.restore();
-    }, 'baseWash');
+    }, 'baseWash', depth);
   }
 
   // =========================================================================
@@ -425,6 +478,10 @@
     const hugVein = !!opts.hugVein;
     const bias = opts.bias || 'from'; // 'from' | 'to' | 'even' | 'vein'
     const dabScale = opts.dabScale || 1.0;
+    const aspect = opts.aspect || 1.0; // >1 for anisotropic brushed sweep
+    const depth = opts.depth || 0;
+    const mineralGrain = !!opts.mineralGrain;
+    const clipOcc = !!opts.clipOccluders;
 
     let emitted = 0;
     let tries = 0;
@@ -434,6 +491,7 @@
       const px = bounds.minX + rng() * bounds.w;
       const py = bounds.minY + rng() * bounds.h;
       if (!pointInPoly(px, py, poly)) continue;
+      if (clipOcc && isPointOccluded(px, py)) continue;
 
       const dEdge = minDistToPolyEdge(px, py, poly);
       if (dEdge < 0.85) continue;
@@ -447,7 +505,6 @@
       if (veinPts && veinPts.length >= 2) {
         const dVein = minDistToCurve(px, py, veinPts);
         if (dVein < waterGap) {
-          // True Suixian water-line preservation along midrib!
           continue;
         }
         if (hugVein) {
@@ -468,9 +525,10 @@
 
       const hex = mixHex(cStart, cEnd, colT);
       const maxRad = Math.max(2.0, dEdge * 1.25);
-      const rx = clamp((5.5 + rng() * Math.min(28, Math.max(bounds.w, bounds.h) * 0.24)) * dabScale, 2.0, maxRad);
-      const ry = clamp(rx * (0.56 + rng() * 0.38), 1.4, maxRad);
-      const rot = Math.atan2(gdy, gdx) + (rng() - 0.5) * 0.75;
+      const baseRx = (5.5 + rng() * Math.min(28, Math.max(bounds.w, bounds.h) * 0.24)) * dabScale;
+      const rx = clamp(baseRx * Math.min(1.8, aspect), 2.0, maxRad);
+      const ry = clamp(baseRx * (0.52 + rng() * 0.34) / Math.sqrt(Math.max(1, aspect)), 1.2, maxRad);
+      const rot = Math.atan2(gdy, gdx) + (rng() - 0.5) * (aspect > 1.4 ? 0.38 : 0.75);
       const a = lerp(alphaMin, alphaMax, clamp(alphaWeight, 0, 1));
       const cCore = rgbaStr(hex, a);
       const cMid = rgbaStr(hex, a * 0.42);
@@ -490,8 +548,37 @@
         c.arc(0, 0, 1, 0, TAU);
         c.fill();
         c.restore();
-      }, 'fenran');
+      }, 'fenran', depth);
       emitted++;
+    }
+
+    // Subtle mineral pigment crystal dust (矿彩石粉颗粒感)
+    if (mineralGrain) {
+      const grainN = clamp(Math.round(count * 0.28), 8, 56);
+      const grains = [];
+      let gt = 0;
+      while (grains.length < grainN && gt < grainN * 10) {
+        gt++;
+        const gx = bounds.minX + rng() * bounds.w;
+        const gy = bounds.minY + rng() * bounds.h;
+        if (!pointInPoly(gx, gy, poly) || minDistToPolyEdge(gx, gy, poly) < 2) continue;
+        const tProj = clamp(((gx - gradFrom[0]) * gdx + (gy - gradFrom[1]) * gdy) / glen2, 0, 1);
+        const gCol = rgbaStr(mixHex(cStart, cEnd, clamp(tProj + (rng() - 0.5) * 0.25, 0, 1)), 0.08 + rng() * 0.14);
+        grains.push([gx, gy, 0.75 + rng() * 1.15, gCol]);
+      }
+      if (grains.length) {
+        for (let b = 0; b < grains.length; b += 4) {
+          const sub = grains.slice(b, b + 4);
+          pushRaw(api, layer, label + '·矿彩微粒', (c) => {
+            c.save();
+            for (let k = 0; k < sub.length; k++) {
+              c.fillStyle = sub[k][3];
+              c.beginPath(); c.arc(sub[k][0], sub[k][1], sub[k][2], 0, TAU); c.fill();
+            }
+            c.restore();
+          }, 'fenran', depth);
+        }
+      }
     }
   }
 
@@ -500,6 +587,7 @@
     const alpha = opts.alpha != null ? opts.alpha : 0.24;
     const lw = opts.width || 0.55;
     const batch = opts.batch || 3;
+    const depth = opts.depth || 0;
 
     for (let i = 0; i < targetPts.length; i += batch) {
       const segs = [];
@@ -523,7 +611,7 @@
         }
         c.stroke();
         c.restore();
-      }, 'vein');
+      }, 'vein', depth);
     }
   }
 
@@ -535,44 +623,57 @@
     const bounds = polyBounds(poly);
     const count = opts.count || 260;
     const baseAngle = opts.angle != null ? opts.angle : Math.PI * 0.5;
-    const angleSpread = opts.spread != null ? opts.spread : 0.22;
+    const angleSpread = opts.spread != null ? opts.spread : 0.16;
     const lenMin = opts.lenMin || 8;
-    const lenMax = opts.lenMax || 20;
+    const lenMax = opts.lenMax || 18;
     const colA = opts.color || PIGMENTS.inkDeep;
     const colB = opts.colorAlt || mixHex(colA, PIGMENTS.clamWhite, 0.35);
-    const alpha = opts.alpha != null ? opts.alpha : 0.65;
+    const alpha = opts.alpha != null ? opts.alpha : 0.68;
     const lw = opts.width || 0.62;
-    const batchSize = opts.batch || 1; // 1 stroke per individual barb/hair when high count desired
-    const curveSign = opts.curve != null ? opts.curve : 0.14;
+    const batchSize = opts.batch || 1;
+    const curveSign = opts.curve != null ? opts.curve : 0.12;
     const angleField = opts.angleFn || null;
     const colorField = opts.colorFn || null;
+    const depth = opts.depth || 0;
 
+    // Stratified jittered grid ordering (批丝层叠排列，消除乱丝杂点!)
+    const cols = Math.max(4, Math.round(Math.sqrt(count * (bounds.w / Math.max(1, bounds.h))) * 1.15));
+    const rows = Math.max(4, Math.ceil(count / cols) + 2);
+    const cellW = bounds.w / cols;
+    const cellH = bounds.h / rows;
     const hairs = [];
-    let tries = 0;
-    while (hairs.length < count && tries < count * 14 + 60) {
-      tries++;
-      const px = bounds.minX + rng() * bounds.w;
-      const py = bounds.minY + rng() * bounds.h;
-      if (!pointInPoly(px, py, poly)) continue;
-      const dEdge = minDistToPolyEdge(px, py, poly);
-      if (dEdge < 1.2) continue;
 
-      const u = clamp((px - bounds.minX) / Math.max(1, bounds.w), 0, 1);
-      const v = clamp((py - bounds.minY) / Math.max(1, bounds.h), 0, 1);
-      const ang = (angleField ? angleField(px, py, u, v) : baseAngle) + (rng() - 0.5) * angleSpread;
-      const len = clamp(lerp(lenMin, lenMax, rng()), 3, Math.max(4, dEdge * 1.35 + 4));
-      const tipX = px + Math.cos(ang) * len;
-      const tipY = py + Math.sin(ang) * len;
-      if (!pointInPoly(tipX, tipY, poly) && dEdge < len * 0.72) continue;
+    for (let r = 0; r < rows && hairs.length < count; r++) {
+      for (let col = 0; col < cols && hairs.length < count; col++) {
+        const px = bounds.minX + (col + 0.18 + rng() * 0.64) * cellW;
+        const py = bounds.minY + (r + 0.18 + rng() * 0.64) * cellH;
+        if (!pointInPoly(px, py, poly)) continue;
+        const dEdge = minDistToPolyEdge(px, py, poly);
+        if (dEdge < 1.1) continue;
 
-      const cX = (px + tipX) * 0.5 - Math.sin(ang) * len * curveSign * (rng() > 0.3 ? 1 : -0.5);
-      const cY = (py + tipY) * 0.5 + Math.cos(ang) * len * curveSign * (rng() > 0.3 ? 1 : -0.5);
-      const hex = colorField ? colorField(px, py, u, v, rng()) : mixHex(colA, colB, rng());
-      hairs.push({
-        px, py, cX, cY, tipX, tipY,
-        col: rgbaStr(hex, alpha * (0.72 + rng() * 0.42)),
-        w: lw * (0.75 + rng() * 0.5)
-      });
+        const u = clamp((px - bounds.minX) / Math.max(1, bounds.w), 0, 1);
+        const v = clamp((py - bounds.minY) / Math.max(1, bounds.h), 0, 1);
+        const ang = (angleField ? angleField(px, py, u, v) : baseAngle) + (rng() - 0.5) * angleSpread;
+        const len = clamp(lerp(lenMin, lenMax, rng()), 3.5, Math.max(4, dEdge * 1.32 + 3.5));
+        const tipX = px + Math.cos(ang) * len;
+        const tipY = py + Math.sin(ang) * len;
+        if (!pointInPoly(tipX, tipY, poly) && dEdge < len * 0.68) continue;
+
+        const midX = (px + tipX) * 0.5 - Math.sin(ang) * len * curveSign * 0.55;
+        const midY = (py + tipY) * 0.5 + Math.cos(ang) * len * curveSign * 0.55;
+        // Alternate tone cohesively across adjacent cluster barbs (批丝成簇!)
+        const batchTone = ((col + r) % 3) * 0.35 + rng() * 0.25;
+        const hex = colorField ? colorField(px, py, u, v, batchTone) : mixHex(colA, colB, clamp(batchTone, 0, 1));
+        const rootW = lw * (0.95 + rng() * 0.3);
+        const aBase = alpha * (0.78 + rng() * 0.25);
+        hairs.push({
+          px, py, midX, midY, tipX, tipY,
+          colRoot: rgbaStr(hex, aBase),
+          colTip: rgbaStr(mixHex(hex, colB, 0.35), aBase * 0.56),
+          wRoot: rootW,
+          wTip: Math.max(0.22, rootW * 0.42)
+        });
+      }
     }
 
     for (let i = 0; i < hairs.length; i += batchSize) {
@@ -582,15 +683,15 @@
         c.lineCap = 'round';
         for (let k = 0; k < grp.length; k++) {
           const h = grp[k];
-          c.strokeStyle = h.col;
-          c.lineWidth = h.w;
-          c.beginPath();
-          c.moveTo(h.px, h.py);
-          c.quadraticCurveTo(h.cX, h.cY, h.tipX, h.tipY);
-          c.stroke();
+          c.strokeStyle = h.colRoot;
+          c.lineWidth = h.wRoot;
+          c.beginPath(); c.moveTo(h.px, h.py); c.lineTo(h.midX, h.midY); c.stroke();
+          c.strokeStyle = h.colTip;
+          c.lineWidth = h.wTip;
+          c.beginPath(); c.moveTo(h.midX, h.midY); c.lineTo(h.tipX, h.tipY); c.stroke();
         }
         c.restore();
-      }, 'simao');
+      }, 'simao', depth);
     }
   }
 
@@ -602,6 +703,7 @@
     const lw = opts.width || 0.62;
     const strandsPerPath = opts.strandsPerPath || 26;
     const jitter = opts.jitter != null ? opts.jitter : 8;
+    const depth = opts.depth || 0;
 
     for (let pIdx = 0; pIdx < paths.length; pIdx++) {
       const pts = catmullRom(paths[pIdx], 10, false);
@@ -634,7 +736,7 @@
           for (let k = 1; k < curve.length; k++) c.lineTo(curve[k][0], curve[k][1]);
           c.stroke();
           c.restore();
-        }, 'hair');
+        }, 'hair', depth);
       }
     }
   }
@@ -648,6 +750,8 @@
       shaftColor = PIGMENTS.inkPale,
       outlineColor = PIGMENTS.inkPale,
       barbCount = 26,
+      depth = 2,
+      baseAlpha = 0.92,
       layers = { line: 1, base: 2, wash: 3, detail: 4 }
     } = spec;
 
@@ -670,24 +774,24 @@
     const poly = polyL.concat(polyR);
 
     baimiaoStroke(api, layers.line, '羽翎双勾', poly, {
-      closed: true, raw: true, width: 0.75, color: outlineColor, alpha: 0.62, chunkSize: 10
+      closed: true, raw: true, width: 0.75, color: outlineColor, alpha: 0.65, chunkSize: 10, depth
     });
     baseShadePoly(api, layers.base, '羽翎底染', poly, {
-      baseColor, baseAlpha: 0.55, shadeColor: tipColor, shadeAlpha: 0.42,
-      gradFrom: [x0, y0], gradTo: [x1, y1]
+      baseColor, baseAlpha, shadeColor: tipColor, shadeAlpha: 0.45,
+      gradFrom: [x0, y0], gradTo: [x1, y1], depth
     });
     fenranRegion(api, layers.wash, '羽片分染', poly, rng, {
       count: Math.max(10, Math.round(len * 0.14)),
       colorFrom: tipColor, colorTo: baseColor,
       gradFrom: [x1, y1], gradTo: [x0, y0], bias: 'from',
-      alphaMin: 0.03, alphaMax: 0.11, dabScale: 0.75
+      alphaMin: 0.03, alphaMax: 0.12, dabScale: 0.85, depth
     });
 
     // Rachis shaft
     const shaftPts = [];
     for (let i = 0; i <= 10; i++) shaftPts.push(quadPoint([x0, y0], [mx, my], [x1, y1], i / 10));
     baimiaoStroke(api, layers.detail, '羽轴丝毛', shaftPts, {
-      raw: true, width: 0.75, color: shaftColor, alpha: 0.52, chunkSize: 6
+      raw: true, width: 0.75, color: shaftColor, alpha: 0.54, chunkSize: 6, depth
     });
 
     // Bilateral barbs (羽枝丝毛)
@@ -720,7 +824,7 @@
         c.moveTo(pt[0], pt[1]); c.lineTo(tipRX, tipRY);
         c.stroke();
         c.restore();
-      }, 'barb');
+      }, 'barb', depth);
     }
   }
 
@@ -770,6 +874,7 @@
     const bodyHex = opts.pollenColor || PIGMENTS.gooseYellow;
     const baseHex = opts.pollenShadow || PIGMENTS.ochre;
     const tipHex = opts.pollenHighlight || PIGMENTS.clamWhite;
+    const depth = opts.depth != null ? opts.depth : 4;
 
     for (let i = 0; i < count; i++) {
       const ang = (i / count) * TAU + (rng() - 0.5) * 0.24;
@@ -792,7 +897,7 @@
         c.quadraticCurveTo(mx, my, ex, ey);
         c.stroke();
         c.restore();
-      }, 'stamen');
+      }, 'stamen', depth);
 
       const cShadow = rgbaStr(baseHex, 0.86);
       const cBody = rgbaStr(bodyHex, 0.94);
@@ -812,7 +917,7 @@
         c.arc(ex - dotR * 0.25, ey - dotR * 0.22, dotR * 0.38, 0, TAU);
         c.fill();
         c.restore();
-      }, 'lifen');
+      }, 'lifen', depth);
     }
   }
 
@@ -883,33 +988,36 @@
       wormBite = false,
       autumnTip = false,
       bend = 0.11,
+      depth = isBack ? 1 : 3,
+      occluders = null,
       layers = { line: 1, base: 2, wash: 3, detail: 4 }
     } = spec;
 
     const geom = buildLeafGeometry(x, y, angle, length, width, { bend, serrated, ovate, wormBite });
     const poly = geom.poly;
     const spine = geom.spine;
+    const customOcc = occluders || _activeOccluders;
 
     const outlineHex = isBack ? PIGMENTS.inkPale : PIGMENTS.inkDeep;
-    const baseHex = isBack ? '#8fa677' : '#58885c';
+    const baseHex = isBack ? '#8ea674' : '#528558';
     const shadeDeep = isBack ? PIGMENTS.sapGreen : PIGMENTS.malachiteDeep;
-    const fenranFrom = isBack ? '#5d7a47' : '#265341';
+    const fenranFrom = isBack ? '#5d7a47' : '#244f3d';
     const fenranTo = isBack ? '#b8ba78' : '#73ab82';
 
     // Layer 1: 双勾白描
     baimiaoStroke(api, layers.line, isBack ? '反叶双勾' : '正叶双勾', poly, {
       closed: true, raw: true, width: isBack ? 0.82 : 1.05,
-      color: outlineHex, alpha: isBack ? 0.66 : 0.82, chunkSize: 10
+      color: outlineHex, alpha: isBack ? 0.68 : 0.84, chunkSize: 10, depth
     });
     baimiaoStroke(api, layers.line, '主脉起稿', spine, {
-      raw: true, width: 0.72, color: isBack ? PIGMENTS.ochre : PIGMENTS.inkPale, alpha: 0.45, chunkSize: 8
+      raw: true, width: 0.72, color: isBack ? PIGMENTS.ochre : PIGMENTS.inkPale, alpha: 0.45, chunkSize: 8, depth
     });
 
-    // Layer 2: 统染底色
+    // Layer 2: 统染底色 (Substantial mineral opacity on front leaves prevents back twigs/stems from bleeding through!)
     baseShadePoly(api, layers.base, '叶片统染', poly, {
-      baseColor: baseHex, baseAlpha: isBack ? 0.45 : 0.62,
-      shadeColor: shadeDeep, shadeAlpha: isBack ? 0.34 : 0.46,
-      gradFrom: geom.base, gradTo: geom.tip
+      baseColor: baseHex, baseAlpha: isBack ? 0.94 : 0.97,
+      shadeColor: shadeDeep, shadeAlpha: isBack ? 0.36 : 0.48,
+      gradFrom: geom.base, gradTo: geom.tip, depth
     });
 
     // Layer 3: 多次分染 + 留水线 (Midrib Suixian) + Optional ochre autumn/insect rim
@@ -925,7 +1033,9 @@
       hugVein: true,
       alphaMin: 0.032,
       alphaMax: isBack ? 0.095 : 0.135,
-      dabScale: 0.78
+      dabScale: 0.82,
+      aspect: 1.8,
+      depth
     });
     if (autumnTip || wormBite) {
       fenranRegion(api, layers.wash, '叶梢赭染', poly, rng, {
@@ -937,11 +1047,12 @@
         bias: 'from',
         alphaMin: 0.025,
         alphaMax: 0.095,
-        dabScale: 0.7
+        dabScale: 0.75,
+        depth
       });
     }
 
-    // Layer 4: 细叶筋 + 复勒主脉与边缘
+    // Layer 4: 细叶筋 + 复勒主脉与边缘 (Strictly clipped against foreground occluders!)
     const cosA = Math.cos(angle), sinA = Math.sin(angle);
     const nx = -sinA, ny = cosA;
     const veinPairs = 7;
@@ -949,6 +1060,7 @@
     for (let v = 1; v < veinPairs; v++) {
       const idx = Math.floor((v / veinPairs) * (spine.length - 3)) + 1;
       const sp = spine[idx];
+      if (isPointOccluded(sp[0], sp[1], customOcc)) continue;
       const hw = width * 0.44 * Math.sin(Math.pow(v / veinPairs, 0.72) * Math.PI);
       const vxL = sp[0] + cosA * hw * 0.55 + nx * hw * 0.9;
       const vyL = sp[1] + sinA * hw * 0.55 + ny * hw * 0.9;
@@ -960,20 +1072,26 @@
         c.lineWidth = 0.55;
         c.lineCap = 'round';
         c.beginPath();
-        c.moveTo(sp[0] + nx * 1.4, sp[1] + ny * 1.4);
-        c.quadraticCurveTo(lerp(sp[0], vxL, 0.55) + cosA * 3, lerp(sp[1], vyL, 0.55) + sinA * 3, vxL, vyL);
-        c.moveTo(sp[0] - nx * 1.4, sp[1] - ny * 1.4);
-        c.quadraticCurveTo(lerp(sp[0], vxR, 0.55) + cosA * 3, lerp(sp[1], vyR, 0.55) + sinA * 3, vxR, vyR);
+        if (!isPointOccluded(vxL, vyL, customOcc)) {
+          c.moveTo(sp[0] + nx * 1.4, sp[1] + ny * 1.4);
+          c.quadraticCurveTo(lerp(sp[0], vxL, 0.55) + cosA * 3, lerp(sp[1], vyL, 0.55) + sinA * 3, vxL, vyL);
+        }
+        if (!isPointOccluded(vxR, vyR, customOcc)) {
+          c.moveTo(sp[0] - nx * 1.4, sp[1] - ny * 1.4);
+          c.quadraticCurveTo(lerp(sp[0], vxR, 0.55) + cosA * 3, lerp(sp[1], vyR, 0.55) + sinA * 3, vxR, vyR);
+        }
         c.stroke();
         c.restore();
-      }, 'vein');
+      }, 'vein', depth);
     }
     // Crisp glowing midrib water line highlight + fule contour
     baimiaoStroke(api, layers.detail, '中脉水线', spine, {
-      raw: true, width: 1.0, color: isBack ? '#d2d49a' : '#a7cba4', alpha: 0.52, chunkSize: 9
+      raw: true, width: 1.0, color: isBack ? '#d2d49a' : '#a7cba4', alpha: 0.52, chunkSize: 6,
+      depth, clipOccluders: true, occluders: customOcc
     });
     baimiaoStroke(api, layers.detail, '叶缘复勒', poly, {
-      closed: true, raw: true, width: 0.72, color: outlineHex, alpha: 0.58, chunkSize: 12
+      closed: true, raw: true, width: 0.72, color: outlineHex, alpha: 0.58, chunkSize: 8,
+      depth, clipOccluders: true, occluders: customOcc
     });
   }
 
@@ -1019,17 +1137,18 @@
 
     const tipPt = [cx + cosA * length, cy + sinA * length * tilt];
     const rootPt = [cx, cy];
+    const depth = spec.depth != null ? spec.depth : 4;
 
     // Layer 1: 双勾白描
     baimiaoStroke(api, layers.line, '花瓣双勾', poly, {
-      closed: true, raw: true, width: 0.78, color: outlineColor, alpha: 0.74, chunkSize: 9
+      closed: true, raw: true, width: 0.78, color: outlineColor, alpha: 0.74, chunkSize: 9, depth
     });
 
-    // Layer 2: 统染底色 (Substantial alum-pigment fill so upper petals cleanly layer over inner rings!)
+    // Layer 2: 统染底色 (Substantial opaque clam-shell/alum mineral ground so upper petals cleanly layer over stems!)
     baseShadePoly(api, layers.base, '花瓣底染', poly, {
-      baseColor, baseAlpha: spec.baseAlpha != null ? spec.baseAlpha : 0.88,
+      baseColor, baseAlpha: spec.baseAlpha != null ? spec.baseAlpha : 0.99,
       shadeColor: midColor, shadeAlpha: 0.48,
-      gradFrom: rootPt, gradTo: tipPt
+      gradFrom: rootPt, gradTo: tipPt, depth
     });
 
     // Layer 3: 分染渐变 + 丝瓣纹
@@ -1042,7 +1161,9 @@
       bias: 'from',
       alphaMin: 0.035,
       alphaMax: 0.14,
-      dabScale: 1.05
+      dabScale: 1.05,
+      aspect: 1.6,
+      depth
     });
     if (tipHighlight) {
       fenranRegion(api, layers.wash, '瓣尖蛤粉提染', poly, rng, {
@@ -1054,7 +1175,8 @@
         bias: 'from',
         alphaMin: 0.04,
         alphaMax: 0.16,
-        dabScale: 0.95
+        dabScale: 0.95,
+        depth
       });
     }
 
@@ -1068,13 +1190,14 @@
       color: mixHex(rootColor, outlineColor, 0.5),
       alpha: 0.24,
       width: 0.46,
-      batch: 3
+      batch: 3,
+      depth
     });
 
     // Layer 4: 复勒提边 (Only along outer visible petal crest — never cutting across overlapped petal bases!)
     const rimArc = poly.slice(3, Math.max(4, poly.length - 3));
     baimiaoStroke(api, layers.detail, '花瓣外缘复勒', rimArc, {
-      closed: false, raw: true, width: 0.62, color: mixHex(outlineColor, rootColor, 0.35), alpha: 0.56, chunkSize: 12
+      closed: false, raw: true, width: 0.62, color: mixHex(outlineColor, rootColor, 0.35), alpha: 0.56, chunkSize: 12, depth
     });
   }
 
@@ -1082,6 +1205,7 @@
     const {
       x, y, radius, angle = 0, view = 'front', // 'front' | 'side' | 'bud'
       blush = false,
+      depth = 4,
       layers = { line: 1, base: 2, wash: 3, detail: 4, highlight: 5 }
     } = spec;
 
@@ -1094,13 +1218,13 @@
         [x + radius * 0.45, y + radius * 0.35]
       ];
       const poly = catmullRom(pts, 6, true);
-      baimiaoStroke(api, layers.line, '梅蕾双勾', poly, { closed: true, raw: true, width: 0.78, color: PIGMENTS.inkWarm, alpha: 0.75 });
-      baseShadePoly(api, layers.base, '梅蕾平涂', poly, { baseColor: blush ? PIGMENTS.rouge : '#d96973', baseAlpha: 0.72, shadeColor: PIGMENTS.carmine, shadeAlpha: 0.48, gradFrom: [x, y + radius * 0.35], gradTo: [x, y - radius] });
-      fenranRegion(api, layers.wash, '梅蕾分染', poly, rng, { count: 14, colorFrom: PIGMENTS.carmine, colorTo: PIGMENTS.clamWhite, gradFrom: [x, y + radius * 0.3], gradTo: [x, y - radius * 0.9], bias: 'from', alphaMin: 0.04, alphaMax: 0.14 });
+      baimiaoStroke(api, layers.line, '梅蕾双勾', poly, { closed: true, raw: true, width: 0.78, color: PIGMENTS.inkWarm, alpha: 0.75, depth });
+      baseShadePoly(api, layers.base, '梅蕾平涂', poly, { baseColor: blush ? PIGMENTS.rouge : '#d96973', baseAlpha: 0.94, shadeColor: PIGMENTS.carmine, shadeAlpha: 0.52, gradFrom: [x, y + radius * 0.35], gradTo: [x, y - radius], depth });
+      fenranRegion(api, layers.wash, '梅蕾分染', poly, rng, { count: 14, colorFrom: PIGMENTS.carmine, colorTo: PIGMENTS.clamWhite, gradFrom: [x, y + radius * 0.3], gradTo: [x, y - radius * 0.9], bias: 'from', alphaMin: 0.04, alphaMax: 0.14, depth });
       // Green-brown calyx (梅蒂)
       const calyx = catmullRom([[x - radius * 0.55, y + radius * 0.2], [x, y + radius * 0.68], [x + radius * 0.55, y + radius * 0.2], [x, y + radius * 0.18]], 4, true);
-      baimiaoStroke(api, layers.line, '梅蒂勾勒', calyx, { closed: true, raw: true, width: 0.72, color: PIGMENTS.inkDeep, alpha: 0.72 });
-      baseShadePoly(api, layers.base, '梅蒂设色', calyx, { baseColor: '#6d5c38', baseAlpha: 0.78, shadeColor: '#3d3020', shadeAlpha: 0.5 });
+      baimiaoStroke(api, layers.line, '梅蒂勾勒', calyx, { closed: true, raw: true, width: 0.72, color: PIGMENTS.inkDeep, alpha: 0.75, depth });
+      baseShadePoly(api, layers.base, '梅蒂设色', calyx, { baseColor: '#6d5c38', baseAlpha: 0.92, shadeColor: '#3d3020', shadeAlpha: 0.5, depth });
       return;
     }
 
@@ -1124,6 +1248,8 @@
         tipColor: PIGMENTS.clamWhite,
         outlineColor: blush ? '#7d444a' : '#736252',
         washCount: Math.max(12, Math.round(radius * 0.52)),
+        baseAlpha: 0.99,
+        depth,
         layers
       });
     }
@@ -1132,48 +1258,75 @@
     const calPoly = catmullRom([
       [x - calR, y], [x, y - calR * tilt], [x + calR, y], [x, y + calR * tilt]
     ], 4, true);
-    baseShadePoly(api, layers.base, '花托点染', calPoly, { baseColor: '#7a633c', baseAlpha: 0.75, shadeColor: PIGMENTS.burntOchre, shadeAlpha: 0.5 });
+    baseShadePoly(api, layers.base, '花托点染', calPoly, { baseColor: '#7a633c', baseAlpha: 0.9, shadeColor: PIGMENTS.burntOchre, shadeAlpha: 0.5, depth });
     lifenStamens(api, layers.highlight, x, y - (view === 'side' ? radius * 0.12 : 0), rng, {
       count: view === 'side' ? 11 : 16,
       rInner: radius * 0.12,
       rOuter: radius * 0.46,
       tilt,
       filamentColor: '#8d5d3c',
-      dotSize: clamp(radius * 0.068, 1.3, 2.2)
+      dotSize: clamp(radius * 0.068, 1.3, 2.2),
+      depth
     });
   }
 
-  // Sculptural Taihu Scholar Rock (太湖石：瘦漏皱透)
+  // Subdivide stone contours into angular chiseled Song-style ZheDai/FuPi facets (瘦漏折带轮廓)
+  function subdivideChiseledRock(pts, rng) {
+    const out = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      out.push(a);
+      if (len > 26) {
+        const segs = len > 75 ? 3 : 2;
+        for (let s = 1; s < segs; s++) {
+          const t = s / segs;
+          const stepOff = (rng() - 0.48) * Math.min(14, len * 0.14);
+          out.push([lerp(a[0], b[0], t) + nx * stepOff, lerp(a[1], b[1], t) + ny * stepOff]);
+        }
+      }
+    }
+    return out;
+  }
+
+  // Sculptural Taihu Scholar Rock (太湖石：瘦漏皱透 + 立体洞壁 + 斧劈皴法)
   function drawTaihuRock(api, rng, spec) {
     const {
       outerPts, holes = [],
       layers = { line: 1, base: 2, wash: 3, detail: 4, highlight: 5 },
-      mossCount = 48
+      mossCount = 48,
+      depth = 1
     } = spec;
 
-    const poly = catmullRom(outerPts, 7, true);
+    const poly = subdivideChiseledRock(outerPts, rng);
     const bounds = polyBounds(poly);
 
-    baimiaoStroke(api, layers.line, '太湖石铁线起稿', poly, {
-      closed: true, raw: true, width: 1.35, color: PIGMENTS.inkDeep, alpha: 0.85, style: 'tiexian', chunkSize: 12
+    baimiaoStroke(api, layers.line, '太湖石折带铁线', poly, {
+      closed: true, raw: true, width: 1.45, color: PIGMENTS.inkDeep, alpha: 0.88, style: 'rock', chunkSize: 8, depth
     });
     baseShadePoly(api, layers.base, '太湖石赭墨统染', poly, {
-      baseColor: '#b7a48a', baseAlpha: 0.72,
-      shadeColor: '#5c5247', shadeAlpha: 0.58,
-      gradFrom: [bounds.maxX, bounds.minY], gradTo: [bounds.minX, bounds.maxY]
+      baseColor: '#b7a48a', baseAlpha: 0.9,
+      shadeColor: '#564c40', shadeAlpha: 0.62,
+      gradFrom: [bounds.maxX, bounds.minY], gradTo: [bounds.minX, bounds.maxY], depth
     });
 
-    // Multi-pass crag cunran (皴染)
+    // Multi-pass anisotropic crag cunran + fine stone granulation
     fenranRegion(api, layers.wash, '太湖石石青赭分染', poly, rng, {
       count: clamp(Math.round(Math.sqrt(bounds.w * bounds.h) * 0.72), 90, 260),
-      colorFrom: '#4f4942',
-      colorTo: '#a7957b',
+      colorFrom: '#49423a',
+      colorTo: '#ab987e',
       gradFrom: [bounds.minX + bounds.w * 0.15, bounds.maxY],
       gradTo: [bounds.maxX - bounds.w * 0.15, bounds.minY],
       bias: 'from',
-      alphaMin: 0.035,
-      alphaMax: 0.125,
-      dabScale: 1.05
+      alphaMin: 0.04,
+      alphaMax: 0.14,
+      dabScale: 1.1,
+      aspect: 1.9,
+      mineralGrain: true,
+      depth
     });
     fenranRegion(api, layers.wash, '太湖石花青阴面罩染', poly, rng, {
       count: clamp(Math.round(Math.sqrt(bounds.w * bounds.h) * 0.36), 45, 130),
@@ -1182,46 +1335,58 @@
       gradFrom: [bounds.maxX, bounds.maxY],
       gradTo: [bounds.cx, bounds.minY],
       bias: 'from',
-      alphaMin: 0.025,
-      alphaMax: 0.088,
-      dabScale: 1.15
+      alphaMin: 0.03,
+      alphaMax: 0.095,
+      dabScale: 1.15,
+      aspect: 1.6,
+      depth
     });
 
-    // Internal structural clefts (斧劈/折带皴纹)
-    const cleftCount = 9;
-    for (let i = 0; i < cleftCount; i++) {
-      const px = bounds.minX + bounds.w * (0.2 + rng() * 0.6);
-      const py = bounds.minY + bounds.h * (0.16 + rng() * 0.68);
-      if (!pointInPoly(px, py, poly)) continue;
-      const cLen = 28 + rng() * 68;
-      const ang = (rng() > 0.5 ? 0.45 : -0.55) + (rng() - 0.5) * 0.4;
-      const cleft = [
-        [px, py],
-        [px + Math.cos(ang) * cLen * 0.45 + (rng() - 0.5) * 8, py + Math.sin(ang) * cLen * 0.45],
-        [px + Math.cos(ang + 0.3) * cLen, py + Math.sin(ang + 0.3) * cLen]
-      ];
-      baimiaoStroke(api, layers.detail, '太湖石斧劈皴', cleft, {
-        width: 1.05, color: PIGMENTS.inkDeep, alpha: 0.64, style: 'bark', chunkSize: 5
-      });
+    // Clustered angular axe-cut & hemp-fiber cleft bands (聚散斧劈/披麻皴组)
+    const cleftGroups = 6;
+    for (let g = 0; g < cleftGroups; g++) {
+      const gx = bounds.minX + bounds.w * (0.16 + rng() * 0.68);
+      const gy = bounds.minY + bounds.h * (0.14 + rng() * 0.72);
+      if (!pointInPoly(gx, gy, poly) || holes.some(hp => pointInPoly(gx, gy, hp))) continue;
+      const baseAng = (rng() > 0.45 ? 0.52 : -0.62) + (rng() - 0.5) * 0.28;
+      const subN = 3 + Math.floor(rng() * 3);
+      for (let s = 0; s < subN; s++) {
+        const px = gx + (s - subN * 0.5) * 9 + (rng() - 0.5) * 6;
+        const py = gy + (s - subN * 0.5) * 11 + (rng() - 0.5) * 5;
+        if (!pointInPoly(px, py, poly) || holes.some(hp => pointInPoly(px, py, hp))) continue;
+        const cLen = 22 + rng() * 48;
+        const cleft = [
+          [px, py],
+          [px + Math.cos(baseAng) * cLen * 0.48 + (rng() - 0.5) * 5, py + Math.sin(baseAng) * cLen * 0.48],
+          [px + Math.cos(baseAng + 0.32) * cLen, py + Math.sin(baseAng + 0.32) * cLen]
+        ];
+        baimiaoStroke(api, layers.detail, '太湖石斧劈皴', cleft, {
+          width: 1.15, color: PIGMENTS.inkDeep, alpha: 0.72, style: 'rock', chunkSize: 4, depth
+        });
+      }
     }
 
-    // Perforations (漏透洞穴 — interior recessed rim + aged silk aperture)
+    // Perforations (漏透洞穴 — soft eroded stone depth rim + silk ground aperture)
     for (let h = 0; h < holes.length; h++) {
-      const hPoly = catmullRom(holes[h], 6, true);
+      const hPoly = catmullRom(subdivideChiseledRock(holes[h], rng), 2, true);
       const hb = polyBounds(hPoly);
-      // Dark interior rim shadow
       const rim = hPoly.map(p => [lerp(hb.cx, p[0], 1.24), lerp(hb.cy, p[1], 1.24)]);
       fenranRegion(api, layers.wash, '石孔阴晕', rim, rng, {
-        count: 26, colorFrom: PIGMENTS.inkDeep, colorTo: '#625648',
+        count: 26, colorFrom: '#584c3e', colorTo: '#8f8170',
         gradFrom: [hb.cx, hb.cy], gradTo: [hb.maxX, hb.maxY],
-        alphaMin: 0.045, alphaMax: 0.14
+        alphaMin: 0.045, alphaMax: 0.14, depth
       });
-      baimiaoStroke(api, layers.line, '石孔双勾', hPoly, {
-        closed: true, raw: true, width: 1.15, color: PIGMENTS.inkDeep, alpha: 0.84, style: 'tiexian'
+      const innerShadowPoly = hPoly.map(p => [p[0], p[1]]);
+      const shiftedSkyPoly = hPoly.map(p => [lerp(hb.cx, p[0], 0.9) + 3.2, lerp(hb.cy, p[1], 0.9) + 3.6]);
+      baseShadePoly(api, layers.detail, '石孔立体内壁', innerShadowPoly, {
+        baseColor: '#706353', baseAlpha: 0.78, shadeColor: '#4a4035', shadeAlpha: 0.42,
+        gradFrom: [hb.minX, hb.minY], gradTo: [hb.maxX, hb.maxY], depth
       });
-      // Reveal aged silk ground cleanly through hole
-      baseShadePoly(api, layers.detail, '漏透空隙', hPoly, {
-        baseColor: '#e7dac0', baseAlpha: 0.9, shadeColor: PIGMENTS.silkTea, shadeAlpha: 0.25
+      baseShadePoly(api, layers.detail, '漏透空隙', shiftedSkyPoly, {
+        baseColor: '#eee4cb', baseAlpha: 0.96, shadeColor: PIGMENTS.silkTea, shadeAlpha: 0.18, depth
+      });
+      baimiaoStroke(api, layers.detail, '石孔复勒', hPoly, {
+        closed: true, raw: true, width: 0.95, color: '#453c33', alpha: 0.74, style: 'rock', chunkSize: 10, depth
       });
     }
 
@@ -1236,12 +1401,12 @@
     while (placed < mossCount && tries < mossCount * 14 && mossCenters.length) {
       tries++;
       const anchor = mossCenters[placed % mossCenters.length];
-      const mx = anchor[0] + (rng() - 0.5) * 44;
-      const my = anchor[1] + (rng() - 0.5) * 24;
+      const mx = anchor[0] + (rng() - 0.5) * 40;
+      const my = anchor[1] + (rng() - 0.5) * 20;
       if (!pointInPoly(mx, my, poly)) continue;
       if (holes.some(hp => pointInPoly(mx, my, hp))) continue;
       const dotR = 1.4 + rng() * 2.2;
-      const dotCol = rgbaStr(rng() > 0.38 ? PIGMENTS.malachiteDeep : PIGMENTS.oliveDark, 0.56 + rng() * 0.28);
+      const dotCol = rgbaStr(rng() > 0.38 ? PIGMENTS.malachiteDeep : PIGMENTS.oliveDark, 0.58 + rng() * 0.28);
       pushRaw(api, layers.highlight, '石隙聚散点苔', (c) => {
         c.save();
         c.fillStyle = dotCol;
@@ -1249,9 +1414,53 @@
         c.ellipse(mx, my, dotR * 1.25, dotR * 0.78, (rng() - 0.5) * 0.6, 0, TAU);
         c.fill();
         c.restore();
-      }, 'moss');
+      }, 'moss', depth);
       placed++;
     }
+  }
+
+  // Classical Unified Drifting Gongbi Cloud Mist Ribbon (双勾流云 / 瑞岚云带)
+  function drawAuspiciousCloud(api, rng, spec) {
+    const { cx, cy, width = 260, height = 38, curls = 4, goldRim = false, depth = 3 } = spec;
+    const hw = width * 0.5, hh = height * 0.5;
+    const topPts = [];
+    const nTop = 22;
+    for (let i = 0; i <= nTop; i++) {
+      const u = i / nTop;
+      const sx = cx + (u - 0.5) * width;
+      const env = Math.sin(u * Math.PI);
+      const lobe = 0.42 + 0.58 * Math.abs(Math.sin(u * Math.PI * curls + 0.45));
+      const sy = cy - env * hh * lobe + (rng() - 0.5) * 2.2;
+      topPts.push([sx, sy]);
+    }
+    const botPts = [];
+    const nBot = 14;
+    for (let i = nBot; i >= 0; i--) {
+      const u = i / nBot;
+      const sx = cx + (u - 0.5) * width * 0.96;
+      const env = Math.pow(Math.sin(u * Math.PI), 0.72);
+      const sy = cy + env * hh * 0.48 + Math.sin(u * Math.PI * 2.2) * hh * 0.12;
+      botPts.push([sx, sy]);
+    }
+    const poly = catmullRom(topPts.concat(botPts), 3, true);
+    baseShadePoly(api, 3, '瑞云蛤粉烘托', poly, {
+      baseColor: '#f5eedc', baseAlpha: 0.84,
+      shadeColor: PIGMENTS.clamWhite, shadeAlpha: 0.48,
+      gradFrom: [cx, cy + hh], gradTo: [cx, cy - hh], depth
+    });
+    const topSmooth = catmullRom(topPts.slice(1, topPts.length - 1), 3, false);
+    baimiaoStroke(api, 4, '勾云游丝卷端', topSmooth, {
+      raw: true, width: 0.76, color: goldRim ? PIGMENTS.goldWarm : '#9a876c', alpha: 0.48, style: 'yousi', chunkSize: 10, depth
+    });
+    // Left & right curled ruyi wisps (如意云尾)
+    const hookPts = catmullRom([
+      [cx - hw * 0.68, cy - hh * 0.18],
+      [cx - hw * 0.84, cy - hh * 0.04],
+      [cx - hw * 0.76, cy + hh * 0.16]
+    ], 4, false);
+    baimiaoStroke(api, 4, '祥云卷尾', hookPts, {
+      raw: true, width: 0.68, color: goldRim ? PIGMENTS.goldWarm : '#9a876c', alpha: 0.42, style: 'yousi', depth
+    });
   }
 
   // =========================================================================
@@ -1369,7 +1578,7 @@
       baseColor, baseAlpha: 0.82, shadeColor: '#b5a289', shadeAlpha: 0.34, gradFrom: leftPts[10], gradTo: spine[10]
     });
 
-    // Koi pattern spots (红斑 / 墨斑 分染)
+    // Organic irregular Koi pattern spots (红斑 / 墨斑 自然渐变晕染)
     for (let p = 0; p < patrolSpots.length; p++) {
       const sp = patrolSpots[p];
       const cIdx = clamp(Math.round(sp.u * (nS - 1)), 0, nS - 1);
@@ -1380,15 +1589,14 @@
       const rx = (sp.rx || 48);
       const ry = (sp.ry || 34);
       const spotPts = [];
-      for (let k = 0; k < 12; k++) {
-        const a = (k / 12) * TAU;
-        const n = 0.8 + 0.4 * valueNoise2D(Math.cos(a) * 2 + p, Math.sin(a) * 2 + p, 77);
+      for (let k = 0; k < 18; k++) {
+        const a = (k / 18) * TAU;
+        const n = 0.65 + 0.58 * valueNoise2D(Math.cos(a) * 2.6 + p * 3.1, Math.sin(a) * 2.6 - p, 91);
         spotPts.push([sx + Math.cos(a) * rx * n, sy + Math.sin(a) * ry * n]);
       }
       const spotPoly = catmullRom(spotPts, 4, true);
-      // Clip pattern spot softly inside bodyPoly by passing clipPoly to fenran + clipped base wash
-      const spotBaseRgba = rgbaStr(sp.color, 0.66);
-      const spotShadeRgba = rgbaStr(mixHex(sp.color, PIGMENTS.inkDeep, 0.25), 0.32);
+      const spotBaseRgba = rgbaStr(sp.color, 0.36);
+      const spotShadeRgba = rgbaStr(mixHex(sp.color, PIGMENTS.inkDeep, 0.22), 0.22);
       pushRaw(api, layers.wash, '锦鲤彩斑罩染', (c) => {
         c.save();
         c.beginPath();
@@ -1402,25 +1610,24 @@
         c.fill();
         c.restore();
       }, 'baseWash');
-      const clippedRegion = { poly: spotPoly, clip: bodyPoly };
-      const sb = polyBounds(clippedRegion.poly);
-      for (let d = 0; d < 36; d++) {
+      const sb = polyBounds(spotPoly);
+      for (let d = 0; d < 46; d++) {
         const px = sb.minX + rng() * sb.w;
         const py = sb.minY + rng() * sb.h;
         if (!pointInPoly(px, py, spotPoly) || !pointInPoly(px, py, bodyPoly)) continue;
         const dEdge = Math.min(minDistToPolyEdge(px, py, spotPoly), minDistToPolyEdge(px, py, bodyPoly));
         if (dEdge < 1.0) continue;
-        const rx = clamp(4 + rng() * 14, 1.8, dEdge * 1.15);
-        const ry = clamp(rx * (0.55 + rng() * 0.35), 1.2, dEdge * 1.15);
+        const drx = clamp(6 + rng() * 18, 2.0, dEdge * 1.35);
+        const dry = clamp(drx * (0.55 + rng() * 0.35), 1.4, dEdge * 1.35);
         const rot = rng() * Math.PI;
-        const mixC = mixHex(sp.color, baseColor, rng() * 0.38);
-        const a = 0.05 + rng() * 0.12;
+        const mixC = mixHex(sp.color, baseColor, rng() * 0.32);
+        const a = 0.06 + rng() * 0.14;
         const scCore = rgbaStr(mixC, a);
-        const scMid = rgbaStr(mixC, a * 0.42);
+        const scMid = rgbaStr(mixC, a * 0.45);
         const scEdge = rgbaStr(mixC, 0);
         pushRaw(api, layers.wash, '彩斑分染过渡', (c) => {
           c.save();
-          c.translate(px, py); c.rotate(rot); c.scale(rx, ry);
+          c.translate(px, py); c.rotate(rot); c.scale(drx, dry);
           const g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
           g.addColorStop(0, scCore); g.addColorStop(0.55, scMid); g.addColorStop(1, scEdge);
           c.fillStyle = g;
@@ -1430,8 +1637,8 @@
       }
     }
 
-    // Imbricated crescent fish scale net (网鳞分染 + 泥金提鳞)
-    const colStart = Math.round(nS * 0.2);
+    // Imbricated crescent fish scale net fading organically toward belly (背实腹虚透视网鳞)
+    const colStart = Math.round(nS * 0.21);
     const colEnd = Math.round(nS * 0.94);
     for (let i = colStart; i < colEnd; i += 2) {
       const u = i / (nS - 1);
@@ -1440,27 +1647,29 @@
       const ang = Math.atan2(ty, tx);
       const rows = Math.max(4, Math.round(hw / 5.8));
       for (let r = -rows + 1; r <= rows - 1; r += 1) {
-        const lat = (r / rows) * hw * 0.86 + ((i % 4 === 0) ? 0 : hw / (rows * 2));
+        const rFrac = r / rows;
+        const lat = Math.sin(rFrac * Math.PI * 0.45) * hw * 0.88 + ((i % 4 === 0) ? 0 : hw / (rows * 2.2));
         const cx = spine[i][0] + nx * lat;
         const cy = spine[i][1] + ny * lat;
         if (!pointInPoly(cx, cy, bodyPoly)) continue;
-        const sr = clamp(hw / rows * 0.92, 4.2, 10.5);
-        const arcColor = rgbaStr(scaleRimColor, 0.56);
-        const hiColor = goldTrim && Math.abs(r) <= rows * 0.45 && rng() > 0.35
-          ? rgbaStr(PIGMENTS.goldPale, 0.45)
-          : rgbaStr(PIGMENTS.clamWhite, 0.38);
+        const dorsalFade = clamp(1 - Math.abs(rFrac) * 0.82, 0.12, 0.72);
+        const sr = clamp((hw / rows) * 0.95 * (1 - Math.abs(rFrac) * 0.25), 3.8, 10.0);
+        const arcColor = rgbaStr(scaleRimColor, dorsalFade * 0.72);
+        const hiColor = goldTrim && Math.abs(rFrac) <= 0.45 && rng() > 0.35
+          ? rgbaStr(PIGMENTS.goldPale, dorsalFade * 0.55)
+          : rgbaStr(PIGMENTS.clamWhite, dorsalFade * 0.45);
 
         pushRaw(api, layers.detail, '网鳞分染勾勒', (c) => {
           c.save();
           c.strokeStyle = arcColor;
-          c.lineWidth = 0.65;
+          c.lineWidth = 0.58;
           c.beginPath();
-          c.arc(cx, cy, sr, ang - 1.15, ang + 1.15);
+          c.arc(cx, cy, sr, ang - 1.1, ang + 1.1);
           c.stroke();
           c.strokeStyle = hiColor;
-          c.lineWidth = 0.55;
+          c.lineWidth = 0.48;
           c.beginPath();
-          c.arc(cx - tx * 0.8, cy - ty * 0.8, sr * 0.82, ang - 0.85, ang + 0.85);
+          c.arc(cx - tx * 0.8, cy - ty * 0.8, sr * 0.82, ang - 0.8, ang + 0.8);
           c.stroke();
           c.restore();
         }, 'scale');
@@ -1641,6 +1850,8 @@
     minDistToPolyEdge,
     minDistToCurve,
     tracePolyPath,
+    setOccluders,
+    isPointOccluded,
     pushRaw,
     baimiaoStroke,
     silkHaloGround,
@@ -1658,6 +1869,7 @@
     drawFlowerPetal,
     drawPlumBlossom,
     drawTaihuRock,
+    drawAuspiciousCloud,
     drawKoiCarp,
     finalizeGongbiBudget
   };
