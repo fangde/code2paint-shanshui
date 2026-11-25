@@ -310,10 +310,26 @@
       }
     }
 
-    slider.addEventListener('input', () => {
-      pause();
-      seekTo(Number(slider.value));
+    slider.addEventListener('pointerdown', () => {
+      isPaused = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     });
+
+    function handleSliderSeek() {
+      const target = Number(slider.value);
+      isPaused = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      seekTo(target);
+    }
+
+    slider.addEventListener('input', handleSliderSeek);
+    slider.addEventListener('change', handleSliderSeek);
 
     playPauseBtn.addEventListener('click', () => {
       if (isPaused) resume();
